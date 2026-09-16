@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Frozen H-033 authenticated runner/protected H-034 handoff gate.
+
+Exit 0 = PASS, 1 = product RED, 2 = rig/owner environment ODÖMBART.
+Judge fixtures model hostile inputs; production acceptance is always exercised
+through controller/provenance/cli and the exact frozen H-034 kernel.
+"""
+from __future__ import annotations
+
+import hashlib, json, os, secrets, shutil, signal, socket, stat, subprocess, sys, tempfile, time
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[2]
+SPEC=ROOT/"specs/tasks.spec.json"
+CLI=ROOT/"controller/provenance/cli"
+KERNEL=ROOT/"verify/h034/kernel"
+EVIDENCE_ROOT=Path("/Library/Application Support/Nortropic/provenance/evidence")
+RECEIPT_ROOT=Path("/Library/Application Support/Nortropic/provenance/probe-receipts")
+ALLOWLIST=Path("/Library/Application Support/Nortropic/provenance/probes.json")
+PRODUCER="_nortropic_provenance"
+PROBES=(("h033-auth-pass-v1","PASS"),("h033-auth-fail-v1","FAIL"),("h033-auth-odombart-v1","ODÖMBART"))
+E_KEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity","request_id","result","effect_sha256")
+R_KEYS=("schema_version","observer_authority","request_id","candidate_sha","probe_identity","probe_path","probe_sha256","effect_marker")
+P_KEYS=("probe_identity","probe_path","probe_sha256","effect_marker","result")
+passed=failed=0
+
+class Rig(Exception): pass
+
+def check(ok,name,detail=""):
+ global passed,failed
+ if ok: passed+=1;print("PASS "+name)
+ else: failed+=1;print(f"FAIL {name}: {detail}")
+
+def sha(raw:bytes)->str:return hashlib.sha256(raw).hexdigest()
+def canon(value)->bytes:return (json.dumps(value,ensure_ascii=False,separators=(",",":"))+"\n").encode()
+
+def gone(pgid):
+ try:os.killpg(pgid,0);return False
+ except ProcessLookupError:return True
+ except PermissionError:return False
+
+def run(argv,*,timeout=8,pass_fds=(),env=None,cwd=None):
+ p=subprocess.Popen(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True,pass_fds=pass_fds,env=env,cwd=cwd)
+ try:out,err=p.communicate(timeout=timeout);timed=False
+ except subprocess.TimeoutExpired:
+  timed=True
+  try:os.killpg(p.pid,signal.SIGKILL)
+  except ProcessLookupError:pass
+  out,err=p.communicate(timeout=2)
+ clean=p.poll() is not None and gone(p.pid)
+ if not clean:raise Rig("process group cleanup failed")
+ return subprocess.CompletedProcess(argv,124 if timed else p.returncode,out,err),timed
+
+def task_valid(tasks):
+ rows=[t for t in tasks if isinstance(t,dict) and t.get("id")=="h-033"]
+ if len(rows)!=1:return False
+ t=rows[0]
+ return (t.get("authority_class")=="ordinary" and t.get("depends_on")==["h-034"]
+  and t.get("exit_test")=="verify/bin/h-033-exit"
+  and t.get("allowed_write")==["controller/provenance/**","tests/controller/provenance/**","docs/05-beslutslogg.md","docs/loop/drift.md"]
+  and t.get("owner_author_allowed_write")==[])
+
+def lifecycle_controls():
+ data=json.loads(SPEC.read_text());tasks=data["tasks"]
+ check(task_valid(tasks),"F_H033_EXACT_TASK")
+ h034=[t for t in tasks if t.get("id")=="h-034"]
+ check(len(h034)==1 and h034[0].get("exit_test")=="verify/bin/h-034-exit","F_H034_AUTHORITY_PRESENT")
+ absent=[t for t in tasks if t.get("id")!="h-033"]
+ check(not task_valid(absent),"J_LIFECYCLE_ABSENT_REJECT")
+ row=next(t for t in tasks if t.get("id")=="h-033")
+ check(not task_valid(tasks+[dict(row)]),"J_LIFECYCLE_DUPLICATE_REJECT")
+ for label,key,value in (("DEPENDENCY","depends_on",["h-035"]),("GATE","exit_test","verify/bin/h-034-exit")):
+  mutant=[]
+  for t in tasks:
+   q=dict(t)
+   if q.get("id")=="h-033":q[key]=value
+   mutant.append(q)
+  check(not task_valid(mutant),"J_LIFECYCLE_WRONG_"+label+"_REJECT")
+
+def documents(result="PASS",request=None):
+ rid=request or secrets.token_hex(32);candidate=secrets.token_hex(20);probe="h033-"+secrets.token_hex(8)
+ path="/Library/Application Support/Nortropic/provenance/probes/"+probe
+ marker="effect-"+secrets.token_hex(8);blob=secrets.token_hex(32)
+ receipt={"schema_version":1,"observer_authority":"root-owned-h033-observer-v1","request_id":rid,"candidate_sha":candidate,"probe_identity":probe,"probe_path":path,"probe_sha256":blob,"effect_marker":marker}
+ rr=canon(receipt)
+ evidence={"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033","candidate_sha":candidate,"task_spec_sha256":secrets.token_hex(32),"gate_sha256":secrets.token_hex(32),"probe_identity":probe,"request_id":rid,"result":result,"effect_sha256":sha(rr)}
+ allow={"schema_version":1,"probes":[{"probe_identity":probe,"probe_path":path,"probe_sha256":blob,"effect_marker":marker,"result":result}]}
+ return evidence,receipt,allow
+
+def kernel_args(fds,e):
+ return [str(KERNEL),"h033-verify","--evidence-fd",str(fds[0]),"--receipt-fd",str(fds[1]),"--allowlist-fd",str(fds[2]),"--task","h-033","--candidate",e["candidate_sha"],"--task-spec-sha256",e["task_spec_sha256"],"--gate-sha256",e["gate_sha256"],"--probe",e["probe_identity"],"--request-id",e["request_id"],"--require-result",e["result"]]
+
+def direct_kernel(raws,e):
+ with tempfile.TemporaryDirectory(prefix="h033-kernel-") as d:
+  paths=[];fds=[]
+  try:
+   for i,raw in enumerate(raws):
+    p=Path(d)/str(i);p.write_bytes(raw);paths.append(p);fds.append(os.open(p,os.O_RDONLY))
+   return run(kernel_args(fds,e),pass_fds=tuple(fds),timeout=4)[0]
+  finally:
+   for fd in fds:os.close(fd)
+
+def kernel_anchor():
+ check(KERNEL.is_file() and not KERNEL.is_symlink() and os.access(KERNEL,os.X_OK),"F_H034_KERNEL_PRESENT")
+ for result in ("PASS","FAIL","ODÖMBART"):
+  e,r,a=documents(result);q=direct_kernel((canon(e),canon(r),canon(a)),e)
+  expected=f"VERIFIED_RESULT={result}\nREQUEST_ID={e['request_id']}\nEFFECT_SHA256={e['effect_sha256']}\n"
+  check(q.returncode==0 and q.stdout==expected,"J_H034_DIRECT_"+result,(q.returncode,q.stdout,q.stderr))
+
+def separated_leaf_ownership(evidence:Path,receipt:Path,producer_uid:int,requester_uid:int)->bool:
+ try:es=os.lstat(evidence);rs=os.lstat(receipt)
+ except OSError:return False
+ return (producer_uid not in (0,requester_uid)
+  and stat.S_ISREG(es.st_mode) and not stat.S_ISLNK(es.st_mode)
+  and stat.S_ISREG(rs.st_mode) and not stat.S_ISLNK(rs.st_mode)
+  and es.st_uid==producer_uid and rs.st_uid==0 and es.st_uid!=rs.st_uid
+  and not (es.st_mode&0o022) and not (rs.st_mode&0o022)
+  and (es.st_dev,es.st_ino)!=(rs.st_dev,rs.st_ino))
+
+def ownership_controls():
+ # Live filesystem controls exercise the same lstat/uid/mode/inode predicate used
+ # by owner acceptance. The synthetic requester is deliberately distinct from
+ # this process so its real leaf can stand in for a non-root dedicated producer.
+ root_receipt=Path("/etc/hosts")
+ if not root_receipt.is_file() or os.lstat(root_receipt).st_uid!=0:raise Rig("root-owned ownership control unavailable")
+ with tempfile.TemporaryDirectory(prefix="h033-ownership-") as d:
+  w=Path(d);evidence=w/"evidence";evidence.write_bytes(b"evidence\n");evidence.chmod(0o600)
+  producer_uid=os.lstat(evidence).st_uid;requester_uid=producer_uid+1
+  check(separated_leaf_ownership(evidence,root_receipt,producer_uid,requester_uid),"J_EXACT_PRODUCER_ROOT_OBSERVER_POSITIVE")
+  check(not separated_leaf_ownership(root_receipt,Path("/etc/passwd"),producer_uid,requester_uid),"J_ROOT_WRITES_BOTH_REJECT")
+  check(not separated_leaf_ownership(evidence,root_receipt,requester_uid,requester_uid),"J_REQUESTER_EVIDENCE_REJECT")
+  link=w/"evidence-link";link.symlink_to(evidence.name)
+  check(not separated_leaf_ownership(link,root_receipt,producer_uid,requester_uid),"J_OWNERSHIP_SYMLINK_REJECT")
+
+def fixture(root:Path,e,r,a):
+ (root/"evidence").mkdir(parents=True);(root/"probe-receipts").mkdir()
+ (root/"evidence"/(e["request_id"]+".json")).write_bytes(canon(e))
+ (root/"probe-receipts"/(e["request_id"]+".json")).write_bytes(canon(r))
+ (root/"probes.json").write_bytes(canon(a))
+
+def subject(root:Path,e,*,extra=(),sync=None,env=None):
+ argv=[str(CLI),"gate-verify","--fixture-root",str(root),"--task","h-033","--candidate",e["candidate_sha"],"--task-spec-sha256",e["task_spec_sha256"],"--gate-sha256",e["gate_sha256"],"--probe",e["probe_identity"],"--request-id",e["request_id"],"--require-result",e["result"]]
+ if sync is not None:argv.extend(("--gate-race-sync",str(sync)))
+ argv.extend(extra)
+ closed={"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C","HOME":"/var/empty","TMPDIR":"/tmp"}
+ if env:closed.update(env)
+ return run(argv,timeout=8,env=closed)[0]
+
+def fixture_contract():
+ with tempfile.TemporaryDirectory(prefix="h033-fixture-") as d:
+  root=Path(d)/"authority"
+  for result in ("PASS","FAIL","ODÖMBART"):
+   e,r,a=documents(result);fixture(root,e,r,a)
+   direct=direct_kernel((canon(e),canon(r),canon(a)),e);actual=subject(root,e)
+   check((actual.returncode,actual.stdout)==(direct.returncode,direct.stdout),"K_H034_DIFFERENTIAL_"+result,(actual.returncode,actual.stdout,actual.stderr))
+   shutil.rmtree(root)
+  e,r,a=documents();fixture(root,e,r,a)
+  evidence=root/"evidence"/(e["request_id"]+".json");receipt=root/"probe-receipts"/(e["request_id"]+".json")
+  # Every binding is sent through production and must match direct H-034 rejection.
+  mutations=(("TASK",("--task","h-032")),("CANDIDATE",("--candidate",secrets.token_hex(20))),
+   ("SPEC",("--task-spec-sha256",secrets.token_hex(32))),("GATE",("--gate-sha256",secrets.token_hex(32))),
+   ("PROBE",("--probe","other-"+e["probe_identity"])),("REQUEST",("--request-id",secrets.token_hex(32))),
+   ("RESULT",("--require-result","FAIL")))
+  for name,args in mutations:
+   q=subject(root,e,extra=args);check(q.returncode==1 and q.stdout=="","K_REJECT_BINDING_"+name,(q.returncode,q.stdout,q.stderr))
+  # Stale replay: B bindings can never consume A objects.
+  b,br,ba=documents();q=subject(root,b)
+  check(q.returncode==1 and q.stdout=="","K_REJECT_STALE_REQUEST_FAMILY")
+  # Copy/symlink/hardlink/type/replaceable-parent substitutions fail closed.
+  original=evidence.read_bytes();evidence.unlink();evidence.symlink_to(receipt)
+  check(subject(root,e).returncode==1,"K_REJECT_EVIDENCE_SYMLINK")
+  evidence.unlink();os.link(receipt,evidence)
+  check(subject(root,e).returncode==1,"K_REJECT_EVIDENCE_HARDLINK")
+  evidence.unlink();evidence.mkdir()
+  check(subject(root,e).returncode==1,"K_REJECT_EVIDENCE_DIRECTORY")
+  evidence.rmdir();evidence.write_bytes(original)
+  os.chmod(root,0o777);check(subject(root,e).returncode==1,"K_REJECT_REPLACEABLE_ROOT");os.chmod(root,0o700)
+  # Same-opened-object race: replacement after the subject signals all FDs opened
+  # must not change the consumed bytes or produce a substituted verdict.
+  sync=Path(d)/"sync";sync.mkdir();p=subprocess.Popen([str(CLI),"gate-verify","--fixture-root",str(root),"--task","h-033","--candidate",e["candidate_sha"],"--task-spec-sha256",e["task_spec_sha256"],"--gate-sha256",e["gate_sha256"],"--probe",e["probe_identity"],"--request-id",e["request_id"],"--require-result",e["result"],"--gate-race-sync",str(sync)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True,env={"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C","HOME":"/var/empty","TMPDIR":"/tmp"})
+  deadline=time.monotonic()+4
+  while not (sync/"opened").is_file() and p.poll() is None and time.monotonic()<deadline:time.sleep(.01)
+  if not (sync/"opened").is_file():
+   try:os.killpg(p.pid,signal.SIGKILL)
+   except ProcessLookupError:pass
+   p.communicate();raise Rig("production race handshake absent")
+  hostile=dict(e);hostile["result"]="FAIL";(root/"evidence"/"replacement").write_bytes(canon(hostile));os.replace(root/"evidence"/"replacement",evidence)
+  (sync/"release").write_text("release\n");out,err=p.communicate(timeout=4)
+  direct=direct_kernel((original,canon(r),canon(a)),e)
+  check(p.returncode==direct.returncode and out==direct.stdout,"K_SAME_OPENED_OBJECT_RENAME_RACE",(p.returncode,out,err))
+  # Environment/PATH cannot select an alternate kernel or authority root.
+  poison=Path(d)/"poison";poison.mkdir();marker=Path(d)/"poison-called"
+  fake=poison/"kernel";fake.write_text("#!/bin/sh\necho called >'"+str(marker)+"'\nexit 0\n");fake.chmod(0o755)
+  q=subject(root,e,env={"PATH":str(poison)+":/usr/bin:/bin","NORTROPIC_PROVENANCE_ROOT":str(Path(d)/"other"),"NORTROPIC_H034_KERNEL":str(fake)})
+  check(not marker.exists() and q.returncode==1,"K_PATH_ENV_SUBSTITUTION_REJECTED",(q.returncode,q.stdout,q.stderr))
+  q=run([str(CLI),"verify","--root",str(root)],timeout=2)[0]
+  check(q.returncode==1 and q.stdout=="","K_CALLER_AUTHORITY_ROOT_REJECTED",(q.returncode,q.stdout,q.stderr))
+
+def owner_environment()->int:
+ # This is evaluated only after the repository implementation exists and its
+ # disposable black-box contract passes. Absence/permission denial is ODÖMBART.
+ try:
+  import pwd
+  producer=pwd.getpwnam(PRODUCER)
+ except (KeyError,PermissionError,OSError) as exc:raise Rig("owner environment lacks canonical producer identity: "+str(exc))
+ if producer.pw_uid==os.getuid():raise Rig("requester and producer identities are not separated")
+ for path,kind,uid in ((EVIDENCE_ROOT,"dir",producer.pw_uid),(RECEIPT_ROOT,"dir",0),(ALLOWLIST,"file",0)):
+  try:s=os.lstat(path)
+  except OSError as exc:raise Rig("canonical authority unavailable: "+str(exc))
+  ok=(stat.S_ISDIR(s.st_mode) if kind=="dir" else stat.S_ISREG(s.st_mode)) and not stat.S_ISLNK(s.st_mode) and s.st_uid==uid and not (s.st_mode&0o022)
+  if not ok:raise Rig("canonical authority identity/protection mismatch: "+str(path))
+ check(True,"K_OWNER_PROTECTED_AUTHORITY_PRESENT")
+ return producer.pw_uid
+
+def parse_lines(raw:str):
+ out={}
+ for line in raw.splitlines():
+  if "=" in line:
+   key,value=line.split("=",1)
+   if key in out:raise Rig("duplicate production output key: "+key)
+   out[key]=value
+ return out
+
+def owner_execution(producer_uid:int):
+ candidate=run(["/usr/bin/git","-C",str(ROOT),"rev-parse","HEAD"],timeout=2)[0].stdout.strip()
+ spec_digest=sha(SPEC.read_bytes());gate_digest=sha(Path(__file__).read_bytes())
+ seen=[]
+ for probe,result in PROBES:
+  request=[str(CLI),"request","--task","h-033","--candidate",candidate,"--task-spec-sha256",spec_digest,"--gate-sha256",gate_digest,"--probe",probe]
+  q=run(request,timeout=15)[0];fields=parse_lines(q.stdout)
+  rid=fields.get("REQUEST_ID","");evidence=Path(fields.get("EVIDENCE",""));receipt=Path(fields.get("RECEIPT",""))
+  check(q.returncode==0 and len(rid)==64 and all(c in "0123456789abcdef" for c in rid),"K_OWNER_FRESH_REQUEST_"+result,(q.returncode,q.stdout,q.stderr))
+  check(evidence==EVIDENCE_ROOT/(rid+".json") and receipt==RECEIPT_ROOT/(rid+".json"),"K_OWNER_CANONICAL_DESTINATION_"+result,(evidence,receipt))
+  check(separated_leaf_ownership(evidence,receipt,producer_uid,os.getuid()),"K_OWNER_EXACT_PRODUCER_ROOT_OBSERVER_"+result)
+  verify=[str(CLI),"verify","--request-id",rid,"--task","h-033","--candidate",candidate,"--task-spec-sha256",spec_digest,"--gate-sha256",gate_digest,"--probe",probe,"--require-result",result]
+  v=run(verify,timeout=8)[0]
+  expected_prefix=f"VERIFIED_RESULT={result}\nREQUEST_ID={rid}\nEFFECT_SHA256="
+  check(v.returncode==0 and v.stdout.startswith(expected_prefix) and len(v.stdout)==len(expected_prefix)+65,"K_OWNER_H034_HANDOFF_"+result,(v.returncode,v.stdout,v.stderr))
+  replay=run(verify,timeout=8)[0]
+  check(replay.returncode==1 and replay.stdout=="","K_OWNER_ONE_TIME_REPLAY_REJECT_"+result,(replay.returncode,replay.stdout,replay.stderr))
+  seen.append(rid)
+ check(len(set(seen))==len(PROBES),"K_OWNER_REQUEST_IDS_UNIQUE")
+ base=[str(CLI),"request","--task","h-033","--candidate",candidate,"--task-spec-sha256",spec_digest,"--gate-sha256",gate_digest,"--probe",PROBES[0][0]]
+ for name,args in (("REQUEST_ID",("--request-id",secrets.token_hex(32))),("RESULT",("--result","PASS")),("EXEC",("--exec","/bin/sh")),("ROOT",("--authority-root","/tmp")),("OBSERVER",("--observer-authority","root")),("UNKNOWN",("--unknown","x"))):
+  q=run(base+list(args),timeout=3)[0];check(q.returncode==1 and q.stdout=="","K_OWNER_CALLER_AUTHORITY_"+name+"_REJECT")
+
+def main():
+ try:
+  lifecycle_controls();kernel_anchor();ownership_controls()
+  if failed:
+   print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+   print(f"H033_GATE_SUMMARY={passed} PASS {failed} FAIL")
+   print("H033_GATE_RESULT=GATE_SELFTEST_FAIL")
+   return 2
+  if not CLI.is_file() or CLI.is_symlink() or not os.access(CLI,os.X_OK):
+   print("CURRENT_RED_REASON=AUTHENTICATED_RUNNER_COMPONENT_ABSENT")
+   print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+   print(f"H033_GATE_SUMMARY={passed} PASS {failed+1} FAIL")
+   print("H033_GATE_RESULT=EXPECTED_RED")
+   return 1
+  fixture_contract()
+  if failed:
+   print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+   print(f"H033_GATE_SUMMARY={passed} PASS {failed} FAIL")
+   print("H033_GATE_RESULT=FAIL")
+   return 1
+  producer_uid=owner_environment();owner_execution(producer_uid)
+ except Rig as exc:
+  print("ODÖMBART:",exc,file=sys.stderr);return 2
+ except (OSError,ValueError,subprocess.SubprocessError) as exc:
+  print("ODÖMBART:",exc,file=sys.stderr);return 2
+ print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+ print(f"H033_GATE_SUMMARY={passed} PASS {failed} FAIL")
+ print("H033_GATE_RESULT="+("FAIL" if failed else "PASS"))
+ return 1 if failed else 0
+
+if __name__=="__main__":raise SystemExit(main())

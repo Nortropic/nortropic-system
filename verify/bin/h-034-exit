@@ -1,0 +1,500 @@
+#!/usr/bin/env python3
+"""Frozen H-034 native finite-verifier gate. 0=PASS, 1=product RED, 2=rig/ODÖMBART."""
+from __future__ import annotations
+
+import hashlib, json, os, re, secrets, shutil, signal, socket, stat, subprocess, sys, tempfile
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[2]
+SPEC=ROOT/"specs/tasks.spec.json"; REG=ROOT/"specs/owner-production-paths.v1.json"
+KERNEL=ROOT/"verify/h034/kernel"; RECIPE=ROOT/"verify/h034/build-recipe.json"
+MANIFEST=ROOT/"verify/h034/identity-manifest.json"; SOURCE=ROOT/"controller/h034-native"
+OWNER=["controller/h034-native/**","verify/h034/kernel","verify/h034/build-recipe.json","verify/h034/identity-manifest.json"]
+E_KEYS=("schema_version","producer_authority","task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity","request_id","result","effect_sha256")
+R_KEYS=("schema_version","observer_authority","request_id","candidate_sha","probe_identity","probe_path","probe_sha256","effect_marker")
+A_KEYS=("schema_version","probes"); P_KEYS=("probe_identity","probe_path","probe_sha256","effect_marker","result")
+RECIPE_KEYS=("schema_version","language","target_arch","compiler_path","compiler_sha256","sdk_path","sdk_settings_sha256","compile_argv","codesign_path","codesign_sha256","sign_argv","deployment_target_policy")
+MANIFEST_KEYS=("schema_version","language","artifact_path","artifact_sha256","build_recipe_sha256","source_sha256","architecture","file_type","code_signature","cdhash","dylinker","uuid","dependencies","macho_build_version")
+passed=failed=0
+class Rig(Exception): pass
+
+def check(ok,name,detail=""):
+ global passed,failed
+ if ok: passed+=1; print("PASS "+name)
+ else: failed+=1; print(f"FAIL {name}: {detail}")
+def sha(raw:bytes)->str:return hashlib.sha256(raw).hexdigest()
+def canon(v)->bytes:return (json.dumps(v,ensure_ascii=False,separators=(",",":"))+"\n").encode()
+def exact(v,keys):return type(v) is dict and tuple(v.keys())==keys
+def hx(v,n):return type(v) is str and len(v)==n and all(c in "0123456789abcdef" for c in v)
+def strict(raw:bytes):
+ def pairs(items):
+  out={}
+  for k,v in items:
+   if k in out: raise ValueError("duplicate")
+   out[k]=v
+  return out
+ return json.loads(raw.decode("utf-8","strict"),object_pairs_hook=pairs)
+
+def load_exact(path:Path,keys):
+ try:v=strict(path.read_bytes())
+ except Exception:return None
+ return v if exact(v,keys) else None
+
+def exact_compile_argv(sdk:str,sources:list[str])->list[str]:
+ return ["-std=c11","-O2","-Wall","-Wextra","-Werror","-arch","arm64","-isysroot",sdk,*sources]
+
+def closed_argv_selftests():
+ expected=exact_compile_argv("/SDK",["controller/h034-native/kernel.c"])
+ hostile=(
+  ["-mmacosx-version-min=11.0"],["-mmacosx-version-min","11.0"],
+  ["-macosx_version_min","11.0"],["-platform_version","macos","11.0","26.5"],
+  ["-target","arm64-apple-macos11.0"],["--target=arm64-apple-macosx11.0"],
+  ["--target","arm64-apple-darwin20.1.0"],["-Wl,-platform_version,macos,11.0,26.5"],
+  ["-Wl,-macosx_version_min,11.0"],["-Xlinker","-platform_version","-Xlinker","macos","-Xlinker","11.0","-Xlinker","26.5"],
+  ["@flags.rsp"],["-Wp,@flags.rsp"])
+ check(expected==exact_compile_argv("/SDK",["controller/h034-native/kernel.c"]),"J_CLOSED_ARGV_EXACT_POSITIVE")
+ for i,bad in enumerate(hostile,1):check(expected+bad!=exact_compile_argv("/SDK",["controller/h034-native/kernel.c"]),f"J_CLOSED_ARGV_INJECTION_{i}_REJECT")
+
+def manifest_valid(manifest,observed,source_hash,artifact_digest,recipe_digest):
+ if not exact(manifest,MANIFEST_KEYS):return False
+ shape=(type(manifest["schema_version"]) is int and all(type(manifest[k]) is str for k in ("language","artifact_path","artifact_sha256","build_recipe_sha256","architecture","file_type","code_signature","cdhash","dylinker","uuid"))
+  and type(manifest["source_sha256"]) is dict and all(type(k) is str and hx(v,64) for k,v in manifest["source_sha256"].items())
+  and type(manifest["dependencies"]) is list and all(type(x) is str for x in manifest["dependencies"])
+  and exact(manifest["macho_build_version"],("platform","minos","sdk")) and all(type(x) is str and x for x in manifest["macho_build_version"].values()))
+ return (shape and manifest["schema_version"]==1 and manifest["language"]=="C" and manifest["artifact_path"]=="verify/h034/kernel"
+  and manifest["artifact_sha256"]==artifact_digest and manifest["build_recipe_sha256"]==recipe_digest and manifest["source_sha256"]==source_hash
+  and all(manifest[k]==observed[k] for k in ("architecture","file_type","code_signature","cdhash","dylinker","uuid","dependencies","macho_build_version")))
+
+def manifest_schema_selftest():
+ source_hash={"controller/h034-native/kernel.c":"1"*64};observed={"architecture":"arm64","file_type":"Mach-O 64-bit executable arm64","code_signature":"adhoc","cdhash":"2"*40,"dylinker":"/usr/lib/dyld","uuid":"01234567-89AB-CDEF-0123-456789ABCDEF","dependencies":["/usr/lib/libSystem.B.dylib"],"macho_build_version":{"platform":"1","minos":"15.0","sdk":"15.5"}}
+ manifest={"schema_version":1,"language":"C","artifact_path":"verify/h034/kernel","artifact_sha256":"3"*64,"build_recipe_sha256":"4"*64,"source_sha256":source_hash,**observed}
+ check(manifest_valid(manifest,observed,source_hash,"3"*64,"4"*64),"J_MANIFEST_SCHEMA_SATISFIABLE")
+ bad=dict(manifest);bad["language"]="Python";check(not manifest_valid(bad,observed,source_hash,"3"*64,"4"*64),"J_MANIFEST_LANGUAGE_BOUND")
+
+def receipt_ok(v):
+ return (exact(v,R_KEYS) and type(v["schema_version"]) is int and v["schema_version"]==1
+  and v["observer_authority"]=="root-owned-h033-observer-v1" and hx(v["request_id"],64)
+  and hx(v["candidate_sha"],40) and all(type(v[k]) is str and bool(v[k]) for k in ("probe_identity","probe_path","effect_marker"))
+  and Path(v["probe_path"]).is_absolute() and hx(v["probe_sha256"],64))
+def evidence_ok(v):
+ return (exact(v,E_KEYS) and type(v["schema_version"]) is int and v["schema_version"]==1
+  and v["producer_authority"]=="_nortropic_provenance" and v["task"]=="h-033"
+  and hx(v["candidate_sha"],40) and hx(v["task_spec_sha256"],64) and hx(v["gate_sha256"],64)
+  and type(v["probe_identity"]) is str and bool(v["probe_identity"]) and hx(v["request_id"],64)
+  and v["result"] in ("PASS","FAIL","ODÖMBART") and hx(v["effect_sha256"],64))
+def allow_ok(v):
+ if not exact(v,A_KEYS) or type(v["schema_version"]) is not int or v["schema_version"]!=1 or type(v["probes"]) is not list or not v["probes"]: return False
+ seen=set()
+ for p in v["probes"]:
+  if not exact(p,P_KEYS) or type(p["probe_identity"]) is not str or not p["probe_identity"] or p["probe_identity"] in seen:return False
+  seen.add(p["probe_identity"])
+  if type(p["probe_path"]) is not str or not Path(p["probe_path"]).is_absolute() or not hx(p["probe_sha256"],64) or type(p["effect_marker"]) is not str or not p["effect_marker"] or p["result"] not in ("PASS","FAIL","ODÖMBART"):return False
+ return True
+
+def gone(pgid):
+ try:os.killpg(pgid,0);return False
+ except ProcessLookupError:return True
+ except PermissionError:return False
+def run(argv,cwd=None,timeout=15,pass_fds=(),env=None,rig_timeout=True,input=None):
+ p=subprocess.Popen(argv,cwd=cwd,text=True,stdin=subprocess.PIPE if input is not None else None,stdout=subprocess.PIPE,stderr=subprocess.PIPE,pass_fds=pass_fds,env=env,start_new_session=True)
+ try:out,err=p.communicate(input=input,timeout=timeout);to=False
+ except subprocess.TimeoutExpired:
+  to=True
+  try:os.killpg(p.pid,signal.SIGKILL)
+  except ProcessLookupError:pass
+  out,err=p.communicate(timeout=2)
+ rc=124 if to else p.returncode; clean=p.poll() is not None and gone(p.pid)
+ if not clean:raise Rig("process group not cleaned")
+ if to and rig_timeout:raise Rig("tool timeout")
+ return subprocess.CompletedProcess(argv,rc,out,err),to,clean
+
+def documents(request=None,result="PASS"):
+ rid=request or secrets.token_hex(32); cand=secrets.token_hex(20); marker=secrets.token_hex(16); probe="h033-"+secrets.token_hex(8)
+ receipt={"schema_version":1,"observer_authority":"root-owned-h033-observer-v1","request_id":rid,"candidate_sha":cand,"probe_identity":probe,"probe_path":"/Library/Application Support/Nortropic/provenance/probes/"+probe,"probe_sha256":secrets.token_hex(32),"effect_marker":marker}
+ rr=canon(receipt)
+ evidence={"schema_version":1,"producer_authority":"_nortropic_provenance","task":"h-033","candidate_sha":cand,"task_spec_sha256":secrets.token_hex(32),"gate_sha256":secrets.token_hex(32),"probe_identity":probe,"request_id":rid,"result":result,"effect_sha256":sha(rr)}
+ allow={"schema_version":1,"probes":[{"probe_identity":probe,"probe_path":receipt["probe_path"],"probe_sha256":receipt["probe_sha256"],"effect_marker":marker,"result":result}]}
+ return evidence,receipt,allow
+
+def receipt_isolation():
+ e,r,a=documents(); check(evidence_ok(e) and receipt_ok(r) and allow_ok(a),"J_DOCUMENT_FAMILY_POSITIVE")
+ mutants=[]
+ for key in R_KEYS:
+  m=dict(r);m.pop(key);mutants.append(("MISSING_"+key.upper(),m))
+ m=dict(r);m["unexpected"]=1;mutants.append(("UNEXPECTED",m))
+ m={k:r[k] for k in reversed(R_KEYS)};mutants.append(("REORDERED",m))
+ for key,bad in (("schema_version","1"),("observer_authority",1),("request_id",[]),("candidate_sha",None),("probe_identity",1),("probe_path",7),("probe_sha256",{}),("effect_marker",False)):
+  m=dict(r);m[key]=bad;mutants.append(("WRONG_TYPE_"+key.upper(),m))
+ for key in ("observer_authority","probe_identity","probe_path","effect_marker"):
+  m=dict(r);m[key]="";mutants.append(("EMPTY_"+key.upper(),m))
+ for key in ("request_id","candidate_sha","probe_sha256"):
+  m=dict(r);m[key]="g"*(64 if key!="candidate_sha" else 40);mutants.append(("BAD_HEX_"+key.upper(),m))
+ raw_invalid=b'{"schema_version":1,"observer_authority":"\xff"}\n'
+ try:strict(raw_invalid);invalid=False
+ except Exception:invalid=True
+ check(invalid,"J_RECEIPT_INVALID_UTF8")
+ accepted_by_digest_only=0
+ for name,m in mutants:
+  raw=canon(m); em=dict(e);em["effect_sha256"]=sha(raw)
+  digest_bound=evidence_ok(em) and em["effect_sha256"]==sha(raw)
+  if digest_bound:accepted_by_digest_only+=1
+  check(digest_bound and not receipt_ok(m),"J_RECEIPT_RECOMPUTED_"+name)
+ check(accepted_by_digest_only==len(mutants),"J_PERMISSIVE_RECEIPT_DIGEST_ONLY_MUTANT_REJECTED",accepted_by_digest_only)
+
+def permissive_c_receipt_mutant():
+ """Run a real C consumer that checks fresh bindings/digest text but omits receipt schema."""
+ with tempfile.TemporaryDirectory(prefix="h034-permissive-c-") as d:
+  w=Path(d); c=w/"mutant.c"; binary=w/"mutant"
+  c.write_text(r'''#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+static int grab(int fd,char *b,size_t n){ssize_t r=read(fd,b,n-1);if(r<1)return 0;b[r]=0;return 1;}
+int main(int ac,char **av){char e[8192],r[8192];if(ac!=4||!grab(3,e,sizeof e)||!grab(4,r,sizeof r))return 1;
+return strstr(e,av[1])&&strstr(e,av[2])&&strstr(r,av[1])&&strstr(r,av[3])?0:1;}''')
+  clang=run(["/usr/bin/xcrun","--find","clang"])[0].stdout.strip()
+  sdk=run(["/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"])[0].stdout.strip()
+  p=run([clang,"-std=c11","-Wall","-Wextra","-Werror","-arch","arm64","-isysroot",sdk,str(c),"-o",str(binary)])[0]
+  if p.returncode:raise Rig("permissive C mutant compile failed: "+p.stderr)
+  e,r,a=documents(); r.pop("observer_authority"); raw=canon(r); e["effect_sha256"]=sha(raw); er=canon(e)
+  ep=w/"evidence";rp=w/"receipt";ep.write_bytes(er);rp.write_bytes(raw)
+  efd=os.open(ep,os.O_RDONLY);rfd=os.open(rp,os.O_RDONLY)
+  try:
+   os.dup2(efd,3);os.dup2(rfd,4)
+   q=run([str(binary),e["request_id"],e["effect_sha256"],r["probe_identity"]],pass_fds=(3,4),timeout=2,rig_timeout=False)[0]
+  finally:
+   os.close(efd);os.close(rfd)
+  check(q.returncode==0 and not receipt_ok(r),"J_PERMISSIVE_C_RECOMPUTED_RECEIPT_MUTANT_CAUGHT",q.stderr)
+
+def permissive_c_evidence_allowlist_mutant():
+ """Real native mutant: receipt-focused, substring evidence, no allowlist semantics."""
+ with tempfile.TemporaryDirectory(prefix="h034-broad-permissive-c-") as d:
+  w=Path(d);src=w/"mutant.c";binary=w/"kernel"
+  src.write_text(r'''#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+static int grab(int fd,char*b,size_t n){ssize_t r=pread(fd,b,n-1,0);if(r<1)return 0;b[r]=0;return 1;}
+static const char* val(int ac,char**av,const char*k){for(int i=2;i+1<ac;i+=2)if(!strcmp(av[i],k))return av[i+1];return 0;}
+int main(int ac,char**av){char e[65536],r[65536],a[65536];if(ac!=22||strcmp(av[1],"h033-verify"))return 1;
+const char*ef=val(ac,av,"--evidence-fd"),*rf=val(ac,av,"--receipt-fd"),*af=val(ac,av,"--allowlist-fd");
+const char*c=val(ac,av,"--candidate"),*p=val(ac,av,"--probe"),*q=val(ac,av,"--request-id"),*z=val(ac,av,"--require-result");
+if(!ef||!rf||!af||!c||!p||!q||!z||!grab(atoi(ef),e,sizeof e)||!grab(atoi(rf),r,sizeof r)||!grab(atoi(af),a,sizeof a))return 1;
+const char*keys[]={"schema_version","observer_authority","request_id","candidate_sha","probe_identity","probe_path","probe_sha256","effect_marker"};
+for(unsigned i=0;i<sizeof(keys)/sizeof(keys[0]);i++)if(!strstr(r,keys[i]))return 1;
+if(!strstr(r,"root-owned-h033-observer-v1")||!strstr(r,c)||!strstr(r,p)||!strstr(r,q))return 1;
+if(!strstr(e,c)||!strstr(e,p)||!strstr(e,q))return 1;
+printf("VERIFIED_RESULT=%s\nREQUEST_ID=%s\nEFFECT_SHA256=",z,q);
+const char*h=strstr(e,"effect_sha256\":\"");if(!h)return 1;h+=16;for(int i=0;i<64;i++)putchar(h[i]);putchar('\n');return 0;}''')
+  clang=run(["/usr/bin/xcrun","--find","clang"])[0].stdout.strip();sdk=run(["/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"])[0].stdout.strip()
+  p=run([clang,"-std=c11","-Wall","-Wextra","-Werror","-arch","arm64","-isysroot",sdk,str(src),"-o",str(binary)])[0]
+  if p.returncode:raise Rig("broad permissive C mutant compile failed: "+p.stderr)
+  e,r,a=documents(); expected=f"VERIFIED_RESULT=PASS\nREQUEST_ID={e['request_id']}\nEFFECT_SHA256={e['effect_sha256']}\n"
+  positive=kernel_call(canon(e),canon(r),canon(a),e,kernel=binary)
+  decoy=dict(e);decoy["unexpected"]="valid-looking-decoy:"+e["candidate_sha"]+":"+e["task_spec_sha256"]+":"+e["gate_sha256"]
+  malformed_e=kernel_call(canon(decoy),canon(r),canon(a),e,kernel=binary)
+  malformed_a=kernel_call(canon(e),canon(r),b'{"schema_version":1,"probes":[],"decoy":"'+e["probe_identity"].encode()+b'"}\n',e,kernel=binary)
+  check(positive.returncode==0 and positive.stdout==expected,"J_PERMISSIVE_C_POSITIVE")
+  check(malformed_e.returncode==0 and malformed_a.returncode==0 and not evidence_ok(decoy),"J_PERMISSIVE_C_EVIDENCE_ALLOWLIST_MUTANT_CAUGHT")
+
+def judge_controls():
+ spec=json.load(open(SPEC)); rows=[t for t in spec["tasks"] if t.get("id")=="h-034"]
+ check(len(rows)==1,"F_H034_SINGLE_TASK")
+ if rows:
+  t=rows[0];check(t.get("authority_class")=="owner_authority" and t.get("depends_on")==["h-035"],"F_H034_OWNER_AFTER_H035")
+  check(t.get("allowed_write")==[] and t.get("owner_author_allowed_write")==OWNER and t.get("exit_test")=="verify/bin/h-034-exit","F_H034_EXACT_OWNER_SURFACE")
+ reg=json.load(open(REG));check(reg.get("owner_production_paths")==OWNER,"F_REGISTRY_EXACT_H034_RESERVATION")
+ h033=[t for t in spec["tasks"] if t.get("id")=="h-033"]
+ check(len(h033)==1,"F_H033_EXACTLY_ONE_MATERIALIZED")
+ if h033:
+  t=h033[0]
+  check(t.get("depends_on")==["h-034"],"F_H033_DEPENDS_EXACT_H034")
+  check(t.get("exit_test")=="verify/bin/h-033-exit","F_H033_CANONICAL_GATE")
+ closed_argv_selftests();manifest_schema_selftest()
+ receipt_isolation();permissive_c_receipt_mutant();permissive_c_evidence_allowlist_mutant()
+ for result in ("PASS","FAIL","ODÖMBART"):
+  e,r,a=documents(result=result);check(evidence_ok(e) and receipt_ok(r) and allow_ok(a) and a["probes"][0]["result"]==result,"J_FRESH_TRISTATE_"+result)
+ e1,r1,a1=documents();e2,r2,a2=documents();check(e1["request_id"]!=e2["request_id"] and e1["effect_sha256"]!=e2["effect_sha256"],"J_FRESH_METAMORPHIC_FAMILIES")
+ fast=run(["/usr/bin/true"],timeout=1,rig_timeout=False);slow=run([sys.executable,"-c","import time;time.sleep(.1)"],timeout=1,rig_timeout=False);hang=run([sys.executable,"-c","import time;time.sleep(30)"],timeout=.1,rig_timeout=False)
+ check(fast[0].returncode==0 and fast[2],"J_TIMEOUT_FAST")
+ check(slow[0].returncode==0 and slow[2],"J_TIMEOUT_SLOW")
+ check(hang[0].returncode==124 and hang[1] and hang[2],"J_TIMEOUT_HANG_CLEAN")
+
+def toolchain_anchor():
+ with tempfile.TemporaryDirectory(prefix="h034-owner-toolchain-") as d:
+  w=Path(d); src=w/"fixture.c"; unsigned=w/"kernel"; signed=w/"signed-kernel"
+  src.write_text("int main(void){return 0;}\n")
+  clang=run(["/usr/bin/xcrun","--find","clang"])[0].stdout.strip();sdk=run(["/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"])[0].stdout.strip()
+  argv=[clang,"-std=c11","-O2","-Wall","-Wextra","-Werror","-arch","arm64","-isysroot",str(Path(sdk).resolve()),str(src),"-o",str(unsigned)]
+  c=run(argv)[0];check(c.returncode==0,"J_OWNER_C_ARM64_COMPILE",c.stderr)
+  if c.returncode:return
+  signed.write_bytes(unsigned.read_bytes()); signed.chmod(0o755)
+  s=run(["/usr/bin/codesign","--force","--sign","-","--identifier","se.nortropic.h034.kernel",str(signed)])[0]
+  check(s.returncode==0,"J_OWNER_ADHOC_SIGN",s.stderr)
+  cd=run(["/usr/bin/codesign","-dvvv",str(signed)])[0]; text=cd.stderr+cd.stdout
+  check("CDHash=" in text,"J_OWNER_CODESIGN_DVVV_CDHASH",text)
+  li=run(["/usr/bin/lipo","-archs",str(signed)])[0];check(li.stdout.strip()=="arm64","J_OWNER_MACHO_ARM64",li.stdout)
+  load=run(["/usr/bin/otool","-l",str(signed)])[0].stdout
+  check("LC_UUID" in load and "LC_BUILD_VERSION" in load,"J_OWNER_UUID_PLATFORM_LOAD_COMMANDS")
+  deps=run(["/usr/bin/otool","-L",str(signed)])[0].stdout.splitlines()[1:]
+  check(bool(deps) and all(x.strip().split()[0].startswith(("/usr/lib/","/System/Library/")) for x in deps),"J_OWNER_APPLE_ONLY_DEPENDENCIES",deps)
+  exe=run([str(signed)],timeout=2,rig_timeout=False)[0];check(exe.returncode==0,"J_OWNER_SIGNED_LOADABLE",exe.stderr)
+
+def macho_observation(path:Path):
+ file_p=run(["/usr/bin/file","-b",str(path)])[0];lipo=run(["/usr/bin/lipo","-archs",str(path)])[0]
+ cs=run(["/usr/bin/codesign","-dvvv",str(path)])[0];signature=cs.stdout+cs.stderr
+ load=run(["/usr/bin/otool","-l",str(path)])[0].stdout;dep_lines=run(["/usr/bin/otool","-L",str(path)])[0].stdout.splitlines()[1:]
+ deps=[line.strip().split(" (",1)[0] for line in dep_lines if line.strip()]
+ cd=re.search(r"(?:^|\n)CDHash=([0-9a-fA-F]+)",signature);uuid="";dylinker="";build={}
+ lines=load.splitlines()
+ for i,line in enumerate(lines):
+  if line.strip()=="cmd LC_UUID":
+   for q in lines[i:i+7]:
+    m=re.match(r"\s*uuid\s+([0-9A-Fa-f-]+)",q)
+    if m:uuid=m.group(1).upper();break
+  if line.strip()=="cmd LC_LOAD_DYLINKER":
+   for q in lines[i:i+7]:
+    m=re.match(r"\s*name\s+(\S+)",q)
+    if m:dylinker=m.group(1);break
+  if line.strip()=="cmd LC_BUILD_VERSION":
+   for q in lines[i:i+9]:
+    m=re.match(r"\s*(platform|minos|sdk)\s+(\S+)",q)
+    if m:build[m.group(1)]=m.group(2)
+ return {"architecture":lipo.stdout.strip(),"file_type":file_p.stdout.strip(),"code_signature":"adhoc" if "Signature=adhoc" in signature else "other","cdhash":cd.group(1).lower() if cd else "","dylinker":dylinker,"uuid":uuid,"dependencies":deps,"macho_build_version":build}
+
+def build_unsigned(recipe:dict,dest:Path):
+ shutil.copytree(SOURCE,dest/"controller/h034-native");(dest/"verify/h034").mkdir(parents=True)
+ output=dest/"verify/h034/kernel"
+ env={"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C","ZERO_AR_DATE":"1","TMPDIR":str(dest)}
+ p=run([recipe["compiler_path"],*recipe["compile_argv"],"-o","verify/h034/kernel"],cwd=dest,env=env)
+ return p[0],output
+
+def sign_rebuild(recipe:dict,path:Path):
+ env={"PATH":"/usr/bin:/bin","LANG":"C","LC_ALL":"C","ZERO_AR_DATE":"1"}
+ return run([recipe["codesign_path"],*recipe["sign_argv"],str(path)],env=env)[0]
+
+def production_contract():
+ present=[]
+ for name,path,kind in (("K_SOURCE_PRESENT",SOURCE,"dir"),("K_KERNEL_PRESENT",KERNEL,"file"),("K_RECIPE_PRESENT",RECIPE,"file"),("K_MANIFEST_PRESENT",MANIFEST,"file")):
+  ok=path.is_dir() if kind=="dir" else path.is_file() and not path.is_symlink()
+  check(ok,name,path);present.append(ok)
+ if not all(present):return
+ recipe=load_exact(RECIPE,RECIPE_KEYS);manifest=load_exact(MANIFEST,MANIFEST_KEYS)
+ check(recipe is not None,"K_RECIPE_STRICT");check(manifest is not None,"K_MANIFEST_STRICT")
+ if recipe is None or manifest is None:return
+ source_files=sorted(p for p in SOURCE.rglob("*") if p.is_file());sources=sorted(str(p.relative_to(ROOT)) for p in source_files if p.suffix==".c")
+ scalar_keys=("language","target_arch","compiler_path","compiler_sha256","sdk_path","sdk_settings_sha256","codesign_path","codesign_sha256","deployment_target_policy")
+ shape=(type(recipe["schema_version"]) is int and all(type(recipe[k]) is str for k in scalar_keys)
+  and type(recipe["compile_argv"]) is list and all(type(x) is str for x in recipe["compile_argv"])
+  and type(recipe["sign_argv"]) is list and all(type(x) is str for x in recipe["sign_argv"]))
+ if not shape:check(False,"K_BUILD_RECIPE_BOUND","types");return
+ compiler=Path(recipe["compiler_path"]);signer=Path(recipe["codesign_path"]);sdk=Path(recipe["sdk_path"])
+ observed_clang=run(["/usr/bin/xcrun","--find","clang"])[0].stdout.strip();observed_sdk=Path(run(["/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"])[0].stdout.strip()).resolve()
+ recipe_ok=(recipe["schema_version"]==1 and recipe["language"]=="C" and recipe["target_arch"]=="arm64"
+  and compiler.is_absolute() and compiler.is_file() and not compiler.is_symlink() and str(compiler)==observed_clang and sha(compiler.read_bytes())==recipe["compiler_sha256"]
+  and sdk==observed_sdk and sdk.is_dir() and (sdk/"SDKSettings.json").is_file() and sha((sdk/"SDKSettings.json").read_bytes())==recipe["sdk_settings_sha256"]
+  and signer==Path("/usr/bin/codesign") and signer.is_file() and not signer.is_symlink() and sha(signer.read_bytes())==recipe["codesign_sha256"]
+  and recipe["compile_argv"]==exact_compile_argv(str(sdk),sources)
+  and recipe["sign_argv"]==["--force","--sign","-","--identifier","se.nortropic.h034.kernel","--timestamp=none"]
+  and recipe["deployment_target_policy"]=="derive-from-Apple-toolchain-and-bind-final-Mach-O"
+  and bool(sources) and all(p.suffix in (".c",".h") and stat.S_ISREG(p.lstat().st_mode) and not p.is_symlink() for p in source_files))
+ check(recipe_ok,"K_BUILD_RECIPE_BOUND")
+ mode=KERNEL.lstat().st_mode;check(stat.S_ISREG(mode) and not KERNEL.is_symlink() and bool(mode&0o111),"K_FINAL_REGULAR_EXECUTABLE")
+ observed=macho_observation(KERNEL)
+ signed_ok=(observed["architecture"]=="arm64" and "Mach-O 64-bit executable arm64" in observed["file_type"] and observed["code_signature"]=="adhoc" and bool(observed["cdhash"]) and bool(observed["uuid"]) and exact(observed["macho_build_version"],("platform","minos","sdk")))
+ check(signed_ok,"K_FINAL_SIGNED_ARM64_MACHO",observed)
+ deps=observed["dependencies"];check(bool(deps) and all(x.startswith(("/usr/lib/","/System/Library/")) for x in deps),"K_ZERO_THIRD_PARTY_RUNTIME",deps)
+ check(observed["dylinker"]=="/usr/lib/dyld","K_APPLE_DYLD_ONLY",observed["dylinker"])
+ source_hash={str(p.relative_to(ROOT)):sha(p.read_bytes()) for p in source_files}
+ manifest_ok=manifest_valid(manifest,observed,source_hash,sha(KERNEL.read_bytes()),sha(RECIPE.read_bytes()))
+ check(manifest_ok,"K_IDENTITY_MANIFEST_BINDS_FINAL")
+ with tempfile.TemporaryDirectory(prefix="h034-rebuild-") as d:
+  w=Path(d);p1,one=build_unsigned(recipe,w/"one");p2,two=build_unsigned(recipe,w/"two")
+  compile_ok=p1.returncode==p2.returncode==0 and one.is_file() and two.is_file()
+  check(compile_ok,"K_PRODUCTION_RECIPE_EXECUTES",p1.stderr+p2.stderr)
+  unsigned_ok=compile_ok and sha(one.read_bytes())==sha(two.read_bytes());check(unsigned_ok,"K_DETERMINISTIC_UNSIGNED_REBUILD")
+  s1=sign_rebuild(recipe,one) if compile_ok else p1;s2=sign_rebuild(recipe,two) if compile_ok else p2
+  rebuilt=[macho_observation(one),macho_observation(two)] if s1.returncode==s2.returncode==0 else []
+  stable=("architecture","file_type","code_signature","dylinker","uuid","dependencies","macho_build_version")
+  stable_ok=len(rebuilt)==2 and all(rebuilt[0][k]==rebuilt[1][k]==observed[k] for k in stable)
+  check(stable_ok,"K_SIGNED_REBUILD_STABLE_IDENTITY",(s1.stderr+s2.stderr)[-500:])
+  x1=run([str(one)],timeout=2,rig_timeout=False)[0] if rebuilt else s1;x2=run([str(two)],timeout=2,rig_timeout=False)[0] if rebuilt else s2
+  check(rebuilt and x1.returncode==x2.returncode==1,"K_SIGNED_REBUILDS_LOADABLE",(x1.returncode,x2.returncode))
+ semantic_contract()
+
+def kernel_call(e_raw:bytes,r_raw:bytes,a_raw:bytes,e:dict,extra=(),result=None,kernel=None,replace=False,seek=False,nonregular=None,omit=(),argv_values=None,duplicate=()):
+ with tempfile.TemporaryDirectory(prefix="h034-semantic-") as d:
+  w=Path(d);paths=[];fds=[];owned=[]
+  for name,raw in (("evidence",e_raw),("receipt",r_raw),("allowlist",a_raw)):
+   p=w/name;p.write_bytes(raw);paths.append(p);fds.append(os.open(p,os.O_RDONLY))
+  if nonregular:
+   index={"evidence":0,"receipt":1,"allowlist":2}[nonregular[0]];os.close(fds[index]);kind=nonregular[1]
+   if kind=="directory":fds[index]=os.open(w,os.O_RDONLY)
+   elif kind=="pipe":
+    rfd,wfd=os.pipe();os.write(wfd,(e_raw,r_raw,a_raw)[index]);os.close(wfd);fds[index]=rfd
+   elif kind=="socket":
+    left,right=socket.socketpair();right.sendall((e_raw,r_raw,a_raw)[index]);right.shutdown(socket.SHUT_WR);fds[index]=left.fileno();owned.extend((left,right))
+  if replace:
+   for p in paths:p.unlink();p.write_bytes(b"hostile pathname replacement\n")
+  if seek:
+   for fd in fds:
+    try:os.lseek(fd,7,os.SEEK_SET)
+    except OSError:pass
+  values={"evidence-fd":str(fds[0]),"receipt-fd":str(fds[1]),"allowlist-fd":str(fds[2]),"task":"h-033","candidate":e["candidate_sha"],"task-spec-sha256":e["task_spec_sha256"],"gate-sha256":e["gate_sha256"],"probe":e["probe_identity"],"request-id":e["request_id"],"require-result":result or e["result"]}
+  values.update(argv_values or {});argv=[str(kernel or KERNEL),"h033-verify"]
+  for key,value in values.items():
+   if key not in omit:argv.extend(("--"+key,value))
+  for key in duplicate:argv.extend(("--"+key,values[key]))
+  argv.extend(extra)
+  try:q=run(argv,pass_fds=tuple(fds),timeout=3,rig_timeout=False)[0]
+  finally:
+   for obj in owned:obj.close()
+   for fd in fds:
+    try:os.close(fd)
+    except OSError:pass
+  return q
+
+def reject(name,e_raw,r_raw,a_raw,bindings):
+ q=kernel_call(e_raw,r_raw,a_raw,bindings);check(q.returncode==1 and q.stdout=="","K_REJECT_"+name,(q.returncode,q.stdout,q.stderr))
+
+def escaped_string(raw:bytes,value:str,escape:bytes)->bytes:
+ token=json.dumps(value,ensure_ascii=False,separators=(",",":")).encode()
+ replacement=b'"'+value.encode("utf-8")+escape+b'evil"'
+ if raw.count(token)!=1:raise Rig("escaped-string target is not unique")
+ return raw.replace(token,replacement,1)
+
+def coordinated_escaped_control_documents(codepoint:int,field:str):
+ e,r,a=documents();suffix=chr(codepoint)+"evil"
+ if field=="probe_identity":
+  probe=e["probe_identity"]+suffix
+  e["probe_identity"]=r["probe_identity"]=a["probes"][0]["probe_identity"]=probe
+ elif field=="probe_path":
+  path=r["probe_path"]+suffix
+  r["probe_path"]=a["probes"][0]["probe_path"]=path
+ elif field=="effect_marker":
+  marker=r["effect_marker"]+suffix
+  r["effect_marker"]=a["probes"][0]["effect_marker"]=marker
+ else:raise Rig("unknown coordinated control field")
+ rr=canon(r);e["effect_sha256"]=sha(rr)
+ return canon(e),rr,canon(a),e
+
+def semantic_contract():
+ for result in ("PASS","FAIL","ODÖMBART"):
+  e,r,a=documents(result=result);q=kernel_call(canon(e),canon(r),canon(a),e)
+  expected=f"VERIFIED_RESULT={result}\nREQUEST_ID={e['request_id']}\nEFFECT_SHA256={e['effect_sha256']}\n"
+  check(q.returncode==0 and q.stdout==expected,"K_FRESH_TRISTATE_"+result,(q.returncode,q.stdout,q.stderr))
+  wrong="FAIL" if result=="PASS" else "PASS";q=kernel_call(canon(e),canon(r),canon(a),e,result=wrong)
+  check(q.returncode==1 and q.stdout=="","K_CROSS_RESULT_REJECT_"+result)
+ e,r,a=documents();er,rr,ar=canon(e),canon(r),canon(a)
+ expected=f"VERIFIED_RESULT=PASS\nREQUEST_ID={e['request_id']}\nEFFECT_SHA256={e['effect_sha256']}\n"
+ q=kernel_call(er,rr,ar,e,replace=True,seek=True);check(q.returncode==0 and q.stdout==expected,"K_SAME_OPEN_DESCRIPTION_PATH_REPLACEMENT")
+ q1=kernel_call(er,rr,ar,e,seek=True);q2=kernel_call(er,rr,ar,e,seek=True);check(q1.returncode==q2.returncode==0 and q1.stdout==q2.stdout==expected,"K_STABLE_DOUBLE_READ")
+ # JSON escape decoding must preserve explicit lengths. C-prefix comparisons may
+ # never turn embedded NUL/control/surrogate-plus-suffix values into exact matches.
+ evidence_strings=("producer_authority","task","candidate_sha","task_spec_sha256","gate_sha256","probe_identity","request_id","result","effect_sha256")
+ receipt_strings=("observer_authority","request_id","candidate_sha","probe_identity","probe_path","probe_sha256","effect_marker")
+ probe_strings=("probe_identity","probe_path","probe_sha256","effect_marker","result")
+ for label,escape in (("NUL",b"\\u0000"),("CONTROL",b"\\u0001"),("SURROGATE",b"\\ud800")):
+  for key in evidence_strings:reject("EVIDENCE_ESCAPED_"+label+"_"+key.upper(),escaped_string(er,e[key],escape),rr,ar,e)
+  for key in receipt_strings:
+   bad_rr=escaped_string(rr,r[key],escape);em=dict(e);em["effect_sha256"]=sha(bad_rr)
+   reject("RECEIPT_ESCAPED_"+label+"_"+key.upper(),canon(em),bad_rr,ar,em)
+  for key in probe_strings:reject("ALLOWLIST_ESCAPED_"+label+"_"+key.upper(),er,rr,escaped_string(ar,a["probes"][0][key],escape),e)
+ # Isolate parser rejection from cross-document mismatch: each C0 value is bound
+ # consistently everywhere that field appears and the receipt digest is refreshed.
+ # U+0000 cannot exist in argv, so its probe/caller row remains covered by the
+ # single-document parser controls above; path and marker still get coordinated rows.
+ for codepoint in range(0x20):
+  for field in (("probe_identity",) if codepoint else ())+("probe_path","effect_marker"):
+   coordinated_er,coordinated_rr,coordinated_ar,coordinated_e=coordinated_escaped_control_documents(codepoint,field)
+   reject(f"COORDINATED_C0_{codepoint:02X}_{field.upper()}",coordinated_er,coordinated_rr,coordinated_ar,coordinated_e)
+ ue,ur,ua=documents();unicode_probe="h033-räksmörgås-雪";unicode_marker="effekt-åäö-雪";unicode_path="/Library/Application Support/Nortropic/provenance/probes/"+unicode_probe
+ ue["probe_identity"]=ur["probe_identity"]=ua["probes"][0]["probe_identity"]=unicode_probe
+ ur["probe_path"]=ua["probes"][0]["probe_path"]=unicode_path;ur["effect_marker"]=ua["probes"][0]["effect_marker"]=unicode_marker
+ urr=canon(ur);ue["effect_sha256"]=sha(urr);uq=kernel_call(canon(ue),urr,canon(ua),ue)
+ uexpected=f"VERIFIED_RESULT=PASS\nREQUEST_ID={ue['request_id']}\nEFFECT_SHA256={ue['effect_sha256']}\n"
+ check(uq.returncode==0 and uq.stdout==uexpected,"K_LEGITIMATE_UNICODE_BOUND_STRINGS")
+ wrong_digest=dict(e);right=e["effect_sha256"];wrong_digest["effect_sha256"]=("0" if right[0]!="0" else "1")+right[1:]
+ reject("EFFECT_DIGEST_RELATION",canon(wrong_digest),rr,ar,e)
+ ev2=dict(e);ev2["schema_version"]=2;reject("EVIDENCE_SCHEMA_VERSION_EXACT",canon(ev2),rr,ar,e)
+ rv2=dict(r);rv2["schema_version"]=2;rv2_raw=canon(rv2);rv2_e=dict(e);rv2_e["effect_sha256"]=sha(rv2_raw);reject("RECEIPT_SCHEMA_VERSION_EXACT",canon(rv2_e),rv2_raw,ar,rv2_e)
+ wrong_observer=dict(r);wrong_observer["observer_authority"]="other-nonempty-observer";wrong_observer_raw=canon(wrong_observer);wrong_observer_e=dict(e);wrong_observer_e["effect_sha256"]=sha(wrong_observer_raw);reject("RECEIPT_OBSERVER_AUTHORITY_EXACT",canon(wrong_observer_e),wrong_observer_raw,ar,wrong_observer_e)
+ av2=dict(a);av2["schema_version"]=2;reject("ALLOWLIST_SCHEMA_VERSION_EXACT",er,rr,canon(av2),e)
+ reject("ALLOWLIST_EMPTY",er,rr,canon({"schema_version":1,"probes":[]}),e)
+ reject("ALLOWLIST_INVALID_UTF8",er,rr,b'{"schema_version":1,"probes":["\xff"]}\n',e)
+ reject("EVIDENCE_WRONG_TOP_LEVEL",canon([]),rr,ar,e)
+ empty_receipt=b"";empty_receipt_e=dict(e);empty_receipt_e["effect_sha256"]=sha(empty_receipt);reject("RECEIPT_EMPTY_DOCUMENT",canon(empty_receipt_e),empty_receipt,ar,empty_receipt_e)
+ reject("RECEIPT_WRONG_TOP_LEVEL",canon({**e,"effect_sha256":sha(canon([]))}),canon([]),ar,{**e,"effect_sha256":sha(canon([]))})
+ reject("ALLOWLIST_EMPTY_DOCUMENT",er,rr,b"",e)
+ reject("ALLOWLIST_WRONG_TOP_LEVEL",er,rr,canon([]),e)
+ oversize_receipt=rr+b" "*(1024*1024);oversize_e=dict(e);oversize_e["effect_sha256"]=sha(oversize_receipt);reject("RECEIPT_OVERSIZE",canon(oversize_e),oversize_receipt,ar,oversize_e)
+ reject("ALLOWLIST_OVERSIZE",er,rr,ar+b" "*(1024*1024),e)
+ reject("EVIDENCE_TRAILING_DATA",er+b"{}\n",rr,ar,e)
+ trailing_receipt=rr+b"{}\n";trailing_e=dict(e);trailing_e["effect_sha256"]=sha(trailing_receipt);reject("RECEIPT_TRAILING_DATA",canon(trailing_e),trailing_receipt,ar,trailing_e)
+ reject("ALLOWLIST_TRAILING_DATA",er,rr,ar+b"{}\n",e)
+ for key in E_KEYS:
+  m=dict(e);m.pop(key);reject("EVIDENCE_MISSING_"+key.upper(),canon(m),rr,ar,e)
+ m=dict(e);m["unexpected"]="decoy:"+e["candidate_sha"]+":"+e["task_spec_sha256"]+":"+e["gate_sha256"];reject("EVIDENCE_UNEXPECTED_DECOY",canon(m),rr,ar,e)
+ reject("EVIDENCE_REORDERED",canon({k:e[k] for k in reversed(E_KEYS)}),rr,ar,e)
+ reject("EVIDENCE_DUPLICATE",er[:-2]+b',"result":"PASS"}\n',rr,ar,e)
+ for key,bad in (("schema_version","1"),("producer_authority",1),("task",[]),("candidate_sha",None),("task_spec_sha256",{}),("gate_sha256",False),("probe_identity",1),("request_id",[]),("result",1),("effect_sha256",None)):
+  m=dict(e);m[key]=bad;reject("EVIDENCE_WRONG_TYPE_"+key.upper(),canon(m),rr,ar,e)
+ reject("EVIDENCE_INVALID_UTF8",b'{"schema_version":1,"producer_authority":"\xff"}\n',rr,ar,e)
+ reject("EVIDENCE_OVERSIZE",er+b" "*(1024*1024),rr,ar,e)
+ receipt_mutants=[]
+ for key in R_KEYS:
+  m=dict(r);m.pop(key);receipt_mutants.append(("MISSING_"+key.upper(),canon(m)))
+ m=dict(r);m["unexpected"]="decoy:"+e["candidate_sha"];receipt_mutants.append(("UNEXPECTED_DECOY",canon(m)))
+ receipt_mutants.append(("REORDERED",canon({k:r[k] for k in reversed(R_KEYS)})))
+ receipt_mutants.append(("DUPLICATE",rr[:-2]+b',"effect_marker":"'+r["effect_marker"].encode()+b'"}\n'))
+ for key,bad in (("schema_version","1"),("observer_authority",1),("request_id",[]),("candidate_sha",None),("probe_identity",1),("probe_path",7),("probe_sha256",{}),("effect_marker",False)):
+  m=dict(r);m[key]=bad;receipt_mutants.append(("WRONG_TYPE_"+key.upper(),canon(m)))
+ for key in ("observer_authority","probe_identity","probe_path","effect_marker"):
+  m=dict(r);m[key]="";receipt_mutants.append(("EMPTY_"+key.upper(),canon(m)))
+ for key in ("request_id","candidate_sha","probe_sha256"):
+  m=dict(r);m[key]="g"*(40 if key=="candidate_sha" else 64);receipt_mutants.append(("BAD_HEX_"+key.upper(),canon(m)))
+ receipt_mutants.append(("INVALID_UTF8",b'{"schema_version":1,"observer_authority":"\xff"}\n'))
+ for name,bad_rr in receipt_mutants:
+  em=dict(e);em["effect_sha256"]=sha(bad_rr);reject("RECEIPT_RECOMPUTED_"+name,canon(em),bad_rr,ar,em)
+ for key in A_KEYS:
+  m=dict(a);m.pop(key);reject("ALLOWLIST_MISSING_"+key.upper(),er,rr,canon(m),e)
+ m=dict(a);m["unexpected"]="decoy:"+e["probe_identity"];reject("ALLOWLIST_UNEXPECTED_DECOY",er,rr,canon(m),e)
+ reject("ALLOWLIST_REORDERED",er,rr,canon({k:a[k] for k in reversed(A_KEYS)}),e)
+ reject("ALLOWLIST_DUPLICATE_KEY",er,rr,ar[:-2]+b',"probes":[]}\n',e)
+ probe=a["probes"][0]
+ for key in P_KEYS:
+  p=dict(probe);p.pop(key);reject("ALLOWLIST_PROBE_MISSING_"+key.upper(),er,rr,canon({"schema_version":1,"probes":[p]}),e)
+ p=dict(probe);p["unexpected"]="decoy";reject("ALLOWLIST_PROBE_UNEXPECTED",er,rr,canon({"schema_version":1,"probes":[p]}),e)
+ reject("ALLOWLIST_DUPLICATE_PROBE",er,rr,canon({"schema_version":1,"probes":[probe,probe]}),e)
+ for key,bad in (("probe_identity",1),("probe_path",[]),("probe_sha256",None),("effect_marker",{}),("result",False)):
+  p=dict(probe);p[key]=bad;reject("ALLOWLIST_PROBE_WRONG_TYPE_"+key.upper(),er,rr,canon({"schema_version":1,"probes":[p]}),e)
+ for label,key,bad in (("PRODUCER","producer_authority","other"),("TASK","task","h-032"),("CANDIDATE","candidate_sha",secrets.token_hex(20)),("SPEC","task_spec_sha256",secrets.token_hex(32)),("GATE","gate_sha256",secrets.token_hex(32)),("PROBE","probe_identity","decoy-"+e["probe_identity"]),("REQUEST","request_id",secrets.token_hex(32)),("RESULT","result","FAIL")):
+  m=dict(e);m[key]=bad;reject("BINDING_"+label,canon(m),rr,ar,e)
+ for label,key,bad in (("RECEIPT_CANDIDATE","candidate_sha",secrets.token_hex(20)),("RECEIPT_REQUEST","request_id",secrets.token_hex(32)),("RECEIPT_PROBE","probe_identity","decoy-"+e["probe_identity"]),("RECEIPT_PATH","probe_path",r["probe_path"]+"-decoy"),("RECEIPT_DIGEST","probe_sha256",secrets.token_hex(32)),("RECEIPT_MARKER","effect_marker",r["effect_marker"]+"-decoy")):
+  rm=dict(r);rm[key]=bad;bad_rr=canon(rm);em=dict(e);em["effect_sha256"]=sha(bad_rr);reject(label,canon(em),bad_rr,ar,em)
+ for label,key,bad in (("ALLOWLIST_PROBE_BIND","probe_identity","decoy-"+e["probe_identity"]),("ALLOWLIST_PATH_BIND","probe_path",r["probe_path"]+"-decoy"),("ALLOWLIST_DIGEST_BIND","probe_sha256",secrets.token_hex(32)),("ALLOWLIST_MARKER_BIND","effect_marker",r["effect_marker"]+"-decoy"),("ALLOWLIST_RESULT_BIND","result","FAIL")):
+  p=dict(probe);p[key]=bad;reject(label,er,rr,canon({"schema_version":1,"probes":[p]}),e)
+ for doc in ("evidence","receipt","allowlist"):
+  for kind in ("directory","pipe","socket"):
+   q=kernel_call(er,rr,ar,e,nonregular=(doc,kind));check(q.returncode==1 and q.stdout=="","K_REJECT_NONREGULAR_"+doc.upper()+"_"+kind.upper())
+ required_argv=("evidence-fd","receipt-fd","allowlist-fd","task","candidate","task-spec-sha256","gate-sha256","probe","request-id","require-result")
+ for key in required_argv:
+  q=kernel_call(er,rr,ar,e,omit=(key,));check(q.returncode==1 and q.stdout=="","K_REJECT_ARGV_MISSING_"+key.upper())
+  q=kernel_call(er,rr,ar,e,duplicate=(key,));check(q.returncode==1 and q.stdout=="","K_REJECT_ARGV_DUPLICATE_"+key.upper())
+ malformed=(
+  ("evidence-fd","not-a-decimal"),("receipt-fd","-1"),("allowlist-fd","999999999999999999999"),
+  ("task","h-032"),("candidate","g"*40),("task-spec-sha256","g"*64),("gate-sha256","g"*64),
+  ("probe",""),("request-id","g"*64),("require-result","GREEN"))
+ for key,bad in malformed:
+  q=kernel_call(er,rr,ar,e,argv_values={key:bad});check(q.returncode==1 and q.stdout=="","K_REJECT_ARGV_MALFORMED_"+key.upper())
+ q=kernel_call(er,rr,ar,e,extra=("--request-id",secrets.token_hex(32)));check(q.returncode==1 and q.stdout=="","K_DUPLICATE_OR_STALE_REQUEST_REJECT")
+ q=kernel_call(er,rr,ar,e,extra=("--unknown","x"));check(q.returncode==1 and q.stdout=="","K_UNKNOWN_ARGUMENT_REJECT")
+
+def main():
+ try:judge_controls();toolchain_anchor();production_contract()
+ except (OSError,ValueError,subprocess.SubprocessError,Rig) as e:print("RIG_ERROR:",e,file=sys.stderr);return 2
+ print("MATERIAL_PROPERTIES_JUDGE_ONLY=NONE")
+ print(f"H034_GATE_SUMMARY={passed} PASS {failed} FAIL")
+ print("H034_GATE_RESULT="+("EXPECTED_RED" if failed else "PASS"))
+ return 1 if failed else 0
+if __name__=="__main__":raise SystemExit(main())
