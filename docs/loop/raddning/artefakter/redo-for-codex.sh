@@ -63,11 +63,17 @@ else rad "dagsfärsk mot origin/main" ODÖMBART "nådde inte origin"; fi
 
 # ── 2. Regel 12 — inget arbete bara på maskinen ─────────────────────────────
 if [ -f "$A/inventera-lokalt-arbete.sh" ]; then
-  if bash "$A/inventera-lokalt-arbete.sh" >/tmp/redo-inv.txt 2>&1; then
-    rad "regel 12: allt lokalt arbete finns på git" JA
-  else
-    rad "regel 12: allt lokalt arbete finns på git" NEJ "se /tmp/redo-inv.txt"
-  fi
+  bash "$A/inventera-lokalt-arbete.sh" >/tmp/redo-inv.txt 2>&1; iv=$?
+  # VERDIKTALGEBRAN MÅSTE RESPEKTERAS: 0=uppfyllt · 1=verkligt fel · 2=ODÖMBART.
+  # Första versionen behandlade allt nollskilt som ✗. 2026-09-16 23:19 timeade
+  # fetchen ut, inventeringen svarade korrekt ODÖMBART — och detta prov bokförde
+  # det som "regel 12 ej uppfylld". Det är en MILJÖ bokförd som ett fel i
+  # kandidaten, precis det LOOP-RÄTTELSE-VAKTBEVIS förbjuder, i vaktens egen kod.
+  case $iv in
+    0) rad "regel 12: allt lokalt arbete finns på git" JA ;;
+    2) rad "regel 12: allt lokalt arbete finns på git" ODÖMBART "kunde inte mätas — se /tmp/redo-inv.txt" ;;
+    *) rad "regel 12: allt lokalt arbete finns på git" NEJ "se /tmp/redo-inv.txt" ;;
+  esac
 else rad "regel 12: allt lokalt arbete finns på git" ODÖMBART "provet saknas"; fi
 
 # ── 3. Autopush — regel 12 som mekanism ─────────────────────────────────────
