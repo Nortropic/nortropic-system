@@ -1,5 +1,57 @@
 # Att köra loopen
 
+## 2026-09-16 — PUBLICERINGSBEFOGENHETEN SAMMANJÄMKAD. Fem lager, en paragraf.
+
+Ägaren: *"varför har vi merge no på dessa ställen?"* → *"fixa detta"*.
+
+### Svaret var: det är inte fel, det är osammanjämkat
+
+| Datum | Lager | Sade |
+|---|---|---|
+| 2026-08-10 | operating model v1 | `PUSH=NO` · `MERGE=NO` |
+| 2026-08-10 | operating model v2 | autopiloten **får** publicera, PR:a, merga |
+| 2026-08-10 | operating model v3 | full roadmap autonomy |
+| 2026-08-11 | Harness Substitution Amendment v1 | — |
+| 2026-08-13 | delegationen | `OWNER_MERGE_APPROVAL_REQUIRED=NO` |
+
+**Alla fem är `[LOOP] ÄGARHAND` — ägarens egna beslut, inte agentackretion.** Men de
+skrevs över fyra dagar, var och en breddade den föregående, och **ingen gick tillbaka och
+ändrade den första**. Den som läste uppifrån mötte `MERGE=NO` och undantagen hundra rader
+ner.
+
+### Och det värre: scopet var dött
+
+```
+Scope: H-035 → H-034 → H-033 → H-032 → H-031 → supervisor resume
+h-031, h-032, h-035  AVSLUTADE OVERIFIERAT 2026-09-16
+```
+
+**Tre av fem namngivna task dog samma dag** — av ägarens eget beslut om trampkvarnen. Den
+bredaste publiceringsbefogenheten hängde alltså på en kedja som inte längre var vägen.
+
+**En befogenhet som namnger task dör med tasken.** Den nya paragrafen scopar därför till
+*vägen till `KERNEL_COMPLETE`*, inte till en lista.
+
+### Vad som inte ändras, och varför det är poängen
+
+Rollagenter publicerar aldrig. Den som bygger får inte attestera sin egen kandidat — det
+är integriteten, inte byråkrati. `NO_FORCE_SEMANTICS`, guarded merge-commit, frysta
+exitprov som trust authority, relock före merge, fail-closed vid ny policyfråga. Allt står.
+
+Det som försvinner är att en agent möter `MERGE=NO` överst och måste gissa vilket av fyra
+senare lager som gäller.
+
+### Följdrättelse: två påståenden i AGENTS.md blev osanna i morse
+
+`LOOP-ÄGARBESLUT-AUTONOM-KARNA` tog bort människohandskravet för `controller/**`,
+`specs/**` och `verify/**`. `AGENTS.md` sa fortfarande *"en §A-ÄNDRING kräver fortfarande
+människohand"* utan avgränsning. Nu begränsat till §A-kontrollens egen yta.
+
+**Det är fjärde gången i dag en ändring lämnat ett osant påstående kvar i ett
+grannavsnitt.** Regel 22 kräver docs i samma commit som ändringen — men säger inget om
+docs som ändringen gör osanna någon annanstans. Den luckan är inte stängd.
+
+
 ## 2026-09-16 — FYND 36: regel 8a auktoriserad i efterhand. Felet var mitt och det är mekanismens kärna.
 
 Ägaren: *"fixa de som väntar."* Regel 8a är därmed auktoriserad
