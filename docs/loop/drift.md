@@ -1,5 +1,76 @@
 # Att köra loopen
 
+## 2026-09-16 — MOTVILLIG GRANSKNING AV ÖVERLÄMNINGSPAKETET: sex hål. Alla rättade.
+
+Ägaren frågade om allt möjligt är gjort — *"inga farthinder, diken, återvändsgränder eller
+hål"*. Att svara ja på den frågan utan att leta är precis det fel hela dagen handlat om.
+Jag letade i stället efter hål, inte efter bekräftelse.
+
+### Hål 1 — Codex första instruktion pekade på en katalog som inte finns
+
+`PROMPT-TILL-CODEX.txt` rad 7: *"LÄS SEPARATION-20260910/ INNAN DU RÖR NÅGOT"*.
+**`SEPARATION-20260910/` finns inte på `main`** — den ligger på
+`nortropic/platform-integration-20260910`. Prompten sa var, men **80 rader längre ner** i
+ett annat sammanhang. `README.md` bar samma rad helt utan sökväg.
+
+Codex hade läst rad 7, letat i sin klon, inte hittat något — vid **steg noll**. Och att
+inte läsa den katalogen är vad som gav FYND 26. Rättat: exakt `git fetch` + `git show` i
+båda filerna.
+
+### Hål 2 — de tre nya proven var osynliga
+
+`inventera-lokalt-arbete.sh`, `radda-lokalt-arbete.sh` och `radda-okommitterat.sh` fanns i
+repot men var **varken routade från `README.md` eller nämnda i prompten**. De existerade
+för den som redan visste om dem — fynd 2:s felklass, ordagrant: *"uppdateringarna gick
+till det lager bara en pågående session läser."* Rättat: eget avsnitt i README, alla fem
+prov listade i prompten.
+
+### Hål 3 och 4 — validatorn bar två falsifierade etiketter
+
+`validera-underlaget.sh` är det prov `CLAUDE.md` säger att man ska köra **innan man lutar
+ett beslut mot ett tal**. Den skrev:
+
+| Etikett | Vad FYND hade visat |
+|---|---|
+| `h-016 (klar)` · `h-013 (klar)` | FYND 33: `11 PASS / 14 FAIL` respektive `8 PASS / 8 FAIL` |
+| `KÄRNA i scripts/: check-provanropare.mjs` (m.fl.) | FYND 31b: ägardömd `WEB / WEB_MOVE` |
+
+Talen var riktiga och provet grönt — **etiketterna var falska**. Rättat till
+`[FAIL, mätt]`, `[EJ MÄTT]`, `[PASS, mätt]` och `finns i scripts/`, med skälet i koden.
+*"Ej mätt" är inte "klar"*, och att skriva det är regel 8.
+
+### Hål 5 — prompten motsade sig själv om var arbetet sker
+
+Rad 123: *"Arbeta på den grenen. Inte på main."* ORDNINGEN steg 1: *"KÖR
+matning-pa-macen.sh PÅ MAIN."* Två instruktioner, motsatt innebörd, i samma fil.
+
+De är förenliga — **mät på main, bygg på grenen** — men det stod ingenstans. Rättat
+explicit, med skälet: `h-012` läser HEAD-commitens ändrade filer, så kartan måste
+verifieras där den påstås gälla.
+
+### Hål 6 — trasig pekare och en föråldrad status
+
+`06-inventering.md` rad 526 pekade på `10-...h014.md`, en fil som inte finns, och kallade
+`h-013` `OVERIFIERAT`. Den är mätt sedan FYND 33: **RÖD**. Båda rättade.
+
+### Vad granskningen INTE hittade
+
+Sandboxen är bekräftat öppen (`sandbox.enabled: false`, noll `Edit()`-lås,
+`disableBypassPermissionsMode` borttagen; de 19 kvarvarande deny-reglerna är
+credential-läsning och sudo, avsiktligt kvar). Alla fem prov är körbara (`100755`) på
+`main`. Validatorn `BEKRÄFTAT 33 · AVVIKER 0`. Vaktsviten `PASS 23/23`. Inga kvarvarande
+falska KLAR-påståenden utanför rättelsetext.
+
+### Lärdomen
+
+**Fyra av de sex hålen var routningsfel, inte sakfel.** Innehållet var riktigt; det gick
+inte att hitta. Det är samma felklass som gjorde att 55 commits låg osynliga i sex dagar,
+och den överlever varje sanningskontroll — för varje enskild mening var sann.
+
+Att fråga *"finns det hål?"* och leta efter bekräftelse hade gett svaret ja, allt är klart.
+Att leta efter hål gav sex.
+
+
 ## 2026-09-16 — Inventeringen skrek varg om 31 worktrees som redan var säkrade. Rättat.
 
 Efter mergen av PR #233 kördes `inventera-lokalt-arbete.sh` en sista gång. Domen var

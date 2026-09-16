@@ -69,12 +69,17 @@ rad "NO-CREDIT-rader i drift.md (>=101)" "JA" \
 # ── ⭐ Konvergensmätningen — underlagets tyngsta fynd ─────────────────────────
 echo
 echo "  ⭐ OMFRYSNINGAR PER GRIND — diskriminanten klar/icke-klar (01 §1, 02, 09 gren 2)"
-rad "h-016  (klar)"       "1"   "$(gatecommits h-016)"
-rad "h-013  (klar)"       "2"   "$(gatecommits h-013)"
-rad "h-017  (klar)"       "2"   "$(gatecommits h-017)"
-rad "h-038  (klar)"       "2"   "$(gatecommits h-038)"
-rad "h-001  (klar)"       "3"   "$(gatecommits h-001)"
-rad "h-036  (klar)"       "3"   "$(gatecommits h-036)"
+# ⚠️ ETIKETTERNA RÄTTADE 2026-09-16 efter FYND 33. Här stod "(klar)" på alla sex.
+# Körda på Macen i ren klon är h-016 (1 omfrysning) 11 PASS / 14 FAIL och h-013
+# (2 omfrysningar) 8 PASS / 8 FAIL. Talen nedan är riktiga; etiketten var det inte.
+# h-017, h-036 och h-038 ligger utanför h-015:s beroendeslutning och är INTE mätta
+# — "ej mätt" är inte "klar", och att skriva det är regel 8.
+rad "h-016  [FAIL, mätt]"   "1"   "$(gatecommits h-016)"
+rad "h-013  [FAIL, mätt]"   "2"   "$(gatecommits h-013)"
+rad "h-017  [EJ MÄTT]"      "2"   "$(gatecommits h-017)"
+rad "h-038  [EJ MÄTT]"      "2"   "$(gatecommits h-038)"
+rad "h-001  [PASS, mätt]"   "3"   "$(gatecommits h-001)"
+rad "h-036  [EJ MÄTT]"      "3"   "$(gatecommits h-036)"
 rad "h-035  (pågår)"      "17"  "$(gatecommits h-035)"
 rad "h-039  (pågår)"      "30"  "$(gatecommits h-039)"
 rad "h-032  (pågår)"      "120" "$(gatecommits h-032)"
@@ -127,11 +132,19 @@ rad "vaktfördelning webb/kärna/båda/noll" "16/2/1/4" \
          else n=$((n+1)); fi; done
        [ $((w+k+b+n)) -eq 0 ] && echo ODÖMBART || echo "$w/$k/$b/$n")"
 
-# ── §0b BLANDADE kataloger: kernelfilerna som aldrig får flytta ──────────────
+# ── §0b BLANDADE kataloger ──────────────────────────────────────────────────
+# ⚠️ ETIKETTEN RÄTTAD 2026-09-16 efter FYND 31b. Här stod "KÄRNA i scripts/" om
+# alla fem. Tre av dem är ägardömda WEB / WEB_MOVE i
+# SEPARATION-20260910/ALLOCATION.tsv och finns inte på plattformsgrenen:
+# check-provanropare.mjs, kor-styrprov.mjs, kor-vakter.mjs. Kärnans i scripts/ är
+# check-invariants.mjs, nortropic-codex-autopilot.py och
+# check-verifierarregistret.mjs, enligt PLATFORM_EXACT i plattformsgrenens
+# check-invariants.mjs — den mekanism som dömer.
+# Kontrollen prövar ENBART att filen finns, aldrig vems den är.
 echo
 for f in scripts/nortropic-codex-autopilot.py scripts/check-provanropare.mjs \
          scripts/check-verifierarregistret.mjs scripts/kor-styrprov.mjs scripts/kor-vakter.mjs; do
-  rad "KÄRNA i scripts/: $(basename "$f")" "FINNS" "$([ -f "$f" ] && echo FINNS || echo SAKNAS)"
+  rad "finns i scripts/: $(basename "$f")" "FINNS" "$([ -f "$f" ] && echo FINNS || echo SAKNAS)"
 done
 
 # ── Dokumentationsrättelsen: fyra commits ────────────────────────────────────
