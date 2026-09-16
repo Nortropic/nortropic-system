@@ -213,8 +213,24 @@ echo "  §0c LOKALT MASKINTILLSTÅND (read-only — riv ingenting)"
 if [ "$(uname -s)" = "Darwin" ]; then
   rad "/usr/local/libexec/nortropic riven" "RIVEN" \
       "$([ -e /usr/local/libexec/nortropic ] && echo FINNS || echo RIVEN)"
-  rad "systemkonton raderade" "0" \
-      "$(dscl . -list /Users 2>/dev/null | grep -ci nortropic || echo ODÖMBART)"
+  # NAMNGE DE SJU. Raden greppade tidigare "nortropic" skiftlägesokänsligt och
+  # träffade _nortropic_provenance — H-033:s produsentidentitet, skapad 2026-08-14,
+  # EN VECKA EFTER att 5Z-kontona raderades. Det kontot SKA finnas: det refereras av
+  # de frysta proven verify/bin/h-033-exit och h-034-exit, av controller/h034-native/
+  # kernel.c, av controller/provenance/{install,cli,native/service.c} och av h-033:s
+  # och h-034:s exit_criterion i specs/tasks.spec.json. Provet rapporterade alltså
+  # "5Z-avvecklingen ofullständig" om ett konto vars radering hade fällt två grindar.
+  # Mätt och rättat 2026-09-16. De sju heter (LOOP-PASS0 FYND 3):
+  FEMZ='^(nortropic-cr|nortropic-cv|nortropic-cw|nortropiccontroller|nortropicreviewer|nortropicverifier|nortropicworker)$'
+  rad "5Z:s sju systemkonton raderade" "0" \
+      "$(u="$(dscl . -list /Users 2>/dev/null)" || { echo ODÖMBART; }; \
+         [ -n "${u:-}" ] && printf '%s\n' "$u" | grep -cE "$FEMZ")"
+  # _nortropic_provenance är INTE en 5Z-kvarleva utan en beroende komponent.
+  # Saknas den är h-033/h-034 obyggbara på denna maskin — därför en egen rad,
+  # med omvänd förväntan.
+  rad "_nortropic_provenance FINNS (h-033 kräver det)" "1" \
+      "$(u="$(dscl . -list /Users 2>/dev/null)" || { echo ODÖMBART; }; \
+         [ -n "${u:-}" ] && printf '%s\n' "$u" | grep -cx '_nortropic_provenance')"
   rad "~/Arkiv finns" "JA" "$([ -d "$HOME/Arkiv" ] && echo JA || echo NEJ)"
   echo "    (sudoers-filen kräver sudo och prövas för hand — se 06-inventering.md §0c)"
 else
