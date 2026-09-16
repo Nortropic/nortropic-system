@@ -427,7 +427,7 @@ operativsystemet. Kör den på Macen.
 ## Läget i en bild
 
 ```
-BOOTSTRAP-KEDJAN — pågår, 4 av 8 kvar
+BOOTSTRAP-KEDJAN — EJ VÄGEN. h-039/032/031 avslutade OVERIFIERAT 2026-09-16
   h-035 ✓ → h-037 ✓ → h-034 ✓ → h-036 ✓ → h-039 ⛔ → h-038 ✓ → h-032 ⛔ → h-031 ⛔
                                      AVSLUTADE OVERIFIERAT 2026-09-16 (regel 11b)
      ⚠️ Denna kedja är INTE vägen till målet. Se "VÄGEN" nedan.
@@ -441,7 +441,7 @@ SUBSTITUTIONSKEDJAN — 0 av 4 finns som task
 KÄRNLOOPEN — 15 av 17 HAR gate. Att HA en gate är inte att PASSERA den.
   ✓ = grindfilen finns    (mätt 2026-09-16: se ⚠️ nedan)
   h-001…h-013 ✓   h-016 ✓   h-017 ✓
-  h-014 ⊘ gate saknas (byggbar NU)
+  h-014 ⊘ gate saknas ("byggbar NU" FALSIFIERAT — h-013 är FAIL)
   h-015 ⊘ gate saknas OCH blockerad av h-030
 
   ⚠️ FYND 33: KÖRDA på Macen i ren klon FALLER h-004, h-009, h-011, h-012,
@@ -460,7 +460,7 @@ PROGRAMDOMEN
 
 ---
 
-## 1. Bootstrap-kedjan — det som pågår
+## 1. Bootstrap-kedjan — avslutad, INTE vägen framåt
 
 Beroendeordningen ur specen, inte ur prosan:
 
@@ -471,7 +471,7 @@ Beroendeordningen ur specen, inte ur prosan:
 | `h-034` | ✓ | h-037 | Native finite verifier kernel |
 | `h-036` | ✓ | h-034 | Pre-sandbox owner för monotona Seatbelt-barn |
 | `h-033` | ✓ | h-034 | Authenticated runner provenance (sidogren) |
-| **`h-039`** | ✓ | h-036 | **OS-exclusive cleanup mediator — runda 33, pågår** |
+| **`h-039`** | ✓ | h-036 | OS-exclusive cleanup mediator — **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
 | `h-038` | ✓ | h-035, h-036 | Managed attempt root confinement |
 | `h-032` | ✓ | h-036 | Exact Codex provider identity |
 | `h-031` | ✓ | h-032 | Codex-autopiloten, explicit modellrouting |
@@ -589,7 +589,7 @@ nästa `verify/bin`-ändring. Det kräver doktrinregel iv först.
 |---|---|---|
 | Bootstrap-kedjan klar | 4 | h-039 (R33) → h-038 → h-032 → h-031. Gates finns |
 | Substitutionskedjan | 4 | h-027…h-030. **Inte specade** |
-| `h-014` notis | 1 | Gate saknas. Byggbar nu |
+| `h-014` notis | 1 | Gate saknas. *"Byggbar nu"* **FALSIFIERAT** — `h-013` är FAIL, mätt på `main` 2026-09-16 |
 | `h-015` återtag / supervisor resume | 1 | Gate saknas. Blockerad av h-030 |
 | Programdomen | 1 | `autonomous-loop-exit` saknas |
 | **Till `KERNEL_COMPLETE`** | ~~11~~ **6** | Se rättelsen nedan |
