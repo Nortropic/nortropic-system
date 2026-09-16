@@ -122,6 +122,10 @@ webbfiler** och ett register som pekar på `workflows/nortropic-verify-suite.js`
 
 Detta är den ordning som gör grenen mergebar. Den tar **inte** kärnan i mål.
 
+**Och den är inte hela paketet.** Underlaget bär sju dokument med byggbart innehåll
+(`07`–`12`), sex med diagnos och metod (`00`, `01`, `02`, `04`, `05`, `06`) och två
+routrar. Listan nedan pekar på var och en. Läs `README.md` för vad varje fil gör.
+
 ### ⚠️ Tre hypoteser är AVSLUTADE — plocka inte upp dem
 
 `h-039` (30 omfrysningar), `h-032` (120) och `h-031` (147) avslutades **`OVERIFIERAT`**
@@ -137,11 +141,31 @@ därmed **inte** vägen framåt. Den leder inte heller till supervisor resume �
 
 Efter merge återstår, i den ordningen:
 
+0. **`docs/loop/autonomy-kernel-v1-acceptance.md` — acceptansfilen.** Underlag i
+   `07-v1-acceptans.md`. Verifierat: **ingen sådan fil finns**, och termen
+   *"Autonomy Kernel"* förekommer noll gånger i repot. Den ska sammanföra befintlig
+   auktoritet, inte skapa en konkurrerande kravlista — varje rad pekar på en redan
+   beslutad källa. Dess §1 är viktigast: **Autonomy Kernel v1, bootstrap-frisläppning,
+   första autonoma start och full-roadmap-avslut är FYRA OLIKA SAKER** och får aldrig
+   användas som synonymer.
 1. `verify/bin/autonomous-loop-exit` — fryst RED mot `KERNEL_COMPLETE`
    (`00-VAD-NORTROPIC-AR.md`). Specificerad 2026-08-10, aldrig byggd. Utan den finns
    ingen mekanism som kan säga *klart*, och då mäts framsteg i rundor.
 2. De tre vakterna (`11-tre-vakter-mot-aterfall.md`), som PINV-kontroller enligt
-   ägarbeslutet.
+   ägarbeslutet. Var och en har ett **kört** positivt kontrollprov — reproducera det
+   innan du bygger.
+2b. **`h-040`, rundtrampsvakten** (`09-task-rundtrampsvakten.md`). Den mekaniserar
+   regel 11: omfrysningsbudget, `MÅLFLYTT`, grindkedjeförbudet. Regeln finns nu, men
+   **regler utan mekanism fäller ingenting** — det bevisade regel 22 i fem dagar.
+   §2:s blockerande placeringsfråga är löst; §4 gren 2 är omskriven till att räkna
+   omfrysningar i stället för filstorlek.
+2c. **De tre arbetsreglerna** (`08-mekanismer.md`), kopplade till befintligt flöde så
+   att de FÄLLER. Bär fyndet som förklarar varför förslag blir reparationsrundor:
+   `codex-autopilot-report.schema.json` har **ingen icke-blockerande fyndkanal** —
+   enda listan heter `blocking_findings` och roten har `additionalProperties: false`.
+   Ett smakförslag har ingenstans att ta vägen utom in i den blockerande listan.
+   Ingreppet är additivt, och schemat läses av fyra frysta exitprov — via test-author,
+   aldrig av en builder.
 3. `h-014` — spec färdig, grind saknas. Pröva `h-013` på Macen först.
 4. `h-027`–`h-030`, substitutionskedjan. Finns **inte** som task i något repo.
    `h-015` (supervisor resume) beror mekaniskt på `h-030`.
