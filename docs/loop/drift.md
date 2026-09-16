@@ -1,5 +1,90 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 20: separationen ÄR gjord och verifierad — på en opushad gren
+
+`~/nortropic-repos/nortropic-system`, gren `nortropic/platform-integration-20260910`:
+**55 commits före `origin/main`, 0 bakom.** Rent arbetsträd, inga stashar. Spannet är
+**2026-09-09 → 09-12** — exakt den vecka FYND 16 visade som tom i detta lägesdokument.
+
+```
+49cc495  2026-09-10  [SEPARATION] ÄGARBESTÄLLD: bryt ut webbförvaltningen till separat repo
+```
+
+377 filer, **+15 022 / −90 414**. `workflows/`, `vendored-skills/ui-ux-pro-max/**` och hela
+webbträdet borta. Sex nya frysta grindar som main saknar:
+`platform-separation-final-exit` (4 131 rader), `platform-control-set-exit` (974),
+`platform-governance-exit` (842), `launch-cwd-exit` (665), `document-authority-exit` (604),
+`invariant-required-exit` (406).
+
+### Mätt på grenen, inte läst
+
+| Prov | Utfall |
+|---|---|
+| Webbfiler under `agents/skills/packs/backtests/workflows` | **0** |
+| `controller/verify/register.json` | **en** post, `check-invariants.mjs`, omskriven till *"plattformsinvariantgrind PINV-001–006"*; `nortropic-verify-suite.js` borta; registret under `denied_write` |
+| `verify/bin/platform-separation-final-exit` | **exit 0 — PASS** |
+| `verify/bin/invariant-required-exit` | **exit 0 — PASS** |
+
+**Den cirkulära trust-roten är alltså upplöst, och separationen är mekaniskt verifierad.**
+Det var `raddning/03-raddningsplan.md` steg 4 och 5, och de utfördes 2026-09-10.
+
+### DIAGNOSEN STÅR — det är ÅTGÄRDEN som ändras
+
+Mätt mot `origin/main` samma dag: **79 webbfiler kvar**, och registret pekar fortfarande
+på `workflows/nortropic-verify-suite.js`. Underlagets beskrivning av main är alltså
+korrekt och oförändrad. Skillnaden är att lösningen **redan finns byggd** — den är bara
+inte landad. Steg 4 och 5 går från *bygg* till *granska och landa*.
+
+### FYND 21: den strukturella grinddefekten, bevisad på sex grindar
+
+Tre av de nya grindarna är röda, och alla på samma grund:
+
+```
+FAIL g6_frozen_trees_and_files_identical_to_512490d4_plus_this_gate_only
+FAIL frozen_artifacts_identical_to_dae90c8f
+FAIL frozen_verify_bin_identical_to_base_383ed387
+RIG_ERROR: subject approved document mismatch: AGENTS.md
+```
+
+Ingen av dem prövar om arbetet är rätt. De kräver att trädet är **byte-identiskt med ett
+baskommit grenen redan passerat**:
+
+| Bas | Datum | Commits sedan | Ändrade `verify/bin`-filer |
+|---|---|---|---|
+| `512490d4` | 2026-09-10 | 40 | 5 |
+| `dae90c8f` | 2026-09-10 | 48 | 7 |
+| `383ed387` | 2026-09-10 | 44 | 6 |
+
+De är dessutom kedjade: `platform-governance` faller på
+`g7_platform_control_set_exit_68_of_68` och `g7_launch_cwd_exit_19_of_20` — den kräver
+andra grindars **exakta poängsummor**. En stale bas fäller en grind, som fäller varje
+grind som kräver dess utfall.
+
+**Detta är samma mekanism som H-039:s 30 omfrysningar, nu på sex oberoende grindar.** Det
+är inte en H-039-egenhet utan en konstruktionsdefekt i hur grindar skrivs: de fryser en
+ögonblicksbild av hela världen i stället för egenskapen de ska mäta. Varje arbete någon
+annanstans invaliderar dem alla.
+
+**Och facit ligger i samma katalog:** `platform-separation-final-exit` är GRÖN trots att
+trädet rört sig 40+ commits — för den prövar *att webbträdet är borta*, inte *att allt är
+identiskt med commit X*. En grind som mäter mekanismen passerar; fem som mäter miljön
+faller.
+
+Det förklarar också varför de 55 commitsen aldrig pushades. De är inte halvfärdiga av
+slarv — de sitter fast i en grindkonstruktion som inte kan vara grön två dagar i rad.
+
+**Doktrinregel iv (`raddning/03-raddningsplan.md` steg 1b) har därmed belägg långt bortom
+H-039, och den är nu paketets viktigaste post med bred marginal.** Att frysa om de fyra
+mot nuvarande bas vore runda N+1 och skulle falla igen vid nästa `verify/bin`-ändring.
+
+### ⚠️ Riskpost: 55 commits finns på EN plats
+
+Grenen är opushad och märkt `[LOCAL]` / `READY_FOR_LOCAL_QUALIFICATION_ONLY`. Den
+märkningen är avsiktlig och ska respekteras — men en disk är en disk. Backuprepots
+runbook säger att den ska bevara *"unpublished/dirty/untracked work"*; om grenen inte är
+säkrad där är det en täckningslucka som kostar sex dagars kernelarbete.
+
+
 ## 2026-09-16 — Den skyddade klonen var övergiven sedan 10 augusti
 
 Undersökningen av det ospårade materialet i `~/nortropic/nortropic-system` är **stängd**.

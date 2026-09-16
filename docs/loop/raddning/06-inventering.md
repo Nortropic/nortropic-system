@@ -535,6 +535,26 @@ specificera nio skivor innan loopen bevisats köra är att bygga ovanpå obevisa
 
 ---
 
+## 4b. ⚠️ OMVÄRDERAT 2026-09-16 — två poster är redan gjorda
+
+Fynd 20 (`docs/loop/drift.md` 2026-09-16) flyttar två poster ur restlistan. Grenen
+`nortropic/platform-integration-20260910` (opushad, 55 commits före main) bär dem klara:
+
+| Post | Var | Bevis |
+|---|---|---|
+| Separationen (plan steg 4) | gjord 2026-09-10 | 0 webbfiler; `platform-separation-final-exit` **exit 0** |
+| Kärnans egen grindsvit + registerbytet (plan steg 5) | gjord 2026-09-10 | registret bär EN post, kärnans invariantgrind; `invariant-required-exit` **exit 0** |
+
+**Restlistan nedan räknar `origin/main`**, där ingetdera är landat ännu. Det är korrekt
+som beskrivning av main — men den som planerar arbete ska veta att posterna inte ska
+byggas, bara granskas och landas.
+
+**Ny post i stället:** lös FYND 21 på den grenen. Tre grindar är röda på föråldrade
+baspinnar, inte på defekt arbete, och en omfrysning mot nuvarande bas löser det bara tills
+nästa `verify/bin`-ändring. Det kräver doktrinregel iv först.
+
+---
+
 ## 5. Kvarvarande arbete, sammanräknat
 
 | Post | Antal | Läge |

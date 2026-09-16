@@ -247,6 +247,21 @@ inget i denna fas; rättelserna blir en egen builder-task.
 
 ## Steg 4 — Avgör separationen  *(roll: architect, read-only)*
 
+> ## ⚠️ OMSKRIVET 2026-09-16: separationen är GJORD — steget är att LANDA den
+>
+> Grenen `nortropic/platform-integration-20260910` (`~/nortropic-repos/nortropic-system`,
+> 55 commits före main, opushad) bär separationen färdig och mekaniskt verifierad:
+> 0 webbfiler kvar, `platform-separation-final-exit` **exit 0**, ägarbeställd i commit
+> `49cc495` 2026-09-10.
+>
+> **De tre vägarna A/B/C nedan är därmed obsoleta.** Valet är inte längre hur
+> separationen ska göras, utan hur den befintliga grenen granskas och landas. Det som
+> blockerar är FYND 21: tre av grenens grindar är röda på föråldrade baspinnar, inte på
+> defekt arbete.
+>
+> Behåll avsnittet som bakgrund till varför separationen var svår — men bygg ingenting
+> av det.
+
 **Blockeringen:** att flytta ut webbträdet bryter frysta, SHA-bundna exitprov. En fryst
 gate kan inte skrivas om — den kräver en ny fryst runda. Att byta `register.json`
 hjälper inte: de frysta proven läser registrets innehåll. Detaljerna i
@@ -292,6 +307,18 @@ Måste vändas i första commiten där.
 ---
 
 ## Steg 5 — Ge kärnan en egen grindsvit — och lös upp cirkeln
+
+> ## ⚠️ GJORT 2026-09-10 — verifierat 2026-09-16
+>
+> *"Det konkreta draget"* nedan är utfört på grenen
+> `nortropic/platform-integration-20260910`: `controller/verify/register.json` bär nu EN
+> post — `scripts/check-invariants.mjs`, omskriven till *"Deterministisk
+> plattformsinvariantgrind PINV-001–006"* — och `workflows/nortropic-verify-suite.js` är
+> borta. Registret ligger dessutom under `denied_write` i specen och ändras bara genom
+> kontraktsflödet.
+>
+> `invariant-required-exit` ger **exit 0**. Den cirkulära kopplingen finns inte längre på
+> den grenen. Kvar: landa den. Se steg 4.
 
 **Det konkreta draget:** `controller/verify/register.json` registrerar i dag två
 **webbfiler**. Registrerar det kernelverifierare i stället upphör hela den cirkulära

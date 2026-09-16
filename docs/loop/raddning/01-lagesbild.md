@@ -194,6 +194,21 @@ Next.js-övervakningsdashboard och hör inte hit.
 
 ## 5. Kärnans trust-rot är pinnad till webblagret
 
+> ## ⚠️ LÖST 2026-09-10 — men lösningen är inte landad
+>
+> **Allt i detta avsnitt gäller fortfarande `origin/main`** (mätt 2026-09-16: 79 webbfiler
+> kvar, registret pekar på `workflows/nortropic-verify-suite.js`). Diagnosen är alltså
+> korrekt.
+>
+> **Men lösningen finns redan byggd och verifierad** — på grenen
+> `nortropic/platform-integration-20260910` i `~/nortropic-repos/nortropic-system`,
+> 55 commits före main, opushad. Där är webbträdet borta, registret bär EN post som är
+> kärnans egen invariantgrind, och `verify/bin/platform-separation-final-exit` ger
+> **exit 0**.
+>
+> **Läs detta avsnitt som diagnos, inte som arbetsbeskrivning.** Åtgärden är inte att
+> bygga — det är att granska och landa. Se `docs/loop/drift.md` 2026-09-16, FYND 20.
+
 Detta är det som faktiskt blockerar separationen.
 
 | Kernelankare | Pinnat till |

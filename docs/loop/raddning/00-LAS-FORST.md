@@ -86,6 +86,28 @@ skälet till att `06-inventering.md` §0 kräver en annan metod, inte samma komm
 | Beslutsloggen är "nyast sist" | Filens eget kontrakt på rad 16: *"aktuell kandidat först, därefter äldst först"* |
 | Konstitutionen är delat styrlager | Innehållet har **0** kernelomnämnanden; varje sökväg §A skyddar ligger i webbträdet |
 
+**⚠️ EN TJUGONDE OCH EN TJUGOFÖRSTA — och de ändrar vad som återstår att göra.**
+Hittade 2026-09-16 när en `git checkout` råkade misslyckas på ägarens maskin.
+
+**Separationen ÄR gjord.** Grenen `nortropic/platform-integration-20260910` i
+`~/nortropic-repos/nortropic-system` ligger **55 commits före `origin/main`, 0 bakom**,
+opushad, spann 2026-09-09→09-12 — exakt den vecka `drift.md` bar noll rader. Commit
+`49cc495` är ägarbeställd: *"bryt ut webbförvaltningen till separat repo"*. 377 filer,
++15 022/−90 414. Mätt på grenen: **0 webbfiler**, registret bär EN post som är kärnans
+egen invariantgrind, `platform-separation-final-exit` ger **exit 0**.
+**`03-raddningsplan.md` steg 4 och 5 är därmed utförda** — de ska landas, inte byggas.
+Diagnosen av `origin/main` står oförändrad (79 webbfiler kvar där).
+
+**Och grinddefekten är strukturell, inte en H-039-egenhet.** Tre av grenens nya grindar
+är röda, alla på `frozen_*_identical_to_<bas>` — de kräver byte-identitet med ett träd
+från 09-10 som ligger 40–48 commits bak med 5–7 ändrade `verify/bin`-filer. De är
+dessutom kedjade till varandras exakta poängsummor. **Samma mekanism som H-039:s 30
+omfrysningar, nu på sex oberoende grindar.** Facit i samma katalog:
+`platform-separation-final-exit` är GRÖN trots 40+ commits, eftersom den prövar *att
+webbträdet är borta* i stället för *att allt är identiskt med commit X*.
+**Doktrinregel iv är därmed paketets viktigaste post med bred marginal.**
+Detaljer i `docs/loop/drift.md` 2026-09-16.
+
 **En TRETTONDE, och den avgjorde att detta paket fick en MEKANISM.** Samma artefakt —
 webb-bundlen — beskrevs med **tre olika tal på tre ställen**: `365/325` i `02-bevis.md`,
 `345/320` i `06-inventering.md`, `337/311` i `00-LAS-FORST.md`. De två första var kvar
@@ -216,9 +238,11 @@ Ordningen är inte godtycklig. Den följer vad som faktiskt förbrukar projektet
    `h-015` (supervisor resume) beror mekaniskt på `h-030`, som aldrig skrivits som task
    — den kedjan som arbetas på leder inte fram till målet.
 3. **Pröva resten av inramningen.** Se KLASS-varningen ovan.
-4. **Avgör separationen.** Viktig, men en följd av problemet — inte orsaken. Kärnan kan
-   nå `KERNEL_COMPLETE` med webbträdet kvar i trädet.
-5. **Ge kärnan en egen grindsvit.** I dag har den ingen.
+4. **~~Avgör separationen~~ → GRANSKA OCH LANDA den befintliga grenen.** Separationen är
+   gjord och verifierad 2026-09-10 på `nortropic/platform-integration-20260910`, opushad.
+   Bygg ingenting; granska, lös FYND 21:s baspinnar, landa.
+5. **~~Ge kärnan en egen grindsvit~~ → GJORT.** Registret bär kärnans egen
+   invariantgrind sedan 2026-09-10. `invariant-required-exit` exit 0. Kvar: landa den.
 
 Detaljerna, med roll per steg, står i `03-raddningsplan.md`.
 
