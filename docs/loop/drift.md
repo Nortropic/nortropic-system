@@ -1,5 +1,55 @@
 # Att köra loopen
 
+## 2026-09-17 — Rundtrampen städad: 4,7 GB frigjort, 386 kataloger borta
+
+Genomfört på ägarens maskin enligt regel 13c, efter att regelns fyra villkor mätts.
+
+| | Före | Efter |
+|---|---|---|
+| `~/nortropic` | 4,7 GB | **973 MB** |
+| `~/nortropic-repos` | 1,0 GB | **37 MB** |
+| kataloger under `worktrees/` | 357 | **2** |
+| kataloger under `work/` | 52 | **0** |
+| registrerade worktrees | 228 | **1** |
+
+**334 + 52 = 386 kataloger.** Varje katalog var en runda som inte konvergerade —
+`h-039` gick 30, `h-032` 120, `h-031` 147. Rundtrampen kostade alltså 4,7 GB utöver
+tiden.
+
+### Vad som säkrades först, i den ordning regel 13b kräver
+
+| Villkor | Utfall |
+|---|---|
+| Rundan avslutad | de tre hypoteserna avslutade `OVERIFIERAT` 2026-09-16 |
+| HEAD på origin | 13 `radda/orphan-*`, inklusive `a288e16` som bara fanns i ett lokalt bare-repo |
+| Okommitterat säkrat | 5 `radda/smuts-*` via tempindex, inget arbetsträd rört |
+| Ignorerat innehåll **mätt** | 1 179 filer i 14 träd — grindfixturer, `__pycache__`, `.claude/`, `.DS_Store`. Största posten 252 KB |
+
+### Två kataloger behölls — ägarbeslut
+
+`intake-v44` (385 MB) och `claude-factory` (132 MB) är inte git och bär arbete ägaren
+känner. *"vi kan låta de vara, jag vet vad de är."* `claude-factory` arkiverades ändå
+till `~/Arkiv/claude-factory-20260916.tar.gz`, verifierat till 2 680 poster mot 2 680
+filer på disk.
+
+De ligger under `worktrees/`, så städningen undantog dem explicit på namn.
+
+### Vad som gjorde städningen möjlig
+
+Fyra fynd samma kväll, alla av samma form — ett prov som uttalade sig om mer än det
+läste:
+
+| Fynd | Antagandet som föll |
+|---|---|
+| 37 | provet läste bara **registrerade** worktrees |
+| 38 | `.gitignore` är en vitlista; `git status` och `add -A` ser inte förbi den |
+| 39 | grindarnas restkontroll mätte med samma blinda kommando |
+| 40 | filtret krävde att origin innehöll `nortropic-system` — 24 repon föll bort |
+| — | scandjupet var satt till fyra; ett repo låg på fyra |
+
+**Ingen av dem hittades av ett prov. Alla fem hittades av en ägarfråga.**
+
+
 ## 2026-09-16 — FYND 40: tjugofyra repon som ingen mätning såg, och 517 MB utan git
 
 Tredje gången samma kväll var `✅ REGEL 12 UPPFYLLD` för smal. Den här gången hittades
