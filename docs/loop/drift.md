@@ -1,5 +1,46 @@
 # Att köra loopen
 
+## 2026-09-16 — Den skyddade klonen var övergiven sedan 10 augusti
+
+Undersökningen av det ospårade materialet i `~/nortropic/nortropic-system` är **stängd**.
+Klonen bär ingenting som `origin/main` saknar.
+
+```
+bakom origin/main: 493        före origin/main: 0
+HEAD = c9275554 "[LOOP] ÄGARHAND: installera Codex operating model v2"  (2026-08-10)
+```
+
+| Artefakt | Utfall |
+|---|---|
+| `h-031-exit`, `h-032-exit` | = historisk blob `d888a4d7` (2026-08-21) — gammal utcheckning |
+| `h-034-exit`, `h-035-exit` | = historisk blob `6c12820d` (2026-08-13) — gammal utcheckning |
+| `h-033-exit`, `python-interpreter-authority-v1-exit` | identiska med `origin/main` |
+| `specs/tasks.spec.json` | ocommittad, men **strikt delmängd**: 22 tasks mot mains 26; saknar `h-036`–`h-039` |
+
+Grindarna såg ospårade ut därför att de inte fanns i trädet vid `c9275554`. Filerna på
+disk är nyare än det utcheckade commit:et — en gammal utcheckning, inte nytt arbete.
+
+**Oberoende bekräftelse av inventeringens tyngsta fynd:** `h-027`–`h-030` saknas även i
+den lokala augustiversionen. Substitutionskedjan har alltså aldrig skrivits, på någon
+plats vi känner till. `raddning/06-inventering.md` §2 står.
+
+### Och det som gör detta till mer än städning
+
+**§A-skyddet pekade på den här klonen.** Varje `denyWrite`-sökväg var prefixad
+`/Users/elinhaggstrom/nortropic/nortropic-system/…` — en katalog som inte tagit emot en
+commit sedan 10 augusti, medan allt verkligt arbete skedde i `~/nortropic-repos/`
+(FYND 17, 30 worktrees 09-10→09-13).
+
+Sandboxen skyddade alltså en **övergiven** klon i fem veckor. FYND 18 sa att låset prövade
+var filen låg i stället för vad som hände med den; detta visar att det inte ens prövade
+rätt plats. Ägarbeslutet att öppna (`LOOP-ÄGARBESLUT-SANDBOX-OPEN`) vilar därmed på
+starkare grund än när det fattades.
+
+**Kvarstår:** samma prov är ännu inte kört mot den LEVANDE roten
+`~/nortropic-repos/nortropic-system`. Det är där §0c:s fråga — finns kernelarbete som
+main saknar — faktiskt ska ställas. `OVERIFIERAT` tills dess.
+
+
 ## 2026-09-16 — INCIDENT vid policyinstallation + ospårat kernelarbete funnet
 
 **Policyn är nu installerad och verifierad identisk** mot källkopian på grenen
