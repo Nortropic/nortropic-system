@@ -60,6 +60,7 @@ PYTHON_SHA256 = "94be2db6796807c796419e7adbc45cbff3e71966c107c2adcbf931cf7039394
 PYTHON_APP_BINARY = PYTHON_SOURCE.parent.parent / "Resources/Python.app/Contents/MacOS/Python"
 PYTHON_APP_SHA256 = "9ea12d11e0573548d6d8b0added1740b2d6377366081dbca05c19746ce7c616e"
 TRUST_ROOT_ENV = "NORTROPIC_TRUST_ROOT"
+ATTEMPT_ROOT_ENV = "NORTROPIC_ATTEMPT_ROOT"
 STAGING_ROOT_ENV = "NORTROPIC_STAGING_ROOT"
 RESULT_SINK_ENV = "NORTROPIC_RESULT_SINK"
 RUNTIME_PARENT = "/private/tmp"
@@ -69,7 +70,7 @@ HANDSHAKE_TIMEOUT = 5.0
 STRIP_PREFIXES = ("DYLD_", "GIT_", "GH_", "GITHUB_", "PYTHON", "SLACK_")
 STRIP_EXACT = frozenset({
     "LD_LIBRARY_PATH", "LD_PRELOAD", "NORTROPIC_TRUST_ROOT",
-    "NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
+    "NORTROPIC_ATTEMPT_ROOT", "NORTROPIC_STAGING_ROOT", "NORTROPIC_RESULT_SINK", "__PYVENV_LAUNCHER__",
 })
 RESERVED_PREFIX = "NORTROPIC_H036_"
 EPHEMERAL_KEYS = (
@@ -278,6 +279,43 @@ def overlaps(a: Path, b: Path) -> bool:
     return sa == sb or sa.startswith(sb + os.sep) or sb.startswith(sa + os.sep)
 
 
+def close_owned(fd: int) -> bool:
+    try: os.close(fd) if fd >= 0 else None; return True
+    except OSError: return False
+def stable_path(path: Path, directory: bool, mode: int | None = None):
+    text = str(path)
+    if not path.is_absolute() or os.path.normpath(text) != text or os.path.realpath(text) != text: return None
+    dflags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0); fd = -1; result = None
+    try:
+        fd = os.open(path.anchor, dflags); names = path.parts[1:]
+        for index, component in enumerate(names):
+            before = os.stat(component, dir_fd=fd, follow_symlinks=False); want_directory = directory or index < len(names) - 1; flags = dflags if want_directory else os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+            child = os.open(component, flags, dir_fd=fd); parent_fd, fd = fd, child
+            if not close_owned(parent_fd): raise OSError("managed parent close failed")
+            if (want_directory and not stat.S_ISDIR((opened := os.fstat(fd)).st_mode)) or (before.st_dev, before.st_ino, before.st_mode) != (opened.st_dev, opened.st_ino, opened.st_mode): raise OSError("managed ancestor changed")
+        if (opened := os.fstat(fd)).st_uid != os.geteuid() or (directory and not stat.S_ISDIR(opened.st_mode)) or (not directory and (not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1)) or (mode is not None and stat.S_IMODE(opened.st_mode) != mode): raise OSError("managed identity changed")
+        result = (text, opened.st_dev, opened.st_ino)
+    except OSError: pass
+    doomed, fd = fd, -1
+    return result if close_owned(doomed) else None
+def strict_child(child: Path, parent: Path) -> bool: return str(child).startswith(str(parent) + os.sep)
+def select_trust_source(root: Path, preferred: Path | None):
+    if preferred is not None and (preferred_id := stable_path(preferred, False)) is not None and strict_child(Path(preferred_id[0]), root): return preferred_id
+    try:
+        with os.scandir(root) as entries: names = [entry.name for _index, entry in zip(range(129), entries)]
+    except OSError: return None
+    if len(names) > 128: return None
+    for name in sorted(names):
+        if (candidate := stable_path(root / name, False)) is not None and Path(candidate[0]).parent == root: return candidate
+    return None
+def validate_managed(ws: Path, trust: Path, trust_given: bool, live_git: Path):
+    attempt, staging, sink = (Path(os.environ[key]) for key in (ATTEMPT_ROOT_ENV, STAGING_ROOT_ENV, RESULT_SINK_ENV)); attempt_id = stable_path(attempt, True, 0o700); trust_source = Path(os.environ[TRUST_ROOT_ENV]) if trust_given else trust
+    workspace_id, trust_id = stable_path(ws, True), stable_path(trust_source, True); staging_id, sink_id = stable_path(staging, True), stable_path(sink, False, 0o600)
+    if None in (attempt_id, workspace_id, trust_id, staging_id, sink_id): return False, "managed roots måste vara kanoniska nofollow-objekt för aktuell uid"
+    attempt, trust = Path(attempt_id[0]), Path(trust_id[0]); staging, sink = Path(staging_id[0]), Path(sink_id[0])
+    roots = [ws, staging] + ([trust] if trust_given else []); invalid = sink.parent != staging or not strict_child(ws, attempt) or not strict_child(staging, attempt) or (trust_given and not strict_child(trust, attempt)) or (not trust_given and trust != ROT.resolve()) or any(overlaps(left, right) for index, left in enumerate(roots) for right in roots[index + 1:]) or overlaps(attempt, ROT.resolve()) or overlaps(attempt, live_git.resolve()) or attempt == Path(RUNTIME_PARENT) or strict_child(Path(RUNTIME_PARENT), attempt) or len({(item[1], item[2]) for item in (attempt_id, workspace_id, trust_id, staging_id)}) != 4
+    if invalid: return False, "managed topologi eller fysisk identitet är ogiltig"
+    identities = {"attempt": [attempt_id[1], attempt_id[2]], "workspace": [workspace_id[1], workspace_id[2]], "trust": [trust_id[1], trust_id[2]], "staging": [staging_id[1], staging_id[2]], "sink": [sink_id[1], sink_id[2]]}; return ("managed", str(attempt), str(staging), str(sink), identities), ""
 # ---------------------------------------------------------------------------
 # Frame helpers over the AF_UNIX socket / control fd.
 # ---------------------------------------------------------------------------
@@ -528,7 +566,20 @@ def sandbox_probe() -> tuple[bool, str]:
     return True, ""
 
 
-def remove_runtime_root(root: Path) -> None:
+def remove_runtime_root(root: Path, cleanup_authorized=False, managed=False) -> None:
+    private, marker = root / "k", root / "k" / ".nortropic-h038-cleanup-state"
+    try:
+        with os.scandir(private) as entries: names = [entry.name for _index, entry in zip(range(4097), entries)]
+    except FileNotFoundError: names = []
+    except OSError: return
+    if len(names) > 4096 or names and not cleanup_authorized: return
+    if managed and names:
+        marker_fd = -1; safe = False
+        try:
+            marker_fd = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)); before = os.fstat(marker_fd); value = os.read(marker_fd, 32); after = os.fstat(marker_fd); named = os.stat(marker, follow_symlinks=False); safe = (before.st_dev, before.st_ino, before.st_mode, before.st_nlink, before.st_uid) == (after.st_dev, after.st_ino, after.st_mode, after.st_nlink, after.st_uid) == (named.st_dev, named.st_ino, named.st_mode, named.st_nlink, named.st_uid) and stat.S_ISREG(before.st_mode) and stat.S_IMODE(before.st_mode) == 0o600 and before.st_nlink == 1 and before.st_uid == os.geteuid() and value == b"H038-SAFE"
+        except OSError: pass
+        marker_owned, marker_fd = marker_fd, -1
+        if not (safe and close_owned(marker_owned)): return
     def onerror(func, path, _exc):
         try:
             os.chmod(path, 0o700)
@@ -577,17 +628,25 @@ def top_level_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[
         if overlaps(ws, protected):
             return svar(f"launch_failed: workspace {ws} överlappar skyddad rot {protected}", LAUNCH)
 
-    profile, staging, sink = "base", None, None
-    staging_present = STAGING_ROOT_ENV in os.environ
-    sink_present = RESULT_SINK_ENV in os.environ
-    if staging_present != sink_present:
+    profile, attempt, staging, sink = "base", None, None, None; managed_identities = None; attempt_present = ATTEMPT_ROOT_ENV in os.environ; staging_present = STAGING_ROOT_ENV in os.environ; sink_present = RESULT_SINK_ENV in os.environ
+    if attempt_present:
+        if not (staging_present and sink_present):
+            return svar("launch_failed: attempt, staging och sink måste anges tillsammans", LAUNCH)
+        ok, why = validate_managed(ws, trust, trust_given, live_git)
+        if not ok:
+            return svar(f"launch_failed: {why}", LAUNCH)
+        profile, attempt, staging, sink, managed_identities = ok
+    elif staging_present != sink_present:
         return svar("launch_failed: staging och sink måste anges tillsammans", LAUNCH)
-    if staging_present:
+    elif staging_present:
         ok, why = validate_staging(ws, trust, live_git)
         if not ok:
             return svar(f"launch_failed: {why}", LAUNCH)
         profile, staging, sink = ok
-
+    trust_candidate = self_exec_path() if trust_given else HELPER
+    trust_proof_source = select_trust_source(trust, trust_candidate) if profile == "managed" else None
+    if profile == "managed" and (trust_proof_source is None or stable_path(Path(trust_proof_source[0]), False) != trust_proof_source or stable_path(trust, True) != (str(trust), *managed_identities["trust"])): return svar("launch_failed: explicit trust saknar bunden proof-källa", LAUNCH)
+    if profile == "managed": managed_identities["trust_source"] = list(trust_proof_source[1:])
     # Private runtime root.
     try:
         root = Path(_mkroot())
@@ -639,6 +698,8 @@ def top_level_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[
             "git_objects": str(live_git / "objects"),
             "git_objects_info": str(live_git / "objects/info"),
             "trust_root": str(trust), "ancestor_workspace": str(ws),
+            "trust_proof_source": trust_proof_source,
+            "attempt_root": attempt, "managed_identities": managed_identities,
             "staging_root": staging, "result_sink": sink,
             "profile": profile, "helper": str(HELPER),
             "runtime_python": str(snapshot),
@@ -664,7 +725,7 @@ def top_level_launch(ws: Path, envelope: bytes, timeout_ms: int, kommando: list[
     except (OSError, ValueError) as exc:
         rc = svar(f"launch_failed: bootstrap misslyckades: {exc}", LAUNCH)
     finally:
-        _teardown(root, supervisor, control_parent, ready_read)
+        _teardown(root, supervisor, control_parent, ready_read, profile == "managed")
     return rc
 
 
@@ -673,7 +734,8 @@ def _mkroot() -> str:
     return tempfile.mkdtemp(prefix=RUNTIME_PREFIX, dir=RUNTIME_PARENT)
 
 
-def _teardown(root: Path, supervisor, control_parent, ready_read) -> None:
+def _teardown(root: Path, supervisor, control_parent, ready_read, managed=False) -> None:
+    cleanup_authorized = False
     if control_parent is not None:
         try:
             control_parent.sendall(b"shutdown\n")
@@ -693,7 +755,7 @@ def _teardown(root: Path, supervisor, control_parent, ready_read) -> None:
                 pass
     if control_parent is not None:
         try:
-            control_parent.close()
+            control_parent.settimeout(0.1); cleanup_authorized = supervisor is not None and supervisor.returncode == 0 and control_parent.recv(2) == b"C"; control_parent.close()
         except OSError:
             pass
     if ready_read is not None:
@@ -702,7 +764,7 @@ def _teardown(root: Path, supervisor, control_parent, ready_read) -> None:
         except OSError:
             pass
     try:
-        remove_runtime_root(root)
+        remove_runtime_root(root, cleanup_authorized, managed)
     except OSError:
         pass
 
@@ -744,6 +806,8 @@ def gor_run(ws_arg: str, kuvert_arg: str, timeout_arg: str, kommando: list[str])
     ws = Path(ws_arg).expanduser()
     if not ws.is_dir():
         return svar(f"anropsfel: workspace {ws_arg} är ingen katalog", ANROP)
+    if ATTEMPT_ROOT_ENV in os.environ and not any(os.environ.get(key) for key in EPHEMERAL_KEYS) and stable_path(ws, True) is None:
+        return svar("launch_failed: managed workspace måste vara kanonisk nofollow-katalog", LAUNCH)
     ws = ws.resolve()
 
     kuvertfil = Path(kuvert_arg).expanduser()
