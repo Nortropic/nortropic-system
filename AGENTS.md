@@ -130,6 +130,32 @@ Codex egen utsaga är inte owner-bevis. Ett grönt exit-test rapporteras med fak
 
 ## Push / merge
 
+### ⚠️ LÄS FÖRST: BEVARANDE och PUBLICERING är inte samma sak (regel 12a, 2026-09-16)
+
+`PUSH=NO / MERGE=NO` nedan gäller **PUBLICERING**. Det har aldrig gällt **BEVARANDE**, och
+att läsa det så är vad som gav ~300 lokala grenar, en `main` 493 commits efter origin och
+veckan med 55 opushade commits som ingen såg på sex dagar.
+
+| | Vad | Trust-innebörd | Vem |
+|---|---|---|---|
+| **BEVARANDE** | commit + push till ARBETSGRENEN | **ingen** — en commit är inte en attestation | **AUTOMATISKT, aldrig en människa** |
+| **PUBLICERING** | attestation, PR, merge till `main` | hela trust-kedjan | kontraktsflödet nedan, oförändrat |
+
+**Du committar och pushar ditt eget arbete till din arbetsgren, alltid, utan att fråga
+någon.** Kör `bash scripts/nortropic-autocommit.sh "<vad du gjorde>"` vid varje avslutat
+arbetssteg och alltid innan du slutar. Den vägrar på `main`, lägger §A-ytor i en egen
+`[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`-commit, pushar aldrig med `--force` och mergar aldrig.
+
+**§A bevarad är inte §A auktoriserad.** Regel 6 står orörd: en §A-ÄNDRING kräver fortfarande
+människohand och en rad i `docs/05-beslutslogg.md`. Autocommiten hindrar bara att arbetet
+försvinner. Att blanda ihop *kan* och *får* är vad `SELF_CERTIFICATION_AS_PROOF=NO`
+förbjuder.
+
+**Att lämna arbete okommitterat eller opushat är ett FEL, inte försiktighet.** Rollseparationen
+hindrar en byggare från att attestera sin egen kandidat — aldrig från att spara sitt arbete.
+
+### Publicering
+
 Standard är:
 
 ```text
@@ -137,7 +163,7 @@ PUSH=NO
 MERGE=NO
 ```
 
-Pusha eller merga endast när användaren uttryckligen har gett den befogenheten för den aktuella fasen och projektets gates tillåter det.
+Detta gäller PUBLICERING: attestation, PR och merge till `main`. Publicera eller merga endast när användaren uttryckligen har gett den befogenheten för den aktuella fasen och projektets gates tillåter det.
 
 För den strikt avgränsade kvarvarande bootstrapkedjan H-035 → H-034 → H-033 →
 H-032 → H-031 → supervisor-resume → första verkliga autonoma start gäller den
@@ -157,7 +183,7 @@ OWNER_GATE_EXECUTOR=MECHANICAL
 FROZEN_OWNER_GATES_REMAIN_TRUST_AUTHORITY=YES
 ```
 
-Detta ändrar inte auktoritetsordningen ovan och gör inte Codex-prosa till trust authority. Rollagenterna committar/pushar/mergar fortfarande inte. Autopiloten får däremot, efter sina mekaniska identity/scope/gate/reviewer-kontroller, skapa immutable candidate commits, publicera, skapa PR och rebase-merga med expected-head-guard utan ny interaktiv owner-prompt per transition.
+Detta ändrar inte auktoritetsordningen ovan och gör inte Codex-prosa till trust authority. Rollagenterna **publicerar** fortfarande inte — de skapar inga immutable candidate commits, ingen attestation, ingen PR och ingen merge. **De BEVARAR däremot alltid sitt arbete** med `scripts/nortropic-autocommit.sh` enligt regel 12a; det är inte publicering och kräver inget godkännande. *(Skärpt 2026-09-16: meningen löd tidigare "Rollagenterna committar/pushar/mergar fortfarande inte", vilket lästes som ett förbud mot att spara arbete och kostade ~300 lokala grenar.)* Autopiloten får, efter sina mekaniska identity/scope/gate/reviewer-kontroller, skapa immutable candidate commits, publicera, skapa PR och rebase-merga med expected-head-guard utan ny interaktiv owner-prompt per transition.
 
 En verklig ny policy-/arkitekturfråga, odömbart gateutfall, oväntad remote-identity eller no-progress stoppar fortfarande fail-closed.
 

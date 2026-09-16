@@ -118,3 +118,37 @@ och den har nu tre mätta instanser:
 
 **Mekaniskt prov:** `git status --short` tomt och `git log --oneline @{u}..HEAD` tomt.
 Är de inte det ska drift-raden förklara varför, i samma dag.
+
+### Regel 12a — BEVARANDE är automatiskt. PUBLICERING har kvar varje grind.
+
+**Beslutad 2026-09-16 av Johnny:** *"jag vill att vi har auto commits, inte att ägarhand
+eller nåt annat tjafs ska commita, det är därför detta sker."*
+
+Projektet har blandat ihop två saker som inte är samma sak:
+
+| | Vad det är | Trust-innebörd | Vem gör det |
+|---|---|---|---|
+| **BEVARANDE** | En commit på en arbetsgren, pushad | **Ingen.** En commit är inte en attestation | **Automatiskt. Aldrig en människa.** |
+| **PUBLICERING** | Attestation, PR, merge till `main` | Bär hela trust-kedjan | Kontraktsflödet i `AGENTS.md`, oförändrat |
+
+`AGENTS.md` bar `PUSH=NO / MERGE=NO` plus *"Rollagenterna committar/pushar/mergar
+fortfarande inte"*. Den regeln skrevs för **publicering** och tillämpades på
+**bevarande**. Resultatet är mätt 2026-09-16: ~300 lokala grenar, en `main` 493 commits
+efter origin, och veckan med 55 opushade commits som ingen såg på sex dagar. **Regeln
+skyddade ingenting och förlorade allt** — rollseparationen hindrar en byggare från att
+attestera sin egen kandidat, inte från att spara sitt arbete.
+
+**Mekanismen:** `scripts/nortropic-autocommit.sh`, kopplad för Claude via `Stop`- och
+`SessionEnd`-hookarna i `.claude/settings.json` (spårad i repot — en hook som bara finns i
+`~/.claude/` upprepar fynd 2), och för Codex via `AGENTS.md`. Den
+
+- **vägrar på `main`** — bevarande hör hemma på en arbetsgren
+- **delar §A i en egen commit** märkt `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`. §A bevaras men
+  **auktoriseras inte**: regel 6 står orörd, och granskaren ska antingen skriva en rad i
+  `docs/05-beslutslogg.md` eller revertera. Att låta §A-arbete ligga okommitterat vore att
+  förlora det för att skydda det
+- **pushar aldrig med `--force`**, mergar aldrig, attesterar aldrig
+- **är tyst när inget ändrats**, och rapporterar högt när pushen misslyckas
+
+Bevarande kräver alltså aldrig ett godkännande, av någon, någonsin. Behöver du en människa
+för att spara arbete har du byggt den felklass detta repo nästan dog av.

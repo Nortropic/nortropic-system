@@ -1,5 +1,131 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 33: KONTROLLPROVET ÄR KÖRT. **KARTAN HÅLLER INTE.** Och min hypotes var fel på fyra av fem punkter.
+
+Ägaren körde `matning-pa-macen.sh` i en **riktig klon** av samma gren, `HEAD 5b6ed6e`,
+Darwin arm64, Python 3.12.13.
+
+```
+worktree:  7 PASS · 7 FAIL    h-001:0 h-002:0 h-003:0 h-004:1 h-005:1 h-006:0 h-007:0 h-008:0 h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+KLON:      8 PASS · 6 FAIL    h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:0 h-008:0 h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+                                                        ↑ ENDA skillnaden
+```
+
+**Exakt en grind skilde: `h-005`.** Den föll i worktreen på `K7 avbrottsstädning —
+worktree-rester efter SIGINT` och är grön i klonen. Riggartefakten var verklig — men den
+förklarade **en** av sju röda.
+
+### Jag hade fel på fyra av fem punkter, och det står nedtecknat i FYND 32
+
+Min hypotes, skriven före kontrollen: *"riggartefakt: `h-009` K8/K9, `h-011` K12, `h-012`
+K3/K15, `h-005` K7 — alla klustrar på cwd/workspace/kuvert."*
+
+**Bara `h-005` stämde.** `h-009` K8 säger fortfarande *"processen kördes i
+[…/nortropic-kontrollklon], inte i workspacet"* — i en ren klon, utan en enda nästlad
+worktree. Att felraden NÄMNER cwd gjorde mig säker på att cwd var orsaken. Det var samma
+fel som hela dagen: **jag läste vad utdata SADE i stället för att pröva vad mekanismen
+GJORDE.** Att jag skrev ned hypotesen i förväg är det enda som gör det mätbart att den föll.
+
+Det jag kallade *"ser ut som äkta"* — `h-004` K8–K11, lease-generationer — höll.
+
+### ⭐ DOMEN: kartan håller inte
+
+| Task | Påstått | Mätt på Macen, ren klon |
+|---|---|---|
+| `h-004` | KLAR | **FAIL** — 8 PASS, 7 FAIL |
+| `h-010` | KLAR | **PASS** |
+| `h-013` | KLAR | **FAIL** — 8 PASS, 8 FAIL |
+| `h-016` | KLAR | **FAIL** — 11 PASS, 14 FAIL |
+
+**Tre av fyra "klara" beroenden för `h-015` är inte klara.** Vägen till `KERNEL_COMPLETE`
+var aldrig sex poster. `h-009`, `h-011` och `h-012` är röda därtill — sex verkliga fel i
+beroendeslutningen.
+
+**Detta är inte en ny regression.** `h-004` faller på att lease-generationer (`lease_id`,
+fencing, renew) inte är implementerade; `h-016` på att attestation aldrig sker. Sådant
+byggdes aldrig. Påståendet KLAR kom av att en grindfil FINNS, inte av att den KÖRTS —
+underlagets elfte lexikala fel, och det dyraste.
+
+### ⚠️ En konfundering som måste sägas, inte döljas
+
+Grindarna kördes mot `HEAD 5b6ed6e`, alltså **denna gren**, inte `main`. Grenens sex
+commits är dokumentation (mätt: noll filer under `verify/`, `specs/`, `controller/`).
+
+**Men `h-012` läser HEAD-commitens ändrade filer.** K3 och K15 räknar upp
+`docs/05-beslutslogg.md`, `docs/loop/drift.md`, `matning-pa-macen.sh` — just denna grens
+senaste commit. För `h-012` påverkar grenen alltså felets TEXT. Strukturen (`kod=6 inga
+ändrade filer`, `kod=4`) är densamma, och den föll även i Linux.
+
+`h-004`, `h-013` och `h-016` rör inte den ytan alls — deras fel handlar om
+lease-generationer, brytarens fingerprints och attestation. **Kartdomen står oberoende av
+grenen.** En körning på `main` vore ändå värd att göra, och det är Codex första uppgift.
+
+### Vad detta gör med arbetsordern
+
+`raddning/12-arbetsorder.md` och `06-inventering.md` bygger båda på *"h-004/010/013/016 är
+KLARA"*. **Den premissen är falsifierad.** Vägen till `KERNEL_COMPLETE` går nu genom sex
+verkliga grindfel först, och `h-027`–`h-030` är inte längre vägens första steg.
+
+Underlaget är analys, inte status — så det rättas inte till en ny plan här. **Denna rad är
+statusen.** Att Codex börjar på en karta som säger KLAR om tre trasiga task är precis det
+diket hela detta arbete skulle undvika.
+
+## 2026-09-16 — REGEL 12a: BEVARANDE ÄR AUTOMATISKT. Autocommit byggd och kopplad.
+
+Ägaren 2026-09-16: *"jag vill att vi har auto commits, inte att ägarhand eller nåt annat
+tjafs ska commita, det är därför detta sker."* (`LOOP-ÄGARBESLUT-AUTOCOMMIT`.)
+
+**Rotorsaken var mekanisk, inte slarv.** `AGENTS.md` bar `PUSH=NO / MERGE=NO` plus
+*"Rollagenterna committar/pushar/mergar fortfarande inte"*. Den regeln skrevs för
+**publicering** och tillämpades på **bevarande**. En rollagent fick alltså inte spara sitt
+eget arbete. Utfallet är mätt: ~300 lokala grenar, `main` 493 commits efter origin,
+55 opushade commits i sex dagar.
+
+| | Trust-innebörd | Vem |
+|---|---|---|
+| **BEVARANDE** — commit + push till arbetsgrenen | **ingen.** En commit är inte en attestation | **automatiskt, aldrig en människa** |
+| **PUBLICERING** — attestation, PR, merge till `main` | hela trust-kedjan | kontraktsflödet, oförändrat |
+
+Rollseparationen hindrar en byggare från att attestera sin egen kandidat. Den har aldrig
+haft något med att spara arbete att göra.
+
+**Byggt och prövat, allt i denna commit:**
+
+- `scripts/nortropic-autocommit.sh` — bash 3.2 (macOS systembash), ingen sudo, aldrig
+  `--force`, aldrig merge. **Fyra prov körda:** på `main` med smuts → `STOPP exit 1`; på
+  arbetsgren → commit + push + `regel 12 uppfylld`; utan ändringar → tyst `exit 0`; blandad
+  ändring → **två** commits, där `CLAUDE.md` och `specs/` hamnade i en egen
+  `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`.
+- `.claude/settings.json` — `Stop`- och `SessionEnd`-hookar. Schemaprövad med `jq -e` och
+  pipe-prövad (`echo '{}' | bash ...` → `exit 0`).
+- `docs/loop/regler.md` regel 12a, `AGENTS.md` (så Codex bär det).
+
+**§A bevaras men auktoriseras ALDRIG.** Regel 6 står orörd. Att låta §A-arbete ligga
+okommitterat vore att förlora det för att skydda det; att kalla commiten ett godkännande
+vore `SELF_CERTIFICATION_AS_PROOF=NO`. Därför: egen commit, skriande rubrik, granskaren
+auktoriserar med en beslutsrad eller reverterar.
+
+### Hooken avslöjade ett fel i sitt eget första andetag
+
+Pipe-provet committade `scripts/nortropic-autocommit.sh` — men **inte**
+`.claude/settings.json`. `.gitignore` är en whitelist (`/*` med `!`-undantag) och
+`.claude/` var utesluten med avsikt: *"Settings, credentials, plugins, projects, memory are
+NEVER tracked."*
+
+Hooken hade alltså funnits på **en maskin**, vilket är fynd 2 exakt — och precis vad
+`11-tre-vakter-mot-aterfall.md` varnar för: *"Den ska ligga i repot, inte i `~/.claude/`."*
+
+Rättat med minsta möjliga öppning: katalogen släpps in och stängs omedelbart igen
+(`!/.claude/` · `/.claude/*` · `!/.claude/settings.json`). **Prövat på beteende, inte på
+exitkod:** `git add --dry-run .claude/settings.json` → `add`;
+`git add --dry-run .claude/settings.local.json` → `paths are ignored`. Credentials,
+sessions, projects, memory och `settings.local.json` förblir ospårade.
+
+Mitt första prov använde `git check-ignore -v`, vars exitkod betyder *"matchade ett
+mönster"* — även ett negationsmönster. Det rapporterade fel. Femte gången samma dag att ett
+svar om en angränsande fråga togs för svar på den ställda; femte gången botemedlet var att
+mäta beteendet i stället.
+
 ## 2026-09-16 — FYND 32: FÖRSTA MÄTNINGEN PÅ MACEN. Sju röda grindar — men riggen är misstänkt, och domen är ODÖMBART tills kontrollprovet körts.
 
 Ägaren körde `artefakter/matning-pa-macen.sh` på Darwin arm64, Python 3.12.13.
