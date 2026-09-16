@@ -26,7 +26,7 @@
   "sandbox": {
     "enabled": false,
     "failIfUnavailable": true,
-    "allowUnsandboxedCommands": false,
+    "allowUnsandboxedCommands": true,
     "allowManagedReadPathsOnly": true,
     "filesystem": {
       "denyWrite": [
@@ -43,18 +43,16 @@
         "/Users/elinhaggstrom/nortropic/nortropic-system/specs",
         "/Users/elinhaggstrom/nortropic/nortropic-system/verify",
         "/Users/elinhaggstrom/nortropic/nortropic-system/.gitignore"
+      ],
+      "allowRead": [
+        "**/.env.example"
+      ],
+      "allowWrite": [
+        "/Users/elinhaggstrom/nortropic/worktrees"
       ]
     },
     "credentials": {
       "files": [
-        {
-          "path": "~/.ssh",
-          "mode": "deny"
-        },
-        {
-          "path": "~/.config/gh",
-          "mode": "deny"
-        },
         {
           "path": "~/.aws",
           "mode": "deny"
@@ -63,7 +61,10 @@
     },
     "network": {
       "allowedDomains": [
-        "api.anthropic.com"
+        "api.anthropic.com",
+        "github.com",
+        "api.github.com",
+        "ssh.github.com"
       ],
       "strictAllowlist": true,
       "allowManagedDomainsOnly": true

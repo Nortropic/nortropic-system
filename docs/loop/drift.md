@@ -1,5 +1,57 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 19: källkopian var INTE det som var installerat
+
+Diffen mot den installerade policyn kördes 2026-09-16 och **bekräftade driften** som
+FYND 17 markerade `OVERIFIERAT`. `config/managed-settings.json` i repot skilde sig från
+`/Library/Application Support/ClaudeCode/managed-settings.json` i **sex punkter**:
+
+| | Källkopian (repot) | Installerat (verkligheten) |
+|---|---|---|
+| `Bash(chmod:*)` | fanns | **borttagen** |
+| `allowUnsandboxedCommands` | `false` | **`true`** |
+| `filesystem.allowRead` | saknades | `["**/.env.example"]` |
+| `filesystem.allowWrite` | saknades | `["~/nortropic/worktrees"]` |
+| `credentials.files` | `~/.ssh`, `~/.config/gh`, `~/.aws` | **endast `~/.aws`** |
+| `network.allowedDomains` | 1 (`api.anthropic.com`) | **4** (+ `github.com`, `api.github.com`, `ssh.github.com`) |
+| `requiredMaximumVersion` | `2.1.224` | **borttagen** |
+
+Sex handgjorda ändringar hade gjorts på maskinen utan att källkopian följde med. Ingen
+mekanism jämförde dem — och Pass 1:s egen formulering, *"installeras därifrån, läses
+aldrig därifrån i drift"*, gjorde driften osynlig per konstruktion.
+
+**Det här är samma felklass som resten av projektet:** ett dokument antogs beskriva en
+mekanism, och beskrivningen prövades aldrig mot verkligheten. Skillnaden är att här var
+dokumentet en säkerhetspolicy.
+
+**Två av avvikelserna är dessutom upplysande.** `requiredMaximumVersion` var redan
+borttagen på maskinen — versionsbomben hade alltså redan detonerat en gång och rättats
+för hand. Och nätverkslistan hade vuxit till fyra domäner, vilket betyder att den
+ursprungliga enda domänen inte räckte för verkligt arbete.
+
+**Åtgärd:** den öppnade policyn är **ombyggd ur den INSTALLERADE filen**, inte ur den
+föråldrade källkopian. Annars hade installationen tyst återställt sex ändringar —
+däribland att ta bort `github.com` ur nätverkslistan och sätta tillbaka versionstaket.
+
+**Vad som faktiskt ändras på maskinen** (installerad → ny), och inget annat:
+
+```
+- disableBypassPermissionsMode: "disable"
+- 13 Edit()-lås på nortropic-system/**
+- Bash(chown:*)
+- sandbox.enabled: true → false
+```
+
+Allt annat i den installerade filen står kvar ordagrant: `allowUnsandboxedCommands: true`,
+`allowRead`, `allowWrite`, `~/.aws`-skyddet, de fyra nätverksdomänerna,
+`requiredMinimumVersion`, `DISABLE_AUTOUPDATER`.
+
+> **Stående regel härefter:** ändra aldrig den installerade policyn för hand utan att
+> commita samma ändring till `config/managed-settings.json` i samma drag. Källkopian är
+> värdelös som referens om den inte är sann — värre än värdelös, eftersom den läses som
+> om den vore det. Kör diffen före varje installation.
+
+
 ## 2026-09-16 — FYND 18 + ÄGARBESLUT: OS-lagrets §A-lås borttagna
 
 **Fyndet först.** Policyns §A-lås skyddade **fel lager**, mätt:
