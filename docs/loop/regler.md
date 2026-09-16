@@ -75,9 +75,26 @@ prövats mot ett oförändrat prov.** Konvergens kräver ett fast mål.
 
   Utan denna distinktion fäller regeln varje försök att laga en trasig grind, och en
   regel som förbjuder sin egen åtgärd blir kringgången första gången den prövas.
-  Bakgrunden står i `docs/loop/drift.md` 2026-09-16 (FYND 29). Varje KLAR task har en grind
-  som rörts ≤ 3 gånger (h-016: 1 · h-013/017/038: 2 · h-001/036: 3); varje icke-klar
-  17–147 (h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147). Ingen mellanform.
+  Bakgrunden står i `docs/loop/drift.md` 2026-09-16 (FYND 29).
+
+  **⚠️ BELÄGGET ÄR OMSKRIVET 2026-09-16 efter FYND 33 — budgeten står, motiveringen inte.**
+  Här stod: *"Varje KLAR task har en grind som rörts ≤ 3 gånger (h-016: 1 · h-013: 2 …);
+  varje icke-klar 17–147. Ingen mellanform."* Omfrysningstalen är riktiga. **Etiketterna
+  var det inte:** körda på Macen i ren klon är `h-016` (1 omfrysning) `11 PASS / 14 FAIL`
+  och `h-013` (2 omfrysningar) `8 PASS / 8 FAIL`. De var aldrig klara.
+
+  Implikationen `klar ⇒ få omfrysningar` är alltså **falsifierad**. Den motsatta står kvar
+  och är mätt: `h-035: 17 · h-039: 30 · h-032: 120 · h-031: 147`, alla icke-klara.
+
+  **Och den rätta läsningen är mörkare än den jag hade.** Ett fåtal omfrysningar betyder
+  inte att grinden blev grön — det betyder att **någon slutade röra den**. `h-016` rördes
+  en gång och är röd på fjorton kontroller. Lågt omfrysningstal är ett tecken på ÖVERGIVEN
+  hypotes lika gärna som på löst problem, och de två gick inte att skilja åt därför att
+  ingen körde grinden.
+
+  **Budgeten 3 gäller oförändrat**, nu som ren stoppmekanism mot trampkvarnen och inte
+  som en framgångsmarkör. **Att deklarera en task KLAR utan ett kört, grönt exitprov i
+  samma session är förbjudet enligt regel 8 och är det fel som gjorde etiketterna falska.**
 - **11b. Överskriden budget stoppar hypotesen.** Arkitekten delar den i mindre med var
   sitt fasta prov, eller avslutar den `OVERIFIERAT`. **Aldrig en runda till.**
 - **11c. MÅLFLYTT är ett eget utfall.** Innan `NO-CREDIT` sätts: jämför grinden

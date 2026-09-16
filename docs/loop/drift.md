@@ -1,5 +1,63 @@
 # Att köra loopen
 
+## 2026-09-16 — PAKETET SANERAT MOT FYND 33. Åtta ställen bar en falsifierad premiss.
+
+Ägaren: *"Skulle vi städa nåt? … en väldokumenterad bil på en väldokumenterad
+transportsträcka i ett väldefinierat mål utan dikeskörningar."* Riktig fråga: FYND 33
+gjorde delar av överlämningspaketet **osant**, och ett paket som säger KLAR om tre trasiga
+grindar är ett dike med karta.
+
+**Mätt, inte antaget** — grep efter varje formulering som vilar på premissen:
+
+| Fil | Bar |
+|---|---|
+| `regler.md` regel 11a | *"Varje KLAR task har en grind rörd ≤ 3 gånger"* |
+| `raddning/00-LAS-FORST.md` | samma diskriminant |
+| `raddning/02-bevis.md` | *"Klar ⇔ grinden rörd ≤ 3 gånger"* |
+| `raddning/05-arbetsordning.md` | samma, som tripwire-rad |
+| `raddning/09-task-rundtrampsvakten.md` | tabellkolumn *"klara"* |
+| `raddning/12-arbetsorder.md` | *"VÄGEN — sex poster"*, `h-004 ✓ h-013 ✓ h-016 ✓` |
+| `raddning/06-inventering.md` | fyra ställen: kärnloopstabell, `h-015`:s beroenderad, `h-001–h-013 klara`, `h-016 klar` |
+| `PROMPT-TILL-CODEX.txt` | diskriminanten OCH hela ORDNINGEN |
+
+### Det värsta fyndet: regel 11a:s belägg vilade på samma falska etiketter
+
+Regel 11a motiverades med *"startbudget 3 — OBSERVERAD, inte vald: varje KLAR task har en
+grind rörd ≤ 3 gånger (h-016: 1, h-013: 2 …)"*. **`h-016` rördes en gång och ger
+`11 PASS / 14 FAIL`. `h-013` rördes två gånger och ger `8 PASS / 8 FAIL`.**
+
+Omfrysningstalen var riktiga. **Etiketterna var det inte.** Implikationen
+`klar ⇒ få omfrysningar` är falsifierad; `många omfrysningar ⇒ icke-klar` står kvar och är
+mätt (17–147, alla röda).
+
+**Och den rätta läsningen är mörkare än min.** Ett lågt omfrysningstal betyder inte att
+grinden blev grön — det betyder att **någon slutade röra den**. `h-016` rördes en gång och
+är röd på fjorton kontroller. Övergiven och löst gick inte att skilja åt, därför att ingen
+körde grinden. Budgeten 3 gäller oförändrat, nu som ren stoppmekanism och aldrig som
+framgångsmarkör.
+
+### Vägen är tretton poster, och `h-027` är inte första steget
+
+```
+GRÖN:  h-010
+RÖDA:  h-004  h-009  h-011  h-012  h-013  h-016     ← vägens första arbete
+SAKNAS: h-027 → h-028 → h-029 → h-030 → h-015 + autonomous-loop-exit + acceptansfilen
+```
+
+`PROMPT-TILL-CODEX.txt` ORDNINGEN är omskriven: steg 1 är att köra
+`matning-pa-macen.sh` **på `main`** i en riktig klon, steg 2 är att root-orsaka de sex
+röda. Det gamla steg 5 (*"kontrollera h-013 på Macen"*) är utfört — svaret var FAIL, och
+det svaret flyttade hela ordningen.
+
+### Ett krav till i tripwire-tabellen
+
+`05-arbetsordning.md` har fått en rad: **"Du är på väg att skriva KLAR"** → kör grinden i
+samma session och citera exitkoden. Tre task bar etiketten utan ett kört exitprov. Det är
+regel 8 tillämpad på den dyraste förväxlingen i underlaget: **att en grindfil FINNS är
+inte att den PASSERAR.**
+
+Vaktsviten `PASS 23/23`, `validera-underlaget.sh` `BEKRÄFTAT 33 · AVVIKER 0 · ODÖMBART 4`.
+
 ## 2026-09-16 — FYND 33: KONTROLLPROVET ÄR KÖRT. **KARTAN HÅLLER INTE.** Och min hypotes var fel på fyra av fem punkter.
 
 Ägaren körde `matning-pa-macen.sh` i en **riktig klon** av samma gren, `HEAD 5b6ed6e`,

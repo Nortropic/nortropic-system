@@ -141,9 +141,14 @@ orsak till projektets dyraste problem.** Underlaget sa att rundorna brinner på
 i commit-titlar. Omhärlett ur **grindfilens egen historik** ser mekanismen annorlunda ut:
 `verify/bin/h-039-exit` ändrades i var och en av sina 30 commits, från 200 798 till
 2 136 969 byte, **noll minskningar**. Kandidaten prövades aldrig mot ett oförändrat prov.
-Konvergens kräver ett fast mål; det har aldrig funnits ett. Och diskriminanten är mätbar:
-**varje klar task har en grind som rörts ≤ 3 gånger, varje icke-klar en som rörts
-17–147.** Ingen mellanform. Detta ändrar `01-lagesbild.md` §1, lägger till doktrinregel
+Konvergens kräver ett fast mål; det har aldrig funnits ett. Och omfrysningstalet är mätbart:
+**varje icke-klar task har en grind rörd 17–147 gånger.**
+
+> **⚠️ Här stod också *"varje klar task har en grind som rörts ≤ 3 gånger. Ingen
+> mellanform."* Den halvan är FALSIFIERAD 2026-09-16 (FYND 33):** `h-016` (1 omfrysning)
+> ger `11 PASS / 14 FAIL` på Macen, `h-013` (2) ger `8 PASS / 8 FAIL`. Talen var riktiga,
+> **etiketten "klar" var det inte** — den sattes utan att grinden kördes. Ett lågt
+> omfrysningstal betyder att någon slutade röra grinden, inte att den blev grön. Detta ändrar `01-lagesbild.md` §1, lägger till doktrinregel
 **iv** i `03-raddningsplan.md` steg 1b (omfrysningsbudget) och skriver om
 `09-task-rundtrampsvaktens` gren 2 — den mätte filstorlek, vilket är följden, inte
 mekanismen.

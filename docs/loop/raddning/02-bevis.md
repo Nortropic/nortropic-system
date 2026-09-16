@@ -79,9 +79,17 @@ done | sort -k2 -n
 | `h-032` | 120 | pågår |
 | `h-031` | 147 | pågår |
 
-**Ingen mellanform.** Klar ⇔ grinden rörd ≤ 3 gånger. Det är den enda variabeln som
-skiljer grupperna åt, och det är den rundtrampsvaktens gren 2 ska räkna
-(`09-task-rundtrampsvakten.md` §4).
+**⚠️ FALSIFIERAD ÅT ENA HÅLLET 2026-09-16 (FYND 33).** Här stod *"Ingen mellanform. Klar ⇔
+grinden rörd ≤ 3 gånger."* Omfrysningstalen ovan är riktiga; **etiketten "klar" var det
+inte.** Körda på Macen i ren klon: `h-016` (1 omfrysning) `11 PASS / 14 FAIL`, `h-013`
+(2 omfrysningar) `8 PASS / 8 FAIL`, `h-004` `8 PASS / 7 FAIL`.
+
+Kvar står: **många omfrysningar ⇒ icke-klar** (17–147, alla röda). Borta är: **få
+omfrysningar ⇒ klar.**
+
+Rätt läsning: ett lågt omfrysningstal betyder att någon **slutade röra grinden**, inte att
+den blev grön. Det är fortfarande den variabel rundtrampsvaktens gren 2 ska räkna
+(`09-task-rundtrampsvakten.md` §4) — men som stoppsignal, aldrig som framgångsmått.
 
 > **Varför denna mätning och inte min förra.** Mitt första försök klassade rundorna efter
 > **ordval** i commit-text via reguljära uttryck. Två körningar med olika ordlistor gav

@@ -118,16 +118,39 @@ webbfiler** och ett register som pekar på `workflows/nortropic-verify-suite.js`
 
 ---
 
-## VÄGEN TILL MÅLET — sex poster, mätt i specen
+## VÄGEN TILL MÅLET — tretton poster, inte sex
+
+> ### ⚠️ RÄTTAT 2026-09-16 efter FYND 33. Här stod "sex poster".
+>
+> Den siffran byggde på att `h-004`, `h-010`, `h-013` och `h-016` var KLARA. **Premissen
+> var falsk.** Grindarna kördes aldrig — de antogs gröna för att grindfilerna FINNS. Körda
+> på Macen i ren klon (`HEAD 5b6ed6e`, Darwin arm64):
+>
+> | Task | Påstått | Mätt |
+> |---|---|---|
+> | `h-004` | KLAR | **FAIL** — 8 PASS / 7 FAIL · `lease_id`, fencing, renew saknas |
+> | `h-010` | KLAR | **PASS** |
+> | `h-013` | KLAR | **FAIL** — 8 PASS / 8 FAIL · brytarens fingerprints |
+> | `h-016` | KLAR | **FAIL** — 11 PASS / 14 FAIL · attestation sker aldrig |
+>
+> Därtill är `h-009` (8/3), `h-011` (9/7) och `h-012` (11/8) röda i samma slutning.
+> **Sex verkliga grindfel.** Ingen regression — funktionerna byggdes aldrig.
 
 ```
-KLART:    h-004 ✓   h-010 ✓   h-013 ✓   h-016 ✓     (alla fyra har grind)
+GRÖN:     h-010 ✓                            (kört på Macen, ren klon)
 
-SAKNAS:   h-027 → h-028 → h-029 → h-030              (fyra task, finns inte)
-          → h-015 supervisor resume                   (grind saknas)
-          + verify/bin/autonomous-loop-exit           (mäter KERNEL_COMPLETE)
+RÖDA, sex st — VÄGENS FÖRSTA ARBETE:
+          h-004  h-009  h-011  h-012  h-013  h-016
+
+SAKNAS:   h-027 → h-028 → h-029 → h-030      (fyra task, finns inte)
+          → h-015 supervisor resume           (grind saknas)
+          + verify/bin/autonomous-loop-exit   (mäter KERNEL_COMPLETE)
           + docs/loop/autonomy-kernel-v1-acceptance.md
 ```
+
+**Första uppgiften är inte `h-027`.** Den är att köra
+`artefakter/matning-pa-macen.sh` på `main` och därefter root-orsaka de sex röda.
+Full mätning i `docs/loop/drift.md` FYND 33.
 
 `h-015` beror på `h-010`, `h-013`, `h-016`, `h-004` och `h-030` — **inte** på `h-031`,
 `h-032` eller `h-039`. De tre avslutade hypoteserna låg aldrig på vägen; ingenting i

@@ -438,10 +438,16 @@ SUBSTITUTIONSKEDJAN — 0 av 4 finns som task
   h-027 ○ → h-028 ○ → h-029 ○ → h-030 ○
   AgentProvider   G20-split    TaskContract   thin task supervisor
 
-KÄRNLOOPEN — 15 av 17 har gate
+KÄRNLOOPEN — 15 av 17 HAR gate. Att HA en gate är inte att PASSERA den.
+  ✓ = grindfilen finns    (mätt 2026-09-16: se ⚠️ nedan)
   h-001…h-013 ✓   h-016 ✓   h-017 ✓
   h-014 ⊘ gate saknas (byggbar NU)
   h-015 ⊘ gate saknas OCH blockerad av h-030
+
+  ⚠️ FYND 33: KÖRDA på Macen i ren klon FALLER h-004, h-009, h-011, h-012,
+     h-013 och h-016. Grön är bara h-010 av kartans fyra. Kryssen ovan säger
+     att FILEN finns — ingenting annat. Det var precis den förväxlingen som
+     gjorde "sex poster" till tretton.
 
 FÖRMÅGESKIVORNA — 0 av 9 finns som task
   h-018 … h-026   (roadmapens S4, S5, S7–S13)
@@ -516,10 +522,10 @@ resume är blockerad av en task som inte existerar.
 
 | Task | Slice | Beror på | Gate | Status |
 |---|---|---|---|---|
-| `h-001`–`h-013` | 1–11 | kedjade | ✓ | klara |
+| `h-001`–`h-013` | 1–11 | kedjade | ✓ | **EJ verifierat som grupp.** Körda 2026-09-16: `h-001`, `h-002`, `h-003`, `h-005`–`h-008`, `h-010` gröna; `h-004`, `h-009`, `h-011`, `h-012`, `h-013` **RÖDA** |
 | **`h-014`** | 12 | h-013 **OVERIFIERAT** (se `10-...h014.md` §1) | **SAKNAS** | *"Notisen — Slack från controllern."* Byggbar så snart `h-013` prövats grön **på Macen** |
-| **`h-015`** | 13 | h-010 ✓, h-013 ✓, h-016 ✓, h-004 ✓, **h-030 ✗** | **SAKNAS** | *"Återtaget — återstart efter avbrott."* **Detta ÄR supervisor resume** |
-| `h-016` | 14 | h-011, h-012, h-013 | ✓ | klar |
+| **`h-015`** | 13 | h-010 **GRÖN**, h-013 **RÖD**, h-016 **RÖD**, h-004 **RÖD**, **h-030 ✗** | **SAKNAS** | *"Återtaget — återstart efter avbrott."* **Detta ÄR supervisor resume.** Rättat 2026-09-16 (FYND 33): här stod ✓ på alla fyra, satt av att grindfilerna finns. Körda på Macen faller tre |
+| `h-016` | 14 | h-011, h-012, h-013 | ✓ | **RÖD** — 11 PASS / 14 FAIL på Macen, attestation sker aldrig (FYND 33) |
 | `h-017` | 15 | h-002, h-016 | ✓ | klar |
 
 `h-015`:s exit-kriterium, ordagrant ur specen:
@@ -598,14 +604,18 @@ nästa `verify/bin`-ändring. Det kräver doktrinregel iv först.
 > tre utanför gruppen själv. De låg aldrig på vägen.
 >
 > ```
-> KLART:   h-004 ✓  h-010 ✓  h-013 ✓  h-016 ✓
-> SAKNAS:  h-027 → h-028 → h-029 → h-030   (fyra task)
->          → h-015 supervisor resume        (grind)
+> GRÖN:    h-010 ✓                                   (kört på Macen, ren klon)
+> RÖDA:    h-004  h-009  h-011  h-012  h-013  h-016  (sex verkliga grindfel)
+> SAKNAS:  h-027 → h-028 → h-029 → h-030             (fyra task)
+>          → h-015 supervisor resume                  (grind)
 >          + verify/bin/autonomous-loop-exit
 >          + docs/loop/autonomy-kernel-v1-acceptance.md
 > ```
 >
-> **Sex poster.** `h-014` ligger utanför kedjan och kan byggas parallellt.
+> **⚠️ RÄTTAT 2026-09-16 (FYND 33). Här stod "KLART: h-004 ✓ h-010 ✓ h-013 ✓ h-016 ✓" och
+> "Sex poster".** Grindarna kördes aldrig — de antogs gröna för att grindfilerna finns.
+> Körda på Macen faller `h-004` (8/7), `h-013` (8/8) och `h-016` (11/14). **Tretton poster,
+> och de sex röda kommer först.** `h-014` ligger utanför kedjan och kan byggas parallellt.
 > Prosaraden i `docs/loop/drift.md` rad 5495 (*"No supervisor resume before the entire
 > chain is green"*) är **upphävd** — den är prosa, specens graf gäller.
 > Fullständig härledning i `12-arbetsorder.md`.

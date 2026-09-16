@@ -98,9 +98,14 @@ TVÅ NYA LOOP-REGLER — LÄS docs/loop/regler.md FÖRE ALLT ARBETE
 REGEL 11 — grinden pinnar EGENSKAPEN, aldrig trädet.
 Ett exitprov får aldrig kräva byte-identitet med ett baskommit.
   11a omfrysningsbudget per hypotes, startbudget 3 — OBSERVERAD, inte vald:
-      varje KLAR task har en grind rörd <= 3 gånger (h-016:1, h-013/017/038:2,
-      h-001/036:3), varje ICKE-KLAR 17-147 (h-035:17, h-039:30, h-032:120,
-      h-031:147). Ingen mellanform.
+      varje ICKE-KLAR task har en grind rörd 17-147 gånger (h-035:17, h-039:30,
+      h-032:120, h-031:147).
+      ⚠️ DEN OMVÄNDA HALVAN ÄR FALSIFIERAD 2026-09-16 (FYND 33). Här stod att
+      varje KLAR task har en grind rörd <= 3 gånger. Omfrysningstalen stämmer,
+      ETIKETTERNA inte: h-016 rördes 1 gång och ger 11 PASS / 14 FAIL på Macen,
+      h-013 rördes 2 gånger och ger 8 PASS / 8 FAIL. Ett lågt omfrysningstal
+      betyder att NÅGON SLUTADE RÖRA GRINDEN — inte att den blev grön.
+      Budgeten 3 står kvar som stoppmekanism, aldrig som framgångsmått.
   11b överskriden budget STOPPAR hypotesen: dela den, eller avsluta OVERIFIERAT.
       Aldrig en runda till.
   11c MÅLFLYTT som eget attributionsutfall före NO-CREDIT. Prov: git diff mellan
@@ -252,16 +257,30 @@ drift.md samma dag.
 ORDNINGEN
 ══════════════════════════════════════════════════════════════════════════════
 
-  0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11 och 12.
-  1. 12-arbetsorder.md steg 1-4. Kontrollera dess tabell mot HEAD först —
+  0. Kör validera-underlaget.sh. Läs docs/loop/regler.md regel 11, 12 och 12a.
+  1. KÖR artefakter/matning-pa-macen.sh PÅ MAIN. Mätningen 2026-09-16 gjordes på
+     en arbetsgren; h-012 läser HEAD-commitens ändrade filer, så main kan ge ett
+     annat utfall för just den. Kör i en RIKTIG KLON — provet vägrar i en
+     git-worktree, och skälet är mätt (FYND 32).
+  2. ROOT-ORSAKA DE SEX RÖDA GRINDARNA: h-004, h-009, h-011, h-012, h-013,
+     h-016. Detta är vägens första arbete. h-004 faller på att lease-generationer
+     (lease_id, fencing, renew) inte finns; h-016 på att attestation aldrig sker.
+     Funktionerna byggdes aldrig — det är inte en regression.
+  3. 12-arbetsorder.md steg 1-4. Kontrollera dess tabell mot HEAD först —
      den är daterad och blir osann på samma sätt som EFTERARBETE.md blev.
-  2. Granska och landa plattformsgrenen.
-  3. verify/bin/autonomous-loop-exit, fryst RED mot KERNEL_COMPLETE
+  4. Granska och landa plattformsgrenen.
+  5. verify/bin/autonomous-loop-exit, fryst RED mot KERNEL_COMPLETE
      (definitionen i 00-VAD-NORTROPIC-AR.md).
-  4. De tre vakterna.
-  5. h-014. Kontrollera först h-013 på Macen — underlaget påstod den grön utan
-     att pröva det, och det är rättat till OVERIFIERAT.
-  6. Specificera h-027..h-030. Utan h-030 kan h-015 inte ens få en gate som håller.
+  6. De tre vakterna.
+  7. h-014.
+  8. Specificera h-027..h-030. Utan h-030 kan h-015 inte ens få en gate som håller.
+  9. h-015 supervisor resume.
 
-Hoppa inte till 2 för att den känns mest konkret. Grenen är inte mergebar förrän
-1 är gjord — det är mätt, inte antaget.
+⚠️ ORDNINGEN ÄR OMSKRIVEN 2026-09-16 (FYND 33). Steg 1-2 fanns inte. Vägen sades
+vara "sex poster" och h-027 sades vara första steget. Det byggde på att h-004,
+h-010, h-013 och h-016 var KLARA — en etikett satt för att grindFILERNA finns,
+aldrig för att grindarna körts. Körda på Macen i ren klon är tre av de fyra röda.
+Att börja på h-027 vore att bygga ovanpå sex trasiga grindar.
+
+Hoppa inte till 4 för att den känns mest konkret. Grenen är inte mergebar förrän
+3 är gjord — det är mätt, inte antaget.

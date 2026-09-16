@@ -109,8 +109,13 @@ git log --oneline --follow -- verify/bin/h-039-exit | wc -l    # 30
 | `h-032` | 120 | pågår |
 | `h-031` | **147** | pågår |
 
-**Ingen mellanform.** Klar ⇔ grinden rörd ≤ 3 gånger. Tröskeln 3 är därför inte vald,
-den är **observerad**. Vakten hade fällt H-039 vid runda 4, inte 33.
+**⚠️ Tabellens kolumn "klara" är falsifierad 2026-09-16 (FYND 33).** Omfrysningstalen
+stämmer; etiketterna inte. Körda på Macen i ren klon är `h-016` (1) `11 PASS / 14 FAIL`
+och `h-013` (2) `8 PASS / 8 FAIL`. Läs kolumnen som *"slutade röras"*, inte *"blev klar"*.
+
+Kvar står den ena riktningen: **många omfrysningar ⇒ icke-klar**, mätt 17–147. Tröskeln 3
+är fortfarande **observerad och inte vald** — men den observerar var arbetet UPPHÖRDE, och
+det är ändå rätt ställe att fälla. Vakten hade fällt H-039 vid runda 4, inte 33.
 
 **Andra fällkriteriet i samma gren — MÅLFLYTT per runda:** när en runda rapporteras som
 `NO-CREDIT` ska vakten jämföra grinden kandidaten byggdes mot med den som dömde. Är de
