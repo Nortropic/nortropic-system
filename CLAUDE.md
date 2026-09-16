@@ -14,6 +14,11 @@ Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollp
 - **Webbfabrikslagret** — `agents/`, `skills/`, `packs/`, `backtests/`, `workflows/`
   och `docs/00`, `01`, `02`, `04`, `06`. Ligger kvar i trädet efter repodelningen,
   beskriver kundflödet och bär en orienteringsrad överst.
+- **BLANDADE kataloger** — `scripts/` och `tests/` är INTE webb. Kärnans där:
+  `scripts/nortropic-codex-autopilot.py` (allowed_write för h-031/032/035),
+  `check-provanropare.mjs`, `check-verifierarregistret.mjs`, `kor-styrprov.mjs`,
+  `kor-vakter.mjs`, `tests/controller/**`, `tests/scripts/**`. De får aldrig följa
+  med när webbträdet flyttas.
 
 **Auktoritetsordning** — identisk med `AGENTS.md`, som Codex läser; håll dem lika:
 `docs/07-konstitution.md` → `docs/03-regelverk.md` → `docs/loop/regler.md` → aktuell

@@ -20,6 +20,12 @@ refererar 16 enbart webbträdet, 2 enbart kärnan (`check-provanropare.mjs`,
 kerneländring — kärnans dom är taskens frysta `exit_test` under `verify/bin/` — men de
 två kernelvakterna följer inte med när webbträdet flyttas.
 
+`scripts/` och `tests/` är BLANDADE kataloger, inte webb. Kärnans där:
+`scripts/nortropic-codex-autopilot.py` (allowed_write för h-031/032/035),
+`check-provanropare.mjs`, `check-verifierarregistret.mjs`, `kor-styrprov.mjs`,
+`kor-vakter.mjs`, `tests/controller/**`, `tests/scripts/**`. De följer aldrig med
+webbträdet.
+
 `CLAUDE.md` är samma router för Claude-sessioner och bär samma auktoritetsordning.
 Ändras den ena ska den andra följa med i samma commit.
 
