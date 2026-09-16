@@ -16,7 +16,12 @@ full historik (825 commits, äldsta 2026-07-17).
 
 ```bash
 # Andel av historiken på kontrollplanet
-git log --format='%s' | grep -ciE 'h-?0[0-9]{2}'        # 440 av 825 = 53 %
+git log --format='%s' | grep -ciE 'h-?0[0-9]{2}'        # >=440 av >=825 = över hälften
+                                                        # 440/825 uppmätt 2026-09-14.
+                                                        # BÅDA ÄR GOLV, inte exakta tal:
+                                                        # loggen växer, så talen stiger.
+                                                        # validera-underlaget.sh pinnar
+                                                        # dem som trösklar (FYND 31c).
 
 # Commits och rundor per hypotes
 for h in 031 032 033 034 035 036 037 038 039; do

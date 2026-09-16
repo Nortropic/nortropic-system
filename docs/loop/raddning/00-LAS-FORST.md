@@ -180,8 +180,18 @@ bundlen omgjord. Felet upptäcktes av en ägarfråga, inte av ett prov.
 **En femte hittades 2026-09-16 — i det här underlaget.** En tidigare version påstod
 *"16 av 23 vakter läser webbträdet, noll läser kärnan"*. Kärnsiffran var fel: grepet
 krävde inledande citattecken och missade alla tre kernelreferenserna. Rätt siffra är
-16 / 2 / 1 / 4, och två äkta kernelvakter finns (`check-provanropare.mjs`,
-`check-verifierarregistret.mjs`).
+16 / 2 / 1 / 4.
+
+**Och ett sjätte fel fanns i rättelsen av det femte — hittat 2026-09-16 (FYND 31).**
+Den löd *"två äkta kernelvakter finns (`check-provanropare.mjs`,
+`check-verifierarregistret.mjs`)"*. Fördelningen 16/2/1/4 är riktig, men den mäter vad en
+fil **refererar** — inte vad den **tillhör**. `check-provanropare.mjs` refererar bara
+kernelsökvägar och är ändå ägardömd `WEB / WEB_MOVE` i
+`SEPARATION-20260910/ALLOCATION.tsv`; den finns inte på plattformsgrenen. Kärnans två i
+sviten är `check-invariants.mjs` och `check-verifierarregistret.mjs`.
+
+**Notera formen:** felet lagades med ett bättre grep, och det nya svaret var lika lexikalt
+som det gamla. **Ägandet avgörs av separationen, aldrig av ett grep.**
 
 **Det gäller alltså detta underlag också.** Det är nu självt ärvd inramning för nästa
 session. Varje siffra i `02-bevis.md` och `06-inventering.md` står med kommandot som

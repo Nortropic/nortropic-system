@@ -14,17 +14,25 @@ respektive ett fryst exitprov i `verify/bin/` läser dem, liksom `controller/ver
 De binder alltså här av beroende, inte av innehåll. `docs/05-beslutslogg.md` är genuint
 delad och kernel-dominerad — tio frysta exitprov läser den.
 
-`node scripts/kor-vakter.mjs` är ÖVERVÄGANDE webbfabrikens grindsvit: av 23 vakter
-refererar 16 enbart webbträdet, 2 enbart kärnan (`check-provanropare.mjs`,
-`check-verifierarregistret.mjs`), 1 båda och 4 inget träd alls. Den är inget bevis om en
-kerneländring — kärnans dom är taskens frysta `exit_test` under `verify/bin/` — men de
-två kernelvakterna följer inte med när webbträdet flyttas.
+`node scripts/kor-vakter.mjs` är webbfabrikens grindsvit och säger **exakt en sak:
+webbfabriken är inte söndrad.** Citera den ALDRIG som bevis för kernelarbete. Av 23 vakter
+refererar 16 enbart webbträdet, 2 enbart kärnan, 1 båda och 4 inget träd alls — men **den
+fördelningen mäter vad en fil PEKAR PÅ, inte vad den TILLHÖR.** Mätt 2026-09-16: noll av de
+23 läser `docs/loop/regler.md`, `docs/loop/drift.md` eller `docs/loop/raddning/**`, och
+`kor-vakter.mjs` finns inte på plattformsgrenen. Kärnans dom är `controller/verify/cli`
+och taskens frysta `exit_test` under `verify/bin/` — båda kräver Python 3.12+, alltså
+Macen. I en 3.11-miljö är kärnans dom `ODÖMBART`, och ett ODÖMBART blir aldrig grönt av en
+grön webbsvit (`LOOP-RÄTTELSE-VAKTBEVIS`).
 
-`scripts/` och `tests/` är BLANDADE kataloger, inte webb. Kärnans där:
-`scripts/nortropic-codex-autopilot.py` (allowed_write för h-031/032/035),
-`check-provanropare.mjs`, `check-verifierarregistret.mjs`, `kor-styrprov.mjs`,
-`kor-vakter.mjs`, `tests/controller/**`, `tests/scripts/**`. De följer aldrig med
-webbträdet.
+`scripts/` och `tests/` är BLANDADE kataloger, inte webb. Kärnans där, enligt
+`PLATFORM_EXACT` i plattformsgrenens `check-invariants.mjs` (PINV-003/005):
+`check-invariants.mjs`, `nortropic-codex-autopilot.py` (allowed_write för h-031/032/035),
+`check-verifierarregistret.mjs`, `tests/controller/**`, `tests/scripts/**`. De följer
+aldrig med webbträdet. **`check-provanropare.mjs`, `kor-styrprov.mjs` och `kor-vakter.mjs`
+är INTE kärnans** (rättat 2026-09-16, FYND 31): `SEPARATION-20260910/ALLOCATION.tsv` dömer
+alla tre `WEB / WEB_MOVE`, och ingen finns på plattformsgrenen, vars `scripts/` bär två
+filer. `check-provanropare.mjs` refererar bara kernelsökvägar — det var därför den
+felklassades. **Ägandet avgörs av separationen, aldrig av ett grep.**
 
 **Vägen till klar kärna** står i `docs/loop/raddning/` — lägesbild, karta, slutkriterium
 (`KERNEL_COMPLETE`), arbetsordning och taskspecar. Läs `raddning/README.md` först;

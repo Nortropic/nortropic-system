@@ -51,9 +51,20 @@ rad "klonen är INTE grund" "false" "$(matt 'git rev-parse --is-shallow-reposito
 # ── §1 Rundtrampen ───────────────────────────────────────────────────────────
 rad "commits i historiken (>=825)" "JA" \
     "$(c=$(git log --oneline 2>/dev/null | wc -l | tr -d ' '); [ "${c:-0}" -ge 825 ] && echo JA || echo "NEJ($c)")"
-rad "commits med H-nummer" "440" "$(matt "git log --format='%s' | grep -ciE 'h-?0[0-9]{2}'")"
-rad "NO-CREDIT-rader i drift.md" "101" \
-    "$(matt "grep -c 'productless\|NO-CREDIT\|no product' docs/loop/drift.md")"
+# Pinnas som MONOTON TRÖSKEL, inte som exakt tal (rättat 2026-09-16, FYND 31c).
+# Talet räknar commits i en växande logg: varje ny commit som nämner ett h-nummer höjer
+# det, så ett exakt förväntat tal AVVIKER av att arbete sker. Det är samma felform som
+# regel 11 förbjuder i en grind — provet band miljön i stället för egenskapen. Påståendet
+# underlaget faktiskt gör är "minst 440 av 825, alltså över hälften", och den är monoton.
+# Samma idiom som raden ovan om historikens längd.
+rad "commits med H-nummer (>=440)" "JA" \
+    "$(c=$(git log --format='%s' 2>/dev/null | grep -ciE 'h-?0[0-9]{2}'); [ "${c:-0}" -ge 440 ] && echo JA || echo "NEJ($c)")"
+# Samma monotona tröskelform, och av samma skäl (FYND 31c). Raden räknar i en fil som
+# växer, och den träffar BÅDE riktiga NO-CREDIT-verdikt OCH prosa som nämner termen —
+# den commit som skrev FYND 31c fällde den omedelbart, 101 → 102. Underlagets påstående
+# är "minst 101 produktlösa rundor", och den egenskapen är monoton.
+rad "NO-CREDIT-rader i drift.md (>=101)" "JA" \
+    "$(c=$(grep -c 'productless\|NO-CREDIT\|no product' docs/loop/drift.md 2>/dev/null); [ "${c:-0}" -ge 101 ] && echo JA || echo "NEJ($c)")"
 
 # ── ⭐ Konvergensmätningen — underlagets tyngsta fynd ─────────────────────────
 echo

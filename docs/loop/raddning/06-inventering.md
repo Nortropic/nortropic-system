@@ -194,7 +194,8 @@ Härav följer en renare uppdelning än "dessa fem stannar":
 |---|---|---|
 | `scripts/nortropic-codex-autopilot.py` | **Kärnan**, och bör flyttas ur `scripts/` | Det är kärnans mekaniska exekverare; `scripts/` är bara där den landade |
 | `kor-vakter.mjs`, `check-vaktankare.mjs` | **Webben** | Sviteinfrastruktur, född med webbapparaten |
-| `check-provanropare.mjs`, `check-verifierarregistret.mjs` | **Kontrollerna** hör till kärnan, men inte som webbvakter | De prövar att kärnans frysta prov faktiskt anropas och att registret är koherent — riktiga kernelfrågor utan hemvist i kärnan i dag |
+| `check-verifierarregistret.mjs` | **Kärnan** | Ägardömd `PLATFORM / PLATFORM_KEEP` i `ALLOCATION.tsv` och namngiven i PINV:s `PLATFORM_EXACT` |
+| `check-provanropare.mjs` | **Webben** — men FRÅGAN den ställer är kärnans | Ägardömd `WEB / WEB_MOVE`; finns inte på plattformsgrenen. Den prövar att kärnans frysta prov faktiskt anropas — en riktig kernelfråga **utan hemvist i kärnan**. Rättat 2026-09-16 (FYND 31): tidigare stod filen som kärnans, på grund av att den bara refererar kernelsökvägar. Ägandet avgörs av separationen, aldrig av ett grep. Kontrollen behöver byggas om som PINV om frågan ska fortsätta ställas |
 | `tests/controller/**`, `tests/scripts/**` | **Kärnan** | Kärnans egna tester |
 
 ### ⚠️ Bundlen är en korrekt extraktion — men inte ett körbart repo

@@ -96,17 +96,80 @@ mekanismen GÖR.
 (`LOOP-RÄTTELSE-VAKTBEVIS`) i stället för som ändring av elva historiska rader —
 beslutsloggen rättas genom tillägg, aldrig genom omskrivning.
 
-### ⚠️ Öppet för ägaren: `CLAUDE.md` bär ett fel om samma vakter
+### FYND 31b — vaktklassificeringen var fel i fyra dokument. RÄTTAD.
 
-`CLAUDE.md` namnger `check-provanropare.mjs` och `check-verifierarregistret.mjs` som
-kärnans och säger att de *"får aldrig följa med när webbträdet flyttas"*. Ägarens egen
-`SEPARATION-20260910/ALLOCATION.tsv` dömer `check-provanropare.mjs` **`WEB / WEB_MOVE`**,
-och ingen av de två finns på plattformsgrenen.
+Ägaren auktoriserade §A-ändringen 2026-09-16: *"Så länge codex och claude båda förstår
+ändringen så är jag nöjd, rätta det som behöver rättas."* (`LOOP-ÄGARHAND-VAKTKLASS`.)
 
-**Jag rättar det inte.** `CLAUDE.md` står i §A-mängden och regel 6 gäller den oförändrat —
-dagens undantag omfattar `h-027`–`h-030` i specen, ingenting annat. Detta är ett
-människohandsbeslut, och att det blev synligt just här är ett argument för din invändning,
-inte mot den.
+`CLAUDE.md` namngav `check-provanropare.mjs` som kärnans och sa att den *"aldrig får följa
+med när webbträdet flyttas"*. Tre källor säger emot:
+
+| Källa | Dom |
+|---|---|
+| `SEPARATION-20260910/ALLOCATION.tsv` | `check-provanropare` · `kor-styrprov` · `kor-vakter` = alla tre **`WEB / WEB_MOVE`** |
+| Plattformsgrenens `scripts/` | Bär **två** filer: `check-invariants.mjs`, `nortropic-codex-autopilot.py` |
+| PINV `PLATFORM_EXACT` i plattformsgrenens `check-invariants.mjs` | `check-invariants.mjs`, `nortropic-codex-autopilot.py`, `check-verifierarregistret.mjs` — inga andra `scripts/` |
+
+**Antalet var rätt, paret fel.** Kärnans två i sviten är `check-invariants.mjs` +
+`check-verifierarregistret.mjs`.
+
+**Orsaken är underlagets återkommande.** `check-provanropare.mjs` refererar sex
+kernelsökvägar och noll webbsökvägar. En **lexikal** mätning gör den därför till
+kernelfil. Separationen dömde på vad den **tillhör**. Värre: `00-LAS-FORST.md` bär redan
+ett fel av samma form — en tidigare kärnsiffra var noll, lagades med ett bättre grep, och
+**det nya svaret var lika lexikalt som det gamla.** Vad en fil PEKAR PÅ är inte vad den
+ÄR. Ägandet avgörs av separationen, aldrig av ett grep.
+
+**Rättat i fyra filer:** `CLAUDE.md` (§A), `AGENTS.md` (så Codex och Claude läser samma
+sak), `raddning/00-LAS-FORST.md`, `raddning/06-inventering.md`. Fördelningen 16/2/1/4 står
+kvar oförändrad — den är en riktig **referensmätning** och pinnas av
+`validera-underlaget.sh`; det som rättats är vad den påstås betyda.
+
+**En kernelfråga blev hemlös av det.** `check-provanropare.mjs` prövar att kärnans frysta
+prov faktiskt anropas — en riktig kernelfråga, i en fil som följer med webben. Den behöver
+byggas om som PINV om frågan ska fortsätta ställas. Noterat i `06-inventering.md`, inte
+åtgärdat här.
+
+### FYND 31c — valideringsprovet pinnade ett växande tal. RÄTTAT.
+
+`validera-underlaget.sh` gick `AVVIKER 1` direkt efter FYND 31:s commit. Kontrollen
+*"commits med H-nummer"* väntade sig **exakt 440** och mätte **441** — commiten nämnde
+`h-027`–`h-030`.
+
+**Provet AVVEK alltså av att arbete skedde.** Det är samma felform som regel 11 förbjuder
+i en grind: **provet band miljön i stället för egenskapen.** Ett exakt tal över en växande
+logg kan inte vara stabilt, och en kontroll som blir röd av varje commit blir tystad — det
+är hela mekanismen bakom de 297 omfrysningarna.
+
+Påståendet underlaget faktiskt gör är *"minst 440 av 825, alltså över hälften"*, och den
+egenskapen är monoton. Kontrollen är omskriven till tröskelform — **samma idiom som raden
+ovanför den redan använde** för historikens längd (`>=825 → JA`). `02-bevis.md` säger nu
+att båda talen är GOLV, uppmätta 2026-09-14.
+
+**Mutationsprövat, inte antaget:** tröskel höjd till `999999` → `NEJ(441)` + `AVVIKER` +
+exit 1. Kontrollen fäller när den ska, och skriver ut det uppmätta talet när den fäller,
+så drift förblir synlig. Baslinjen är åter `BEKRÄFTAT 33 · AVVIKER 0 · ODÖMBART 4`.
+
+**Och den latenta systerkontrollen föll inom samma commit.** Jag skrev först att raden
+*"NO-CREDIT-rader i drift.md" = 101* var samma felklass men lämnades orörd, eftersom den
+var grön och jag inte ville ändra på spekulation. **Nästa körning gav `101 → 102`** — den
+mening jag just hade skrivit innehöll strängen `NO-CREDIT`, och kontrollen räknar prosa
+lika gärna som verdikt. Klassen behövde alltså inte spekuleras om; den demonstrerade sig
+själv på under en minut. Även den är nu tröskelform och mutationsprövad
+(`>=999999 → NEJ(102)` + `AVVIKER`).
+
+**Lärdomen är inte "jag borde ha fixat båda direkt".** Den är att ett prov som räknar
+förekomster i en fil som provet självt dokumenteras i **är cirkulärt**: att skriva om
+mätningen ändrar mätningen. Två sådana fanns i underlaget. Leta efter fler innan nästa tal
+pinnas.
+
+### ⚠️ Sidofynd som INTE rättas här: dinglande referens inifrån PINV
+
+Plattformsgrenens `check-invariants.mjs` namnger `scripts/check-verifierarregistret.mjs` i
+`PLATFORM_EXACT` (rad 106) — men filen finns inte på den grenen, trots att
+`ALLOCATION.tsv` dömer den `PLATFORM_KEEP`. Det är en dinglande referens **inifrån kärnans
+egen invariantgrind**, alltså precis vad vakt 2 i `11-tre-vakter-mot-aterfall.md` byggs
+för att fånga. Hör hemma i plattformsgrenens granskning.
 
 ## 2026-09-16 — VÄGEN TILL MÅLET ÄR SEX POSTER, och den prosarad som sa annat är upphävd
 
