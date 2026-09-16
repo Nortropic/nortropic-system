@@ -52,8 +52,33 @@ klassa() {
   echo "FORALDRALOS"
 }
 
-n_main=0; n_remote=0; n_foraldralos=0; n_smutsig=0; n_tot=0
+n_main=0; n_remote=0; n_foraldralos=0; n_smutsig=0; n_smuts_sakrad=0; n_tot=0
 FARLIGA=""
+
+# Är ett smutsigt worktrees NUVARANDE innehåll redan säkrat på origin?
+# Tillagt 2026-09-16 efter att provet larmat "STÄDA INGENTING" om 31 worktrees
+# vars innehåll radda-okommitterat.sh just hade pushat. En vakt som skriker varg
+# blir ignorerad, och en ignorerad vakt är värre än ingen
+# (11-tre-vakter-mot-aterfall.md).
+#
+# Provet är INNEHÅLL, inte namn: bygg worktreets träd i ett tempindex och jämför
+# med trädet i radda/smuts-<namn>. Lika träd = innehållet finns på origin.
+# Har worktreet ändrats sedan räddningen skiljer sig träden, och larmet står kvar
+# — vilket är rätt, för då finns nytt arbete som inte är säkrat.
+smuts_sakrad() {
+  local wt="$1" namn ref tmpidx tree fjarrtree
+  namn="$(basename "$wt" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
+  ref="refs/remotes/origin/radda/smuts-$namn"
+  git rev-parse --verify -q "$ref" >/dev/null 2>&1 || return 1
+  tmpidx="$(mktemp)"; rm -f "$tmpidx"
+  GIT_INDEX_FILE="$tmpidx" git -C "$wt" read-tree HEAD >/dev/null 2>&1 \
+    && GIT_INDEX_FILE="$tmpidx" git -C "$wt" add -A >/dev/null 2>&1 \
+    && tree="$(GIT_INDEX_FILE="$tmpidx" git -C "$wt" write-tree 2>/dev/null)"
+  rm -f "$tmpidx"
+  [ -z "${tree:-}" ] && return 1
+  fjarrtree="$(git rev-parse "$ref^{tree}" 2>/dev/null)"
+  [ "$tree" = "$fjarrtree" ]
+}
 
 echo "=== WORKTREES ==="
 printf "%-12s %-10s %-9s %s\n" LÄGE HEAD SMUTS KATALOG
@@ -66,7 +91,11 @@ process() {
   n_tot=$((n_tot+1))
   local k; k="$(klassa "$HEAD_SHA")"
   local s; s="$(git -C "$SOKVAG" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
-  [ "${s:-0}" -gt 0 ] && n_smutsig=$((n_smutsig+1))
+  local smutsmark=""
+  if [ "${s:-0}" -gt 0 ]; then
+    if smuts_sakrad "$SOKVAG"; then smutsmark=" (säkrad)"; n_smuts_sakrad=$((n_smuts_sakrad+1))
+    else n_smutsig=$((n_smutsig+1)); fi
+  fi
   case "$k" in
     I_MAIN)      n_main=$((n_main+1)) ;;
     PA_REMOTE)   n_remote=$((n_remote+1)) ;;
@@ -76,7 +105,7 @@ $HEAD_SHA|${GREN:-DETACHED}|$s|$SOKVAG" ;;
   esac
   # Skriv bara ut det som INTE är helt säkrat — 200 gröna rader döljer de farliga
   if [ "$k" != "I_MAIN" ] || [ "${s:-0}" -gt 0 ]; then
-    printf "%-12s %-10s %-9s %s\n" "$k" "${HEAD_SHA:0:8}" "${s:-0} fil" "${SOKVAG#$HOME/}"
+    printf "%-12s %-10s %-9s %s\n" "$k" "${HEAD_SHA:0:8}" "${s:-0} fil$smutsmark" "${SOKVAG#$HOME/}"
   fi
 }
 
@@ -90,7 +119,7 @@ done < <(git worktree list --porcelain)
 process
 
 echo
-echo "worktrees: $n_tot totalt · $n_main helt i main · $n_remote på pushad gren · $n_foraldralos FÖRÄLDRALÖSA · $n_smutsig med okommitterat"
+echo "worktrees: $n_tot totalt · $n_main helt i main · $n_remote på pushad gren · $n_foraldralos FÖRÄLDRALÖSA · $n_smutsig OSÄKRAT okommitterat · $n_smuts_sakrad smutsiga men säkrade"
 echo "(rader ovan = endast de som inte är helt säkrade och rena)"
 echo
 
@@ -116,6 +145,7 @@ FARA=$((n_foraldralos + g_farliga + n_smutsig))
 if [ "$FARA" = "0" ]; then
   echo "✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns på git."
   echo "   Städning kan ske utan att något går förlorat."
+  [ "$n_smuts_sakrad" -gt 0 ] && echo "   ($n_smuts_sakrad worktrees är smutsiga, men deras innehåll ligger i radda/smuts-*" && echo "    med IDENTISKT träd — mätt, inte antaget på grennamnet.)"
 else
   echo "⚠️  $FARA poster finns BARA på denna maskin:"
   echo "      $n_foraldralos worktrees med föräldralös HEAD"
