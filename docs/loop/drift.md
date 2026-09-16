@@ -1,5 +1,79 @@
 # Att köra loopen
 
+## 2026-09-16 — ⭐ PLATTFORMSGRENEN HALVERAR FELEN. Tvårotshypotesen bekräftad.
+
+**Kört 22:43 på Darwin, ren lokal klon av `nortropic/platform-integration-20260910`
+(`8095d94`), 0 okommitterade före och efter.** Samma fjorton grindar, samma
+mätsticka — grindfilerna är bytesidentiska med `main` för `h-004` och `h-009`.
+
+```
+main   RAD: h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:0 h-008:0
+            h-009:1 h-010:0 h-011:1 h-012:1 h-013:1 h-016:1
+gren   RAD: h-001:0 h-002:0 h-003:0 h-004:1 h-005:0 h-006:0 h-007:1 h-008:0
+            h-009:1 h-010:0 h-011:0 h-012:1 h-013:1 h-016:1
+```
+
+Båda ger `8 PASS · 6 FAIL`. **Men summan döljer allt som betyder något.** Räknat på
+fallande KONTROLLER, inte på grindar:
+
+| Task | main FAIL | gren FAIL | Δ |
+|---|---|---|---|
+| `h-004` | 7 | 7 | 0 |
+| `h-007` | 0 | **5** | **+5 ⚠️ ny röd** |
+| `h-009` | 3 | 2 | −1 |
+| `h-011` | 7 | **0** | **−7 ⬅ GRÖN** |
+| `h-012` | 9 | 1 | −8 |
+| `h-013` | 8 | 6 | −2 |
+| `h-016` | 14 | 3 | −11 |
+| **summa** | **48** | **24** | **−24** |
+
+**Utan `h-007`: 19.** Grenen bär alltså en kärna med under hälften så många fel.
+
+### Tvårotshypotesen är BEKRÄFTAD
+
+`h-009` K8 — *"processen kördes i reporoten, inte i workspacet"* — är **PASS på grenen**.
+Det är de elva raderna `os.chdir(ws)` som ligger där sedan 10 september.
+
+Och nedströmseffekten är precis den hypotesen förutsade: `h-011` blev grön, `h-012` gick
+`9 → 1` fallande kontroller, `h-016` gick `14 → 3`. **En rot lagad, fyra nedströms
+följde med.** Hypotesen skrevs ner innan provet kördes (FYND 34), vilket är det som gör
+utfallet mätbart i stället för efterkonstruerat.
+
+`h-009` är ändå inte grön: **K2 (exit 127) och K9 (kuvertleverans) kvarstår.** `chdir`
+löste workspacet, inte kuvertet. Roten är alltså halvlagad, och resten av nedströms —
+`h-012` K4, `h-013` sex kontroller, `h-016` tre — står kvar.
+
+`h-004` är oförändrad `7 FAIL` på båda. Andra roten är orörd av grenen, som väntat:
+`lease_id`, fencing och renew är inte byggda någonstans.
+
+### `h-007`:s fem nya röda — starkt indicium, inte bevisat
+
+Alla fem är `K1.x §A-orsak — <sökväg> avvisades men orsaken namnger den inte`. Orsaken
+som ges är i stället docs-kravet. Fyra av de fem sökvägarna finns på `main` och är
+**borta på grenen** — `AUTOPILOT`, `agents/nortropic-steward.md` och två under `skills/`
+— alltså filer separationen flyttade till webbrepot.
+
+**Men frånvaro ensam förklarar det inte:** `docs/07-konstitution.md` är också borta på
+grenen, och dess kontroll `K1.6` **passerar**. Den femte sökvägen, `workflows/prov.md`,
+saknas på båda. Sambandet är starkt men inte slutet, och det ska mätas innan någon
+bygger på det. Det är samma bindning `SEPARATION-20260910/EFTERARBETE.md` punkt 4/5/7
+beskriver — de fem flyttade dokumenten — och därmed arbete som redan är specat.
+
+### Registret är friskt på grenen
+
+`controller/verify/cli list` ger på `main` två poster, varav
+`nortropic-verify-suite` → **`EJ STARTBAR`**. På grenen finns bara `check-invariants`,
+och den är **startbar**. Den omätta posten från mätningen 21:59 är alltså åtgärdad där.
+
+### Vad detta betyder för vägen
+
+**Grenen är närmare `KERNEL_COMPLETE` än `main` är.** Att bygga om `h-009` på `main`
+vore att skriva samma elva rader en gång till och kasta bort `h-011`, `h-012` och
+`h-016`:s förbättringar. Vägen går genom att **landa grenen**, och `h-007` är då inte en
+regression att frukta utan den kända efterarbetsbindningen som ändå måste lösas.
+
+`VAGEN.md` FAS 0/1 är omskriven efter detta.
+
 ## 2026-09-16 — MÄTT PÅ MAIN: kartan håller inte, och nu utan konfundering
 
 FYND 33:s dom kördes mot gren `5b6ed6e`, inte `main`. Den konfunderingen skrevs ner i

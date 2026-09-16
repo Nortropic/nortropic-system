@@ -48,7 +48,7 @@ lät auktoritativa.
 |---|---|---|
 | `03-raddningsplan.md` steg 1 | *"Bygg slutgrinden först"* | **Analys.** Ordningen upphävd → FAS 8 här |
 | `10-forsta-arbetspaketet-h014.md` | *"Första arbetspaketet: h-014"* | **Arbetspaket.** Inte första → FAS 5 här |
-| `12-arbetsorder.md` steg 1–4 | separationens landning | **Analys och delplan.** → FAS 1B här |
+| `12-arbetsorder.md` steg 1–4 | separationens landning | **Delplanen för FAS 1**, som mätningen gjorde till huvudspår |
 | `06-inventering.md` §1 | bootstrap-kedjan `h-039→h-038→h-032→h-031` | **Upphävd** — de tre är avslutade `OVERIFIERAT` |
 | `PROMPT-TILL-CODEX.txt` ORDNINGEN | pekar hit | Ingången. Läs den först, den bär körbanan |
 
@@ -164,92 +164,95 @@ h-016 ← h-011, h-012, h-013
 Fyra av sex ligger **nedströms**. Ingen rot beror på något rött. Grafen är läst ur
 `specs/tasks.spec.json`, inte ur prosan.
 
-**Detta är en hypotes, inte ett faktum.** Grafen är fakta; att symtomen liknar varandra är
-en svagare signal, och samma session gissade fel om sju röda grindar tre timmar tidigare.
-**Därför följer ordningen av provet, inte av tron.**
+**Detta skrevs som en hypotes, och den är nu BEKRÄFTAD.** Mätningen 22:43 på
+plattformsgrenen, där `h-009` K8 är PASS: `h-011` blev grön, `h-012` gick `9 → 1`
+fallande kontroller, `h-016` gick `14 → 3`. **En rot lagad, fyra nedströms följde med.**
+Att hypotesen skrevs ner FÖRE provet är det som gör utfallet mätbart i stället för
+efterkonstruerat. Rot 1 (`h-004`) är orörd, som väntat.
 
 ---
 
 ## §4. VÄGEN
 
-### FAS 0 — Mät plattformsgrenen. Detta kan korta vägen dramatiskt.
+### FAS 0 — ✅ GJORD 22:43. Grenen halverar felen.
 
-**Lagningen till `h-009` kan redan finnas skriven.** Mätt 2026-09-16:
-`controller/launch/cli` **skiljer sig** mellan `main` och
-`nortropic/platform-integration-20260910`, och skillnaden är elva rader som gör exakt det
-`h-009` K8 klagar på:
+`controller/launch/cli` skiljer sig mellan `main` och
+`nortropic/platform-integration-20260910` med elva rader `os.chdir(ws)` — exakt det
+`h-009` K8 klagar på. `verify/bin/h-009-exit` är bytesidentisk på båda grenarna, så
+mätningen blev ett rent kontrollprov: **samma mätsticka, två versioner av komponenten.**
 
-```python
-# Målet ska köras i det upplösta workspacet, oberoende av anroparens cwd.
-try:
-    os.chdir(ws)
-except OSError as exc:
-    return svar(f"launch_failed: kunde inte byta arbetskatalog till workspacet {ws}: ...")
-```
+Kört på Darwin, ren lokal klon av grenen (`8095d94`), 0 okommitterade före och efter.
+Räknat på fallande **kontroller**, inte på grindar:
 
-`verify/bin/h-009-exit` är **bytesidentisk** på båda grenarna. Det ger ett rent
-kontrollprov: **samma grind, två versioner av komponenten.**
+| Task | main | gren | Δ |
+|---|---|---|---|
+| `h-004` | 7 | 7 | 0 |
+| `h-007` | 0 | **5** | **+5 ⚠️** |
+| `h-009` | 3 | 2 | −1 |
+| `h-011` | 7 | **0** | **−7 ⬅ GRÖN** |
+| `h-012` | 9 | 1 | −8 |
+| `h-013` | 8 | 6 | −2 |
+| `h-016` | 14 | 3 | −11 |
+| **summa** | **48** | **24** | **−24** |
 
-```bash
-git clone --branch nortropic/platform-integration-20260910 \
-  git@github.com:Nortropic/nortropic-system.git ~/kernel-gren && cd ~/kernel-gren
-bash docs/loop/raddning/artefakter/matning-pa-macen.sh
-```
+Utan `h-007`: **19**.
 
-| Utfall | Betyder | Gör då |
-|---|---|---|
-| `h-009` **grön** på grenen | Lagningen finns och fungerar | FAS 1A: implementera samma ändring på `main` |
-| `h-009` **röd** på grenen | Lagningen räcker inte | FAS 1A: bygg den, med grenens ändring som utgångspunkt |
+**Tvårotshypotesen är bekräftad.** `h-009` K8 är PASS på grenen, och nedströms följde
+med precis som förutsagt: `h-011` grön, `h-012` `9 → 1`, `h-016` `14 → 3`. Hypotesen
+skrevs ner **före** provet (FYND 34), vilket är det som gör utfallet mätbart i stället
+för efterkonstruerat.
 
-**Kör om alla fjorton, inte bara `h-009`.** Grenen bär även ändringar i
-`controller/policy/cli` (64 rader), `controller/verify/cli` (163) och `register.json`.
-Vad de gör åt de övriga fem är omätt — och en omätt sak ska mätas, inte gissas.
-
-> ⚠️ Grenen saknar `workflows/nortropic-verify-suite.js`, som finns på `main`. Grindarna
-> körs direkt (`bash verify/bin/h-NNN-exit`) och behöver inte registret, men blir något
-> `ODÖMBART` på grenen är det den troliga orsaken. `ODÖMBART` är aldrig `FAIL`.
+**Slutsatsen för vägen:** grenen är närmare `KERNEL_COMPLETE` än `main`. Att bygga om
+`h-009` på `main` vore att skriva samma elva rader igen och kasta bort `h-011`,
+`h-012` och `h-016`:s förbättringar. **Vägen går genom att landa grenen.**
 
 ---
 
-### FAS 1A — `h-009` grön. ⭐ Vägens första bygge.
+### FAS 1 — ⭐ Landa plattformsgrenen. Vägens första arbete.
 
-**Varför just denna:** `h-009` är den ena roten och den enda som har nedströms. Dess tre
-fel säger samma sak tre gånger:
+Det som tidigare stod som PARALLELLSPÅR är nu huvudspåret. `12-arbetsorder.md` steg 1–4
+bär delplanen; **kontrollera dess tabell mot HEAD först** — den är daterad.
+
+**`h-007`:s fem nya röda är den kända efterarbetsbindningen, inte en ny defekt.** Alla
+fem är `K1.x §A-orsak — <sökväg> avvisades men orsaken namnger den inte`. Fyra av de fem
+sökvägarna finns på `main` och är borta på grenen: `AUTOPILOT`,
+`agents/nortropic-steward.md` och två under `skills/` — filer separationen flyttade.
+
+> ⚠️ **Men frånvaro ensam förklarar det inte, och det ska mätas innan du bygger på det.**
+> `docs/07-konstitution.md` är också borta på grenen och dess kontroll `K1.6` **passerar**.
+> Den femte sökvägen, `workflows/prov.md`, saknas på båda. Sambandet är starkt, inte
+> slutet. Root-orsaka `h-007` K1.1 innan du antar att en ompekning löser det.
+
+Det motsvarar `SEPARATION-20260910/EFTERARBETE.md` punkt 4/5/7 — de fem flyttade
+dokumenten — alltså arbete som ändå måste göras för att grenen ska kunna mergas.
+
+**Registret blir friskt på köpet:** `controller/verify/cli list` ger på `main` posten
+`nortropic-verify-suite` → **`EJ STARTBAR`**. På grenen finns den inte, och
+`check-invariants` är startbar.
+
+**Klart när:** `h-007` är grön på grenen och grenen är mergebar mot `main`.
+
+---
+
+### FAS 1B — `h-009` helt grön. Roten är bara halvlagad.
+
+`chdir` löste workspacet. **`K2` och `K9` kvarstår:**
 
 | Kontroll | Fel |
 |---|---|
 | `K2` kuvertet når processen | **exit 127** — kommandot fanns inte |
-| `K8` workspace | processen kördes i **reporoten**, inte i workspacet |
 | `K9` kuvertleverans | processen hittade **inget kuvert** |
-
-Det är **en** sak: barnprocessen startas inte i rätt katalog och får inte sitt kuvert.
-Samma primitiv konsumeras av `h-011`, `h-012`, `h-013` och `h-016`, och deras felrader bär
-dess signatur (`nonzero_exit kod 1`, `kod=4`).
 
 | | |
 |---|---|
-| **Komponent** | `controller/launch/cli` (824 rader) |
-| **`allowed_write`** | `controller/launch/**`, `tests/controller/launch/**`, `docs/05-beslutslogg.md`. **Ingenting annat** |
-| **Grind** | `verify/bin/h-009-exit` — **rörs inte** |
-| **Budget** | 3 omfrysningar (regel 11a). Överskriden → dela hypotesen eller avsluta `OVERIFIERAT` (11b). **Aldrig en runda till** |
-| **Klart när** | `bash verify/bin/h-009-exit` ger `exit 0` på Darwin, i ren klon, på dagsfärsk `main` |
+| **Komponent** | `controller/launch/cli` |
+| **`allowed_write`** | `controller/launch/**`, `tests/controller/launch/**`, `docs/05-beslutslogg.md` |
+| **Grind** | `verify/bin/h-009-exit` — **rörs inte**. Budget 3 (regel 11a) |
+| **Klart när** | `exit 0`, och de fjorton körda om |
 
-**Ingen `cherry-pick`.** `NO_FORCE_SEMANTICS=YES` förbjuder `--force`, rebase, amend,
-reset och cherry-pick. Grenens ändring är **läsunderlag**, inte något som plockas över.
-
----
-
-### FAS 1B — Provet på tvårotshypotesen. Skrivs ner oavsett utfall.
-
-När `h-009` är grön: **kör om alla fjorton.**
-
-| Utfall | Slutsats | Gör |
-|---|---|---|
-| Flera av `h-011/012/013/016` gröna | Hypotesen **bekräftad**, vägen är kort | Fortsätt FAS 2 |
-| Ingen nedströms vände | Hypotesen **falsifierad** | Skriv det i `drift.md` **samma dag**, root-orsaka var för sig |
-
-**Att skriva ner en falsifierad hypotes är arbete, inte misslyckande.** Elva av tretton
-fel i detta projekt överlevde för att ingen skrev ner att de prövats.
+Kör om de fjorton efteråt: `h-012` K4, `h-013`:s sex och `h-016`:s tre kan vara samma
+rot. Blir de gröna med är kuvertet den sista biten av rot 2. Blir de det inte, har de
+egna orsaker — **och det skrivs i `drift.md` samma dag.**
 
 ---
 
@@ -331,15 +334,13 @@ krav per rad, med sökväg till provet.
 
 ---
 
-### PARALLELLSPÅR — separationens landning
+### ~~PARALLELLSPÅR~~ — separationens landning är nu FAS 1
 
-Plattformsgrenen ligger **55 commits före `main`, 67 efter**, och bär kernelarbete:
-`controller/policy/cli`, `controller/verify/cli`, `register.json` och `launch/cli`. Den kan
-inte mergas förrän de fem flyttade dokumenten är ompekade — `12-arbetsorder.md` steg 1–4,
-vars tabell ska **kontrolleras mot HEAD först**; den är daterad och blir osann på samma
-sätt som `EFTERARBETE.md` blev.
-
-**Detta spår blockerar inte FAS 1–3.** Kernelarbetet sker på grenar ur `main`.
+*Här stod att separationens landning var ett sidospår som inte blockerade kernelarbetet.
+**Upphävt 2026-09-16 22:43:** mätningen visade att grenen halverar de fallande
+kontrollerna, 48 → 24, och tar `h-011` grön. Den bär lagningen till rot 2. Att bygga
+kernelarbete ur `main` vore att skriva om elva rader som redan finns och kasta bort
+`h-012`:s och `h-016`:s förbättringar. Landningen ÄR vägen — se FAS 1.*
 
 ---
 
