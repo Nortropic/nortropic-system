@@ -1,5 +1,55 @@
 # Att köra loopen
 
+## 2026-09-16 — FYND 24: fyra frysta grindar är VÄRDBUNDNA i sin shebang
+
+Försöket att döma `h-007`, `h-035`–`h-038` på plattformsgrenen gav `exit=127` rakt
+igenom — **tolken hittades inte**. Det är `ODÖMBART`, inte FAIL. Orsaken:
+
+```
+h-035, h-036, h-038, h-039:
+#!/opt/homebrew/Cellar/python@3.12/3.12.13_4/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+```
+
+**Fyra av 29 grindar i `origin/main` bär en absolut Homebrew-sökväg med exakt
+patchversion.** När Homebrew roterar `3.12.13_4` försvinner sökvägen och grindarna blir
+**okörbara** — inte röda, utan omöjliga att starta. De kan aldrig bli gröna igen utan en
+omfrysning.
+
+Jämför med resten av trädet: `h-037` har `#!/usr/bin/env python3`,
+`platform-separation-final-exit` har `#!/usr/bin/env python3.12`, `h-007` har
+`#!/usr/bin/env bash`. Samma repo, samma syfte, och bara fyra filer band värden.
+
+### Varför detta är dagens tyngsta enskilda fynd
+
+**`h-039` är en av de fyra.** Hypotesen med 30 omfrysningar och ett 2,1 MB stort exitprov
+har en shebang som pekar på en Homebrew-patchversion. Varje runda den kört har dömts av
+ett prov som slutar existera vid nästa `brew upgrade`.
+
+Det ger `raddning/01-lagesbild.md` §1 en tredje mekanism utöver de två redan mätta:
+
+1. Grinden ändras varje runda (30 av 30 commits) → inget fast mål.
+2. Grinden pinnar trädet mot ett baskommit (FYND 21) → varje arbete någon annanstans fäller den.
+3. **Grinden pinnar värdmaskinens tolksökväg** → en pakethanteraruppdatering fäller den.
+
+Alla tre är samma fel i olika skepnader: **provet binder miljön i stället för egenskapen.**
+Det är exakt vad **regel 11** nu förbjuder, och fyndet gör regeln konkret på ett sätt som
+ingen prosa kunnat.
+
+### Åtgärd — och den är liten, till skillnad från allt annat
+
+Byt de fyra shebangarna till `#!/usr/bin/env python3.12`. Det är en enradsändring per
+fil. **Men de är frysta exitprov**, så ändringen kräver omfrysning — och därmed regel 11:s
+attributionssteg: detta är en **gatedefekt**, inte en kandidatdefekt, så samma kandidat
+körs om. Rundan bokförs inte mot kandidaten.
+
+**Omfrysningen är dessutom lagom:** den gör grinden mindre miljöbunden, vilket är riktningen
+regel 11 kräver. Det är skillnaden mot de omfrysningar som skapade trampkvarnen — de gjorde
+grindarna mer exakta, denna gör dem mindre värdbundna.
+
+`OVERIFIERAT` tills ägaren bekräftat att Cellar-sökvägen faktiskt är borta
+(`ls -d /opt/homebrew/Cellar/python@3.12/*/`). `exit=127` är starkt indicium, inte bevis.
+
+
 ## 2026-09-16 — FYND 22: plattformsgrenen är INTE mergebar — beslutsloggen är raderad
 
 Granskning av den nu pushade grenen `nortropic/platform-integration-20260910`.
