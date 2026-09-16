@@ -105,9 +105,9 @@ git log --oneline --follow -- verify/bin/h-039-exit | wc -l    # 30
 | `h-013`, `h-017`, `h-038` | 2 | klara |
 | `h-001`, `h-036` | 3 | klara |
 | `h-035` | 17 | pågår |
-| `h-039` | 30 | pågår |
-| `h-032` | 120 | pågår |
-| `h-031` | **147** | pågår |
+| `h-039` | 30 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
+| `h-032` | 120 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
+| `h-031` | **147** | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
 
 **⚠️ Tabellens kolumn "klara" är falsifierad 2026-09-16 (FYND 33).** Omfrysningstalen
 stämmer; etiketterna inte. Körda på Macen i ren klon är `h-016` (1) `11 PASS / 14 FAIL`

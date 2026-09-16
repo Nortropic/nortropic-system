@@ -45,10 +45,10 @@ grön har blandat ihop rad 1 och rad 2.
 | Post | Task | Gate | Läge 2026-09-16 |
 |---|---|---|---|
 | Bootstrap-kedjan | `h-035`, `h-037`, `h-034`, `h-036`, `h-033` | ✓ frysta | klara |
-| | `h-039` | ✓ fryst | **runda 33, pågår** |
+| | `h-039` | ✓ fryst | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
 | | `h-038`, `h-032`, `h-031` | ✓ frysta | ej gröna |
 | Substitutionskedjan | `h-027`, `h-028`, `h-029`, **`h-030`** | — | **inte specade** (§3) |
-| Notisen | `h-014` | **saknas** | beroenden gröna, byggbar nu |
+| Notisen | `h-014` | **saknas** | ⚠️ *"beroenden gröna"* **FALSIFIERAT** — `h-013` är FAIL, mätt på `main` 2026-09-16. `VAGEN.md` FAS 4 |
 | Återtaget / supervisor resume | `h-015` | **saknas** | blockerad av `h-030` |
 | Programdomen | `verify/bin/autonomous-loop-exit` | **saknas** | specad 2026-08-10, aldrig byggd |
 

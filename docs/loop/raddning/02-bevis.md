@@ -75,9 +75,9 @@ done | sort -k2 -n
 | `h-013`, `h-017`, `h-038` | 2 | klara |
 | `h-001`, `h-036` | 3 | klara |
 | `h-035` | 17 | pågår |
-| `h-039` | 30 | pågår |
-| `h-032` | 120 | pågår |
-| `h-031` | 147 | pågår |
+| `h-039` | 30 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
+| `h-032` | 120 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
+| `h-031` | 147 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
 
 **⚠️ FALSIFIERAD ÅT ENA HÅLLET 2026-09-16 (FYND 33).** Här stod *"Ingen mellanform. Klar ⇔
 grinden rörd ≤ 3 gånger."* Omfrysningstalen ovan är riktiga; **etiketten "klar" var det

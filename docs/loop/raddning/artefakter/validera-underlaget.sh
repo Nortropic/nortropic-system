@@ -208,6 +208,33 @@ else
   odombart=$((odombart+1))
 fi
 
+# ── ⭐ INAKTUELL STATUS I ANALYSKATALOGEN ────────────────────────────────────
+# Ägaren 2026-09-16: "visst tar du bort det som inte längre gäller eller är utdaterad?"
+# Svaret var nej. Sex ställen sa fortfarande att h-039/032/031 PÅGÅR — de avslutades
+# OVERIFIERAT samma dag — och två att h-014:s beroenden är gröna, vilket falsifierades av
+# att h-013 är FAIL. Underlaget ska bära ANALYS OCH PLAN, aldrig status; en statusrad här
+# driftar inom ett dygn och blir en andra sanning. Disciplin räckte inte, så här är provet.
+#
+# Rättelsetexter räknas INTE som återfall: en rad som säger att påståendet är FALSIFIERAT
+# eller RÄTTAT är dokumentation av felet, inte felet. Utan det undantaget skulle provet
+# förbjuda sin egen rättelse — samma fälla som regel 11a bar innan riktningen infördes.
+echo
+echo "  ⭐ INAKTUELL STATUS — analyskatalogen får inte bära status (README, CLAUDE.md)"
+# Två mönster, båda måste finnas PÅ SAMMA RAD. Första versionen band dem i ETT
+# BRE-mönster med `|` emellan — men `|` är en LITERAL i BRE, alltså en tabellkolumn, och
+# mönstret krävde exakt en kolumn mellan träffarna. Mutationen föll inte: provet förblev
+# grönt när `pågår` återinfördes. Fångat och rättat 2026-09-16 innan det anfördes.
+ren_traffar() { # <mönster-A> <mönster-B> → rader där båda finns, exkl. rättelsetexter
+  grep -rniE "$1" docs/loop/raddning/*.md 2>/dev/null \
+    | grep -iE "$2" \
+    | grep -viE 'falsifierat|falsifierad|rättat|rättelse|obevisat|avslutad|upphävd|INTE vägen|EJ VÄGEN' \
+    | wc -l | tr -d ' '
+}
+rad "h-039/032/031 beskrivs inte som pågående" "0" \
+    "$(ren_traffar 'h-0(31|32|39)' 'pågår|pågående')"
+rad "h-014 påstås inte ha gröna beroenden" "0" \
+    "$(ren_traffar 'h-014' 'beroenden gröna|byggbar nu')"
+
 # ── Summering ────────────────────────────────────────────────────────────────
 printf '%.0s-' {1..108}; echo
 echo "BEKRÄFTAT $bekraftat · AVVIKER $avvik · ODÖMBART $odombart"

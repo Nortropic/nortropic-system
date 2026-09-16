@@ -75,9 +75,9 @@ slutet än R4 var, och kan inte bli det så länge grinden rör sig med kandidat
 | `h-013`, `h-017`, `h-038` | **2** | klara |
 | `h-001`, `h-036` | **3** | klara |
 | `h-035` | 17 | pågår |
-| `h-039` | 30 | pågår, R33 |
-| `h-032` | 120 | pågår |
-| `h-031` | **147** | pågår |
+| `h-039` | 30 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
+| `h-032` | 120 | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
+| `h-031` | **147** | **AVSLUTAD OVERIFIERAT 2026-09-16 (regel 11b)** |
 
 Ingen mellanform. Varje klar task har en grind som rörts högst tre gånger; varje
 icke-klar har en som rörts 17–147 gånger. **Antalet omfrysningar av grinden är den enda
