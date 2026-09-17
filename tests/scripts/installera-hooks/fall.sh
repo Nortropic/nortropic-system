@@ -32,11 +32,30 @@
 # är sann både om vad den ändrar och om vad som redan är installerat (regel 8a:
 # provet dömer den yta det läser).
 #
-# KÄND LUCKA, utskriven i stället för upptäckt senare: mutationsprovet visar att
-# `SEDDA`-dedupliceringen (installeraren rad 72) kan tas bort utan att något fall
-# faller. Det är sannolikt en likvärdig mutant — att sätta samma `core.hooksPath`
-# två gånger i samma git-dir är idempotent — men provet BEVISAR inte det, det
-# missar det. Dedupliceringen finns för utdatans skull, och utdata prövas inte här.
+# DE NIO PRÖVADE MUTATIONERNA, uppräknade. Talet "åtta av nio dödade" stod tidigare
+# utan att de nio fanns någonstans — ett tal ingen kunde pröva, alltså ett påstående
+# och inte en mätning (andra granskningen, icke-blockerande). Uppräknade i stället:
+#
+#   1. `-maxdepth 6` → `4`                        → K3b
+#   2. `cmp -s ...` → `true` (torrläget ljuger)   → K5b
+#   3. `HOOKHEM` → `$ROT/.githooks`               → K3, K3b, K5, K5b, K6
+#   4. `""|--torr)` → `"")`                       → K1b
+#   5. torrläget skriver ändå (`LAGE="kor"`)      → K2
+#   6. origin-jämförelsen borttagen               → K4
+#   7. ODÖMBART-spärren (rad 34) borttagen        → K8b
+#   8. `--av` gör ingenting                       → K7
+#   9. `SEDDA`-dedupliceringen borttagen          → ÖVERLEVER
+#
+# KÄND LUCKA (nr 9): `SEDDA`-dedupliceringen (installeraren rad 72) kan tas bort utan
+# att något fall faller. Sannolikt en likvärdig mutant — att sätta samma
+# `core.hooksPath` två gånger i samma git-dir är idempotent — men provet BEVISAR inte
+# det, det missar det. Dedupliceringen finns för utdatans skull, och utdata prövas
+# inte här.
+#
+# En oberoende granskare prövade en EGEN uppsättning om nio och fick 7/9; dess andra
+# överlevare var `chmod +x` struket ur installeraren rad 50. Även den sannolikt
+# likvärdig (`.githooks/post-commit` är `100755` och `cp` bevarar läget) — men samma
+# sak gäller: provet bevisar det inte.
 
 set -u
 ROT_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -184,9 +203,17 @@ fi
 # som flyttade hookhemmet in i klonens träd fälldes av K3 och K5, aldrig av K6.
 #
 # Nu raderas kontrollklonens `.githooks/` helt, och kravet är att den sökväg
-# installeraren SATTE fortfarande bär en körbar hook. Pekade konfigurationen in i
-# en klons arbetsträd — vilket den gjorde i första versionen av installeraren, för
-# 60 av 61 repon — faller detta, och inget annat fall märker det.
+# installeraren SATTE fortfarande bär en körbar hook.
+#
+# ⚠️ K6 ÄGER INTE DEN EGENSKAPEN ENSAM, och här stod tidigare att det gjorde det —
+# *"inget annat fall märker det"*. Mätt: mutationen som flyttar hookhemmet in i
+# klonens träd fäller **K3, K3b, K5, K5b OCH K6**, alltså fyra andra fall. Påståendet
+# var ett obelagt anspråk om ett provs skärpa — exakt samma felklass som fallet självt
+# infördes för att rätta, en nivå upp. Rättat efter andra granskningen, FYND F4.
+#
+# Det K6 FAKTISKT äger ensam är ett DINGLANDE hookhem: en sökväg som var giltig när
+# den sattes men inte längre bär en körbar hook. Det är den formen av tyst död de 60
+# repona hade riskerat, och det är det fallet prövar.
 SATT="$(hooksPath "$HOME/annan/klon2")"
 rm -rf "$HOME/kontroll/.githooks"
 if [ -z "$SATT" ]; then

@@ -1,5 +1,80 @@
 # Att köra loopen
 
+## 2026-09-17 — Andra granskningen: fyra fynd till, och ett av dem var en riktig bugg
+
+`DOM: FYND`. Den granskade `eb9483e..463989e` med uppdraget att pröva om **åtgärderna
+från första granskningen håller** — inte om de finns. Rätt fråga, och den gav utdelning.
+
+### F1 — jobbet kunde presentera ett äkta kandidatfel som en miljö
+
+`provsviter`-loopen bar `[ "$K" = "0" ] || rc="$K"`. **Sist vinner, inte värst vinner.**
+
+Mätt, och det är den kombination som spelar roll:
+
+```
+prov1=1 (äkta FAIL) · prov2=2 (ODÖMBART) → jobbets exit=2
+sammanfattning: "Detta är INTE ett fel i kandidaten."
+```
+
+Ett verkligt fel i `nortropic-autocommit/fall.sh` maskerat som en miljö — **exakt den
+bokföringsinversion som FYND 4-åtgärden infördes för att hindra, bara åt andra hållet.**
+Jag lagade ena riktningen och byggde den andra i samma andetag.
+
+Lagat: `case` med FAIL-dominans, domen tas **efter** loopen ur det slutliga utfallet, och
+båda listorna skrivs ut. En exitkod utanför algebran (t.ex. `127`) är fail-closed som FAIL.
+**Prövat mot alla nio kombinationer av 0/1/2** — verdikt och sammanfattning stämmer i
+samtliga.
+
+### F2 — mallen bar samma kategorifel, oåtgärdad
+
+Det återstartbara jobbet avslutade `exit 1` på ett ODÖMBART. Actions ser bara rött, men
+exitkoden är repots egen algebra och varje omslutande körare läser den. Den mallen hade
+klistrats in ordagrant den dag jobbet slås på. `exit 2`.
+
+### F3 — ett föråldrat tal inuti en grön vakt
+
+`check-provanropare.mjs` registerrad sa fortfarande *"tio fall … fem mutationer"* medan
+drift.md och beslutsloggen i **samma commit** sa 13 och 8 av 9. Talet stod på den yta som
+är minst benägen att läsas om: inuti en vakt som är grön.
+
+### F4 — mitt eget obelagda anspråk om ett provs skärpa
+
+`K6`-kommentaren sa *"inget annat fall märker det"*. Mätt: mutationen fäller **K3, K3b,
+K5, K5b och K6** — fyra andra fall märker det.
+
+**Det är samma felklass som fallet självt infördes för att rätta, en nivå upp.** Jag
+rättade `K6` från att jämföra ett gissat namn, och skrev i samma andetag ett obelagt
+påstående om vad det nya fallet kunde. Rättat, och den egenskap `K6` faktiskt äger ensam
+— ett **dinglande** hookhem — står nu i stället.
+
+### De nio mutationerna räknas nu upp
+
+*"Åtta av nio dödade"* gick inte att pröva, eftersom de nio inte fanns någonstans. Ett tal
+ingen kan pröva är ett påstående, inte en mätning. De står nu i provets huvud, med vilket
+fall som fäller vilken.
+
+### Metodnotis: granskarens rena klon var ett mätartefakt
+
+Granskaren rapporterade att `kor-vakter` faller i en ren utcheckning av `463989e`
+(`check-foundation-smoke` → *"0 kvittensrader"*), och alltså att evidensraden `24/24` inte
+reproducerar.
+
+**Mätt och motbevisat:** klonen var gjord från en **lokal sökväg**, så dess `origin` var
+`/home/user/nortropic-system`. Foundation-svitens `K1` är identitetsbunden med flit —
+*"identitet före konsumtion"* — och vägrar köra mot fel origin. Samma klon med
+`origin` satt till `Nortropic/nortropic-system`: **`PASS 24/24`**. Det förklarar också
+varför GitHub Actions var grön på samma commit.
+
+Fyndet var alltså falskt, men **frågan var rätt ställd**, och svaret hör hemma här: `24/24`
+är identitetsbundet, inte arbetsträdsbundet.
+
+### Och branch protection är nu MÄTT, inte grep:at
+
+Mitt tidigare påstående vilade på att ett grep inte hittade någon konfiguration — vilket
+inte är ett bevis. Mekaniskt i stället: PR #261 stod **`mergeable_state: "unstable"`**
+medan en check var röd. Hade en required status check funnits hade tillståndet varit
+`blocked`. **Ingenting hindrar en merge i dag.**
+
 ## 2026-09-17 — ÄGARBESLUT "Nej i nuläget": diffgranskningen ur CI, inte lämnad röd
 
 Ägaren på frågan om `/install-github-app`: **"Nej i nuläget"**.

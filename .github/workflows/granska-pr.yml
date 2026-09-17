@@ -141,9 +141,19 @@ jobs:
           fetch-depth: 0
       # Proven bygger sina egna engångsrepon och sitt eget $HOME. De når aldrig
       # nätet och rör aldrig arbetsträdet de ligger i.
+      # ETT FAIL DOMINERAR ETT ODÖMBART. Första formen var `[ "$K" = "0" ] || rc="$K"`
+      # — SIST VINNER, inte värst vinner — och skrev sammanfattningen inne i loopen.
+      # Mätt: prov 1 exit 1 (äkta kandidatfel) följt av prov 2 exit 2 gav jobbet exit 2
+      # och den ENDA texten i sammanfattningen sa *"Detta är INTE ett fel i kandidaten."*
+      # Alltså samma bokföringsinversion som filen finns emot, bara åt andra hållet: ett
+      # verkligt fel maskerat som en miljö. Fångat av andra granskningen, FYND F1.
+      #
+      # Domen tas nu EFTER loopen, ur det slutliga utfallet, och båda listorna skrivs ut.
       - name: skalproven
         run: |
           rc=0
+          fallda=""
+          odombara=""
           for p in tests/scripts/nortropic-autocommit/fall.sh \
                    tests/scripts/installera-hooks/fall.sh; do
             set +e
@@ -151,17 +161,36 @@ jobs:
             K=$?
             set -e
             echo "── $p → exit $K"
-            if [ "$K" = "2" ]; then
-              {
-                echo "## ⛔ ODÖMBART — \`$p\` kunde inte dömas (exit 2)"
-                echo
-                echo "**Detta är INTE ett fel i kandidaten.** Provet vägrade köra —"
-                echo "det hittade inte skriptet det prövar, eller kunde inte bygga sin"
-                echo "engångsvärld. Rött därför att ett ODÖMBART aldrig blir grönt."
-              } >> "$GITHUB_STEP_SUMMARY"
-            fi
-            [ "$K" = "0" ] || rc="$K"
+            case "$K" in
+              0) ;;
+              1) fallda="$fallda $p"; rc=1 ;;
+              2) odombara="$odombara $p"; [ "$rc" = "1" ] || rc=2 ;;
+              # Utanför algebran 0/1/2 — t.ex. 127 när ett kommando saknas. Fail-closed:
+              # en kod vi inte kan tolka får aldrig tolkas som det mildare utfallet.
+              *) fallda="$fallda $p(exit $K)"; rc=1 ;;
+            esac
           done
+          if [ -n "$fallda" ]; then
+            {
+              echo "## ❌ FAIL — skalprov föll"
+              echo
+              echo "Fällda prov:$fallda"
+              [ -n "$odombara" ] && echo "Dessutom ODÖMBART (kunde inte mätas):$odombara"
+              echo
+              echo "**Detta ÄR ett fel i kandidaten.** Ett FAIL dominerar ett ODÖMBART —"
+              echo "läs det fällda provets utdata i jobbloggen, inte ODÖMBART-raden."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$odombara" ]; then
+            {
+              echo "## ⛔ ODÖMBART — skalprov kunde inte dömas (exit 2)"
+              echo
+              echo "Odömbara prov:$odombara"
+              echo
+              echo "**Detta är INTE ett fel i kandidaten.** Provet vägrade köra — det"
+              echo "hittade inte skriptet det prövar, eller kunde inte bygga sin"
+              echo "engångsvärld. Rött därför att ett ODÖMBART aldrig blir grönt."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
           exit $rc
 
 # ── SÅ HÄR SLÅR DU PÅ DIFFGRANSKNINGEN IGEN ─────────────────────────────────────
@@ -205,7 +234,12 @@ jobs:
 #             echo "**Detta är INTE ett fel i kandidaten.** Ingen nyckel i repot."
 #             echo "Kör \`/install-github-app\`. En agent kan inte sätta secrets."
 #           } >> "$GITHUB_STEP_SUMMARY"
-#           exit 1
+#           # exit 2, inte 1: repots algebra är 0=PASS · 1=FAIL · 2=ODÖMBART. Actions ser
+#           # bara rött, men exitkoden är repots egen och varje omslutande körare läser
+#           # den. Mallen bar `exit 1` — samma kategorifel som FYND 4, oåtgärdat på det
+#           # tredje jobbet. Fångat av andra granskningen, FYND F2, i en mall som annars
+#           # hade klistrats in ordagrant den dag jobbet slås på.
+#           exit 2
 #       - name: Claude granskar diffen
 #         if: steps.nyckel.outputs.finns == 'ja'
 #         uses: anthropics/claude-code-action@v1
