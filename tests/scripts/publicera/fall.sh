@@ -205,7 +205,7 @@ rc="$(kor --utan-merge)"; [ "$rc" = 0 ] && [ "$(git -C "$T/arb" rev-parse origin
 bash "$PUB" --skriv-skal "$T/skal" >/dev/null || fel "S0" "--skriv-skal misslyckades"
 rm -rf "$T/sk"; mkdir -p "$T/sk"; git init -q --bare "$T/sk/lokal.git"; git init -q "$T/sk/klon"
 ( cd "$T/sk/klon" && echo a > a && git add a && git commit -q -m a && git remote add origin "$T/sk/lokal.git" && git remote add nat git@github.com:x/y.git && git remote add nathttps https://github.com/x/y.git && git push -q -u origin HEAD:main )
-sk() { ( cd "$T/sk/klon" && env PATH="$T/skal:$PATH" GIT_SSH_COMMAND=false "$@" ) > "$T/sk.ut" 2>&1; echo $?; }
+sk() { ( cd "$T/sk/klon" && env PATH="$T/skal:$PATH" GIT_SSH_COMMAND=false perl -e 'alarm shift; exec @ARGV' 20 "$@" ) > "$T/sk.ut" 2>&1; echo $?; }   # väggklocka: ett skal som loopar ger 142, inte ett hängt prov
 rc="$(sk git push origin HEAD:refs/heads/s1)"; [ "$rc" = 0 ] && git -C "$T/sk/lokal.git" rev-parse -q --verify refs/heads/s1 >/dev/null && ok "S1 skalet släpper push till lokal bare via fjärrnamn" || fel "S1" "rc=$rc $(head -1 "$T/sk.ut")"
 rc="$(sk git push --dry-run nat HEAD:refs/heads/s2)"; [ "$rc" = 77 ] && ok "S2 fjärrnamn med ssh-URL (scp-form) → 77" || fel "S2" "rc=$rc $(head -1 "$T/sk.ut")"
 rc="$(sk git push --dry-run nathttps HEAD:refs/heads/s2)"; [ "$rc" = 77 ] && ok "S3 fjärrnamn med https-URL → 77" || fel "S3" "rc=$rc $(head -1 "$T/sk.ut")"
@@ -229,6 +229,10 @@ rc="$( ( cd "$T/sk/klon" && env -u GIT_SSH_COMMAND PATH="$T/skal:$PATH" perl -e 
 rc="$(sk git -c user.name=x -c user.email=y@z commit -q --allow-empty -m tom)"; [ "$rc" = 0 ] && ok "S18 git -c user.name/user.email → släpps (proven behöver dem)" || fel "S18" "rc=$rc $(head -1 "$T/sk.ut")"
 rc="$(sk git -c credential.helper=osxkeychain push --dry-run nathttps HEAD)"; [ "$rc" = 77 ] && ok "S19 git -c credential.helper=… → 77" || fel "S19" "rc=$rc"
 rc="$(sk git -c core.sshCommand=/usr/bin/ssh ls-remote git@github.com:x/y.git)"; [ "$rc" = 77 ] && ok "S20 git -c core.sshCommand=… → 77" || fel "S20" "rc=$rc"
+# S21 skal på skal: granskaren kör harnessen under mekanismens skal, och harnessen lägger sitt eget skal först — måste komponera
+bash "$PUB" --skriv-skal "$T/skal2" >/dev/null
+rc="$( ( cd "$T/sk/klon" && env PATH="$T/skal2:$T/skal:$PATH" GIT_SSH_COMMAND=false perl -e 'alarm shift; exec @ARGV' 20 git push origin HEAD:refs/heads/s21 ) > "$T/sk.ut" 2>&1; echo $? )"; [ "$rc" = 0 ] && git -C "$T/sk/lokal.git" rev-parse -q --verify refs/heads/s21 >/dev/null && ok "S21 skal på skal: lokal push går igenom båda (skalens egna -c-nycklar är tillåtna)" || fel "S21" "rc=$rc $(head -1 "$T/sk.ut")"
+rc="$( ( cd "$T/sk/klon" && env PATH="$T/skal2:$T/skal:$PATH" GIT_SSH_COMMAND=false perl -e 'alarm shift; exec @ARGV' 20 git push --dry-run nat HEAD ) > "$T/sk.ut" 2>&1; echo $? )"; [ "$rc" = 77 ] && ok "S22 skal på skal: nätpush vägras fortfarande" || fel "S22" "rc=$rc"
 # ── H: Bash-vakten (spärr a') — hooken körs som Claude Code kör den: JSON på stdin, exit 2 = nekad ──
 hk() { printf '{"tool_name":"Bash","tool_input":{"command":%s}}' "$(printf '%s' "$1" | /usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" | sh "$T/skal/vakt-bash.sh" > "$T/hk.ut" 2>&1; echo $?; }
 [ "$(hk 'git log --oneline -3')" = 0 ] && ok "H1 vakten släpper git log" || fel "H1" "$(cat "$T/hk.ut")"

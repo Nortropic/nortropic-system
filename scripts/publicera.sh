@@ -91,7 +91,8 @@ skriv_skal() {
 # släpps (proven pushar till bare-repon under mktemp). Kringgås av absolut sökväg eller egen PATH.
 HAR="$(cd "$(dirname "$0")" && pwd -P)"; REAL=""
 # hoppa över skalet självt (PATH kan stava katalogen med dubbla snedstreck — jämför inod, inte sträng)
-OIFS=$IFS; IFS=:; for d in $PATH; do [ -x "$d/git" ] || continue; [ "$d/git" -ef "$0" ] && continue; REAL="$d/git"; break; done; IFS=$OIFS
+# hoppa över ALLA skal (eget och andra i kedjan — provets skal ligger före mekanismens): känns igen på markören
+OIFS=$IFS; IFS=:; for d in $PATH; do [ -x "$d/git" ] || continue; [ "$d/git" -ef "$0" ] && continue; grep -q 'git-skal för granskaren' "$d/git" 2>/dev/null && continue; REAL="$d/git"; break; done; IFS=$OIFS
 [ -n "$REAL" ] || { echo "git-skal: ingen riktig git i PATH" >&2; exit 127; }
 neka() { echo "$1 är avstängt för granskaren (publicera.sh spärr b)" >&2; exit 77; }
 ofarlig() { case "$1" in user.*|core.fsmonitor=*|init.*|advice.*|commit.gpgsign=*|log.*|diff.*|color.*|status.*|gc.*|core.pager=*|core.quotepath=*) return 0 ;; *) return 1 ;; esac; }
