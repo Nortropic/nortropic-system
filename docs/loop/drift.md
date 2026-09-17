@@ -28,8 +28,11 @@ Alla nio källblobbar auditen granskade är oförändrade på `eb9483e9` (`helhe
 `nortropic-autocommit.sh 9f9d23e9`, `.githooks/post-commit dd22e865`, `codex-autopilot-report.schema.json
 a755139d`, `harness-substitution-contract-v1.md 3997437c`, `VAGEN.md 5de48145`). Radnummer avser
 blobbarna vid `eb9483e9`; efter PR #261 (L1) flyttar `helhetsbilden.sh`:s rader +14 från rad 54, och
-`validera-underlaget.sh` rad 123–124 (`23`, `16/2/1/4`) blir AVVIKER (mätt av granskaren: 24 och 16/2/2/4)
-— AUD-03:s felklass på nästa merge. Disposition:
+`validera-underlaget.sh` rad 123–124 (`23`, `16/2/1/4`) blir AVVIKER — mätt av granskaren i andra passet med
+skriptets egna regexar: `24` och **`16/1/3/4`** (`check-provanropare.mjs` får en rad som nämner `workflows/` och
+flyttar från "kärna" till "båda"; den nya vakten hamnar i "båda") — AUD-03:s felklass på nästa merge. Efter L1
+flyttar också `AGENTS.md`:s rader +79 från rad 191 (AUD-11:s `:196`/`:233` → 275/312; AUD-12:s `:124`/`:189`
+oförändrade). Disposition:
 
 | Fynd | Läge | Avgörande mätning | Stängs i |
 |---|---|---|---|
@@ -50,11 +53,16 @@ blobbarna vid `eb9483e9`; efter PR #261 (L1) flyttar `helhetsbilden.sh`:s rader 
 ärvs av **varje** länkad worktree i klonen (`core.hooksPath` står i `.git/config`, delad) — både kernelns
 kandidat-worktrees (`controller/workspace/cli:184` `git worktree add --detach`; `controller/utforare/cli:105`
 committar som `nortropic-utforare`) **och de fjorton grindarnas fixturer**: `verify/bin/h-007-exit:18` gör
-`git worktree add` på den riktiga klonen och committar tio gånger på grenen `h007-prov-$$`; ingen av de
-fjorton, `_lib.sh`, `matning-pa-macen.sh` eller `helhetsbilden.sh` sätter `NORTROPIC_AUTOPUSH=0` eller
-`--no-verify`. ⚠️ **Kallstartsfara:** `helhetsbilden.sh --kor-grindar` eller `bash verify/bin/h-NNN-exit`
-i en hook-aktiverad klon (`~/kernel-arbete`, `~/nortropic-kontrollklon`) publicerar fixturcommits som
-`h007-prov-<pid>`/`radda/auto-*` på origin. Ännu inte inträffat (`git ls-remote --heads origin
+`git worktree add` på den riktiga klonen och committar **17** gånger på grenen `h007-prov-$$` (åtta
+anropsställen av `commit_i_ws`, ett i en loop över tio mål); `h-016-exit:257–258` committar i kernelns
+detached workspace; ingen av de fjorton, `_lib.sh`, `matning-pa-macen.sh` eller `helhetsbilden.sh` sätter
+`NORTROPIC_AUTOPUSH=0` eller `--no-verify`. ⚠️ **Kallstartsfara:** `helhetsbilden.sh --kor-grindar` eller
+`bash verify/bin/h-NNN-exit` i en hook-aktiverad klon publicerar fixturcommits som `h007-prov-<pid>`/
+`radda/auto-*` på origin — och `core.hooksPath` pekar på `~/.nortropic/githooks` i **alla fyra** kloner
+(`~/kernel-arbete`, `~/nortropic-kontrollklon`, `~/nortropic-repos/nortropic-system`,
+`~/nortropic/nortropic-system`; `git config --show-origin core.hooksPath` → `.git/config`). Kallstarts-
+ingångarna `VAGEN.md:17` och `AGENTS.md:51` säger fortfarande "kör `--kor-grindar`" — de får varningen i
+denna leverans; `CLAUDE.md:85` är §A och rättas i L2. Ännu inte inträffat (`git ls-remote --heads origin
 'refs/heads/h0*-prov-*' 'refs/heads/radda/auto-*'` → 0). **Kör inga grindar i en hook-aktiverad klon
 förrän hook-vakten (L1c) är landad.** Stängs i L1c (hooken) och L4 (autocommiten).
 
@@ -75,7 +83,7 @@ kontraktsflödesändring och föreslås skrivas in i VÄGEN före Milstolpe A.
 | `docs/loop/raddning/PROMPT-TILL-CODEX.txt` | ingen automatiskt | 424 rader, bär status och återkallade order; dubblerar VÄGEN |
 | `~/.claude/settings.json` `autoMode.environment` | Claude Code (alla repon) | bär Nortropic-styrningstext med stale sökväg och "push/merge out of scope" — konkurrerande order; ägaråtgärd |
 | `~/.claude/CLAUDE.md`, `~/.claude/rules/` | — | finns inte |
-| Grindpinning av AGENTS/CLAUDE | main: ingen (bara sökvägslistor). Plattformsgren: `document-authority-exit`, `controller/verify/cli PLATFORM_DOCUMENTS`, autopilotens `SUBSTITUTION_BLOBS`, governance-regexar — redan brutna mot main (`regler.md:70`) | ingångsbygget (L2) görs före FAS 1:s omfrysning |
+| Grindpinning av AGENTS/CLAUDE | main: ingen (bara sökvägslistor). Plattformsgren: `document-authority-exit`, `controller/verify/cli PLATFORM_DOCUMENTS`, autopilotens `SUBSTITUTION_BLOBS`, governance-regexar — redan brutna mot main (`regler.md:70`) | plan (inte mätt): ingångsbygget (L2) görs före FAS 1:s omfrysning |
 
 Laddningen är här **inventerad**, inte beteendeprövad; beteendeprovet (markör i AGENTS.md, `claude -p`
 + `codex exec` från två startkataloger) görs i L2 och bokförs här.
@@ -102,13 +110,14 @@ spets orörd sedan 09:34; inga registrerade worktrees i någon klon.
 ### Verktygstillgänglighet — mätt 11:57 med ren miljö (launcher utan sessionsvariabler)
 | Verktyg | Utfall | Bevis |
 |---|---|---|
-| `claude -p` (Claude Code 2.1.257) | fungerar nästlat från denna session när `CLAUDECODE`/`CLAUDE_CODE_*` tas bort ur miljön: `-p --max-turns 1 --output-format json` → exit 0, `"result":"OK"`, 11,5 s | scratchpad `smoke/claude1.stdout` |
-| `codex exec` 0.147.0 (`/opt/homebrew/bin/codex`) | **kan inte användas**: `The 'gpt-6-astra' model requires a newer version of Codex` (modellen står i `~/.codex/config.toml`) | `smoke/codex1.stdout` |
-| `codex exec` 0.154.0-alpha.6.2 (`/Applications/ChatGPT.app/Contents/Resources/codex`, = `CODEX_CLI_PATH` i config) | når API:et men **`You've hit your usage limit … try again at Sep 19th, 2026 8:22 PM`** | `smoke/codex2.stdout` |
+| `claude -p` (Claude Code 2.1.257) | fungerar nästlat från denna session när `CLAUDECODE`/`CLAUDE_CODE_*` tas bort ur miljön: `-p --max-turns 1 --output-format json` → exit 0, `"result":"OK"`, 11,5 s | sessionslokal evidens (scratchpad); reproducerbart: `claude -p --max-turns 1 --output-format json 'Svara med exakt ett ord: OK'` i ren miljö |
+| `codex exec` 0.147.0 (`/opt/homebrew/bin/codex`) | **kan inte användas**: `The 'gpt-6-astra' model requires a newer version of Codex` (modellen står i `~/.codex/config.toml`) | sessionslokal; reproducerbart: `codex exec --skip-git-repo-check -s read-only --json 'Svara OK'` |
+| `codex exec` 0.154.0-alpha.6.2 (`/Applications/ChatGPT.app/Contents/Resources/codex`, = `CODEX_CLI_PATH` i config) | når API:et men **`You've hit your usage limit … try again at Sep 19th, 2026 8:22 PM`** | sessionslokal; samma kommando med app-binären |
 
 Konsekvens: alla Codex-led i L2 (laddningsbevis) och L6 (verktygsbyte) står **EJ KÖRT — kvota, återställs
 2026-09-19 20:22** tills dess; de Claude-led som inte beror på Codex körs. Ingen kapacitet köps och inga
-credentials delas (uppdraget §4.3). När Codex körs igen ska app-motorn användas, inte 0.147.0.
+credentials delas (uppdraget §4.3). Rekommendation (inte beslut): när Codex körs igen används app-motorn
+(`CODEX_CLI_PATH`), eftersom 0.147.0 inte kan tala med den konfigurerade modellen.
 
 ### Gällande mandat (beslutsloggen, inte tolkning)
 `LOOP-ÄGARBESLUT-PUBLICERING-V2` (kedjedrivaren committar, pushar, öppnar PR, mergar inom vägen till
@@ -126,8 +135,9 @@ PR:en landat (L1).
 
 ### Vad denna session INTE gjort
 Inga grindar körda. Ingen Codex-session genomförd (kvota, se ovan). Inget mergat. Inga ändringar av
-agenten i `~/.claude`, `~/.codex`, managed-settings (`~/.claude/settings.json` skrevs 11:01:55 av ägarens
-egna `/model`- och `/effort`-kommandon vid sessionsstart). Auditens reproducerare inte omkörda (de läser
+agenten i `~/.claude`, `~/.codex`, managed-settings (`~/.claude/settings.json` skrevs 11:01:55 — enligt
+sessionen av ägarens egna `/model`- och `/effort`-kommandon; mtime och fälten `model`/`effortLevel` stämmer,
+övriga fält OVERIFIERAT). Auditens reproducerare inte omkörda (de läser
 inte aktuell kod).
 
 ### Åtkomstluckor (uppdraget §3: redovisas, antas inte konfliktfria)
@@ -145,7 +155,7 @@ inte aktuell kod).
 |---|---|---|
 | L1 | PR #261 granskad oberoende (separat read-only-subagent, hela `eb9483e9..f3aa4f92`) och mergad **först** — den rör samma ställen i drift.md/beslutslogg som L0 | `granska-pr.yml` på main; nästa PR får två checks |
 | L0 | denna post + underlaget i repot; grenen mergar in main efter L1 och löser sina egna konflikter (nyast överst); granskad av separat read-only-subagent (första granskningen gjord 11:58: FYND 1–3 åtgärdade i denna version, kvarvarande frågor prövas i andra passet) | på `origin/main` via PR |
-| L1c | hook-vakt i `.githooks/post-commit`: ingen autopush från länkade worktrees eller commits av `nortropic-utforare` (+ test) — **före varje grindkörning i en hook-aktiverad klon** | test grönt; `git ls-remote` visar inga `h0*-prov-*`/`radda/auto-*` efter en grindkörning |
+| L1c | hook-vakt i `.githooks/post-commit`: ingen autopush från länkade worktrees eller commits av `nortropic-utforare` (+ test); den ändrade hooken ominstalleras till `~/.nortropic/githooks` (`installera-hooks.sh --kor`, `cmp` grönt) — **före varje grindkörning i en hook-aktiverad klon** | test grönt; `git ls-remote` visar inga `h0*-prov-*`/`radda/auto-*` efter en grindkörning |
 | L1b | `scripts/publicera.sh`: bevara → PR → separat granskarprocess → merge vid granskat SHA + gröna checks; required status checks satta | en leverans går igenom utan ägarfråga; negativa fall gröna |
 | L2 | en kort `AGENTS.md`, tunn `CLAUDE.md` med `@AGENTS.md`, `PROMPT-TILL-CODEX.txt` avförd, README/banners rena; laddningsbevis för båda verktygen | båda verktygen svarar med markören från två startkataloger |
 | L3 | helhetsbilden/redo/validera/inventera/matning sanningsenliga; tester mot auditens motexempel | fall gröna, mutanter döda, `helhetsbilden.sh` visar ingen KERNEL_COMPLETE |
