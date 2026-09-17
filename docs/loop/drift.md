@@ -58,7 +58,11 @@ Före commit (arbetsträdet bär L3-filerna okommitterade — det syns, och det 
   (bundle/patch-raderna, permanent ODÖMBART i repot — det står nu i README).
 - `inventera-lokalt-arbete.sh` → **exit 1**: 1 worktree OSÄKRAT okommitterat (= detta träd), 8 fristående kloner, 0 föräldralösa,
   0 grenar utanför origin; städning EJ frikänd förrän ignorerade filer mätts; rapport `~/.nortropic/rapporter/lokalt-arbete-20260917-184405.txt`.
-EFTER_COMMIT_PLATSHALLARE
+Efter commit `e58abfb` + autopush (18:46 CEST): `redo-for-codex.sh` → **exit 0, "✅ REDO — starta Codex eller Claude Code i
+reporoten; AGENTS.md laddas automatiskt, VAGEN.md bär ordningen"** — tolv ✓, och domen är nu exitkoden, inte en rad som
+skrivs ändå. `inventera-lokalt-arbete.sh` → **exit 0**: 0 OSÄKRAT, 1 worktree på pushad gren, 8 kloner, 0 föräldralösa; och
+raden *"STÄDNING EJ FRIKÄND — 2029 ignorerade filer i 4 träd är omätta (regel 13b villkor 4)"* står kvar som sann varning i
+stället för det gamla "Städning kan ske" (AUD-10). `helhetsbilden.sh` oförändrad (0/6, exit 1) — leveransen ändrar inte kärnan.
 
 ### Auditdisposition
 AUD-01 ✔ (slutningen ur specen, h-017/h-027–030 med) · AUD-02 ✔ (stegen, aldrig `-f`) · AUD-03 ✔ (`v` är domen,
