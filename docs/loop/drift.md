@@ -117,7 +117,7 @@ kontraktsflödesändring och föreslås skrivas in i VÄGEN före Milstolpe A.
 Laddningen är här **inventerad**, inte beteendeprövad; beteendeprovet (markör i AGENTS.md, `claude -p`
 + `codex exec` från två startkataloger) görs i L2 och bokförs här.
 
-### GitHub — mätt (uppdraget §6)
+### GitHub — mätt 11:20 (uppdraget §6); läget 12:25 står sist i stycket
 `gh api repos/…/rules/branches/main` → `[]`. Rulesetet "main" (id 20553421: 1 approval, inga bypass)
 har **tom ref-selektor** och träffar inga refs. Legacy-skydd: PR krävs, 0 approvals, `enforce_admins`,
 ingen force-push, inga required checks. PR #260 mergades 07:51 med 0 reviews av enda collaboratorn.
@@ -127,7 +127,9 @@ diffgranskningsjobbet ur drift efter ägarens "Nej i nuläget" till `/install-gi
 granskningssteg i AGENTS.md, `PR-TILLAGG.md`, ny vakt `check-granskningsmekanismen.mjs`. Dess text
 säger "mergas inte än — en andra granskare läser hela intervallet". Ägarval i dag: lokal
 auto-granskning (separat process) nu, appen senare; required status checks för de två CI-jobben sätts
-efter att #261 landat.
+efter att #261 landat. **Läget 12:25:** #261 mergad i `371b4a76` med granskad spets `10cd342` som andra
+förälder och domen postad som review-kommentar; `granska-pr.yml` finns på main; required status checks
+`vaktsviten (webbfabriken)` + `skalprov under tests/scripts` (avsändare app 15368) satta 12:27 → **L1 KLAR**.
 
 ### Andra utförare (rättat efter oberoende granskning 11:58)
 `/bin/ps -axo pid,etime,command`: **3** Claude Code-processer (pid 14119 VS Code-tillägget, 6 d 23 h;
@@ -182,7 +184,7 @@ inte aktuell kod).
 ### Nästa leveranser, i ordning, med klart-när
 | L | Leverans | Klart när |
 |---|---|---|
-| L1 | PR #261 granskad oberoende (separat read-only-subagent, hela `eb9483e9..f3aa4f92`) och mergad **först** — den rör samma ställen i drift.md/beslutslogg som L0 | `granska-pr.yml` på main; nästa PR får två checks |
+| L1 | PR #261 granskad oberoende (separat read-only-subagent, hela intervallet, två pass) och mergad **först** — den rör samma ställen i drift.md/beslutslogg som L0 | **KLAR 12:25** (`371b4a76`); `granska-pr.yml` på main; required checks satta 12:27 |
 | L0 | denna post + underlaget i repot; grenen mergar in main efter L1 och löser sina egna konflikter (nyast överst); granskad av separat read-only-subagent (första granskningen gjord 11:58: FYND 1–3 åtgärdade i denna version, kvarvarande frågor prövas i andra passet) | på `origin/main` via PR |
 | L1c | hook-vakt i `.githooks/post-commit`: ingen autopush från länkade worktrees eller commits av `nortropic-utforare` (+ test); den ändrade hooken ominstalleras till `~/.nortropic/githooks` (`installera-hooks.sh --kor`, `cmp` grönt) — **före varje grindkörning i en hook-aktiverad klon** | test grönt; `git ls-remote` visar inga `h0*-prov-*`/`radda/auto-*` efter en grindkörning |
 | L1b | `scripts/publicera.sh`: bevara → PR → separat granskarprocess → merge vid granskat SHA + gröna checks; required status checks satta | en leverans går igenom utan ägarfråga; negativa fall gröna |
@@ -498,6 +500,7 @@ granskningen av denna PR köras utan en — men på en GitHub-runner finns ingen
 **Skillen låg i repot hela tiden medan 28 PR:er mergades ogranskade.** Den var aldrig det
 som saknades; motorn var det. Huruvida abonnemanget räcker eller separat API-fakturering
 krävs är **omätt** och besvaras av `/install-github-app`, inte av mig.
+
 ## 2026-09-17 — Tog vi bort mer än vi vet? Mätt: fyra av 38, och de 24 andra var redan borta
 
 Ägaren frågade: *"Frågan är ju om vi tog bort någon annan evidens som vi inte bara har
