@@ -1,5 +1,80 @@
 # Att köra loopen
 
+## 2026-09-17 — Granskningen fällde sitt eget införande: åtta fynd, sju mina
+
+Mekanismen infördes 06:10 och granskades 06:19. **Domen blev `FYND`, inte `TILLSTYRKS`** —
+åtta stycken, varav sju i mitt eget arbete. Det är första gången i det här repot som en
+PR granskats av något annat än sin författare, och den fann på tio minuter fem saker jag
+missat under en timmes bygge.
+
+Varje fynd prövades av mig innan det åtgärdades; en granskares påstående är också bara
+ett påstående.
+
+| # | Fynd | Min kontrollmätning | Utfall |
+|---|---|---|---|
+| **4** | Workflowen bokförde ODÖMBART som FAIL | `kor-vakter.mjs` rad 25 deklarerar `exit 2 = ODÖMBART` och når den på sex ställen; Actions har ingen exit-2-algebra | **BEKRÄFTAT** |
+| **1** | Provet fäller inte den senast lagade buggen | `-maxdepth 6 → 4` kört mot provet: **10/10 gröna** | **BEKRÄFTAT** |
+| **3** | *"main låg röd i ett dygn"* | skapad `20:32:42Z`, mergad `20:38:15Z`, rättad `06:10:19Z` → **9 h 32 min** | **BEKRÄFTAT** |
+| **5** | Mekanismen kan inte hindra en merge | ingen branch protection; ingen `check-*.mjs` läser `.github/`; `check-invariants.mjs` menar rot-`workflows/` | **BEKRÄFTAT** |
+| **2** | `K6` ⊆ `K3`, alltså dekoration | K3 kräver redan `SATT = $HOOKHEM`; mutanten fälldes av K3 och K5, aldrig av K6 | **BEKRÄFTAT** |
+| **8** | Falskt skäl i provets huvud | `ROT` kommer ur `git rev-parse`, inte ur `$HOME` | **BEKRÄFTAT** |
+| **7** | `CLAUDE.md` nämner mekanismen noll gånger | grep: noll träffar | **BEKRÄFTAT — ägarens hand, se nedan** |
+| **6** | Actionens inputs oprövade | granskaren nådde inte nätet; **jag gjorde det** — samtliga `with:`-nycklar finns i `action.yml`, och prompt-läge på `pull_request` postar en PR-kommentar som standard | **AVFÄRDAT, men grundad oro** |
+
+### Den tyngsta: ODÖMBART bokfördes som ett kandidatfel
+
+Filens egen header förbjöd exakt detta — jag hade tillämpat resonemanget på de
+Darwin-bundna grindarna som **inte** körs, och inte på jobben som faktiskt kördes.
+
+**Valet, uttalat för att kunna ifrågasättas:** ODÖMBART blir nu **rött**, men skriver
+först en sammanfattning vars första rad säger att det ÄR odömbart och **inte** ett fel i
+kandidaten. Av de två möjliga missläsningarna i ett tvåvärt system är den falska gröna
+värre: en grön bock som betyder *"kunde inte dömas"* är mekanismen-som-ser-ut-att-finnas.
+Det gäller nu även den saknade nyckeln, som tidigare var grön — inkonsekvensen var min.
+
+**Följd som måste stå:** `granskning av diffen` får därför **aldrig** bli en required
+status check. Utan nyckel är den röd, och som required hade den låst repot helt. De två
+mekaniska jobben är grinden.
+
+### Provet: 10 → 13 fall, 8 av 9 mutationer dödade
+
+`K3b` (klon på djup 6) fäller `maxdepth`-regressen. `K5b` fäller att torrläget ljuger om
+vad som redan är installerat — den grenen nåddes aldrig av något fall. `K6` prövar nu den
+egenskap rättelsen handlar om: hookhemmet överlever att klonens `.githooks/` raderas.
+`K1b` fäller att `--torr` stryks ur gränssnittet.
+
+**Kvarvarande lucka, utskriven i provets huvud i stället för upptäckt senare:**
+`SEDDA`-dedupliceringen kan tas bort utan att något fall faller. Sannolikt en likvärdig
+mutant — att sätta samma `core.hooksPath` två gånger är idempotent — men provet
+**bevisar** inte det, det missar det.
+
+### Ny vakt, med sin blindfläck utskriven
+
+`scripts/check-granskningsmekanismen.mjs` — tio kontrollprov mot en syntetisk workflow
+som tvingar den att bevisa att den kan säga NEJ. Den fäller borttagen utlösare, borttaget
+jobb, `push` som utlösare, kärnans Darwin-prov i en kodrad, borttagen exit-2-hantering,
+`cancel-in-progress: true`, en secret inbakad i ett skalkommando, och borttagen
+skillpekare.
+
+**Två av kontrollerna är verkliga mekanismprov, resten är lexikala:** att filen är
+**spårad**, och att vitlistan inte ignorerar den. Det är just de två som hade fångat
+natten innan. Resten läser vad YAML:en SÄGER — den metod som gav elva av repots tretton
+falska påståenden — och används här för att inget annat är möjligt utan att köra Actions.
+Det står i vaktens huvud.
+
+### Två saker som kräver ägarens hand, och som jag inte gör åt dig
+
+1. **`/install-github-app`** — nyckeln. Utan den är granskningsjobbet rött.
+2. **Branch protection** — gör `vaktsviten` och `skalprov` till required på `main`.
+   Utan den är hela mekanismen rådgivande och 28-mergarmönstret är oförändrat möjligt.
+
+**Och en tredje, som är ett öppet fynd:** `CLAUDE.md` nämner granskningsmekanismen noll
+gånger. En Claude-session bootar ur `CLAUDE.md` och får ingen pekare till
+`granska-pr.yml` — samma *"bara en människa minns det"*-klass som PR:en bekämpar.
+`CLAUDE.md` ligger i §A-kontrollens yta (`LOOP-ÄGARBESLUT-AUTONOM-KARNA` räknar upp den
+explicit bland de ytor som står orörda), så **jag ändrar den inte på eget bevåg.**
+Raden som behövs är en mening under `AGENTS.md`-hänvisningen; ägaren säger ja eller nej.
+
 ## 2026-09-17 — Granskningen blev en mekanism, och mätningen fällde main på köpet
 
 Ägaren: *"jag vill att den pr reviewar och sen pushar, det är väl praxis"* och *"detta
@@ -10,7 +85,7 @@ repot. `get_check_runs` på PR #261 → noll. `get_reviews` på PR #261 → **to
 trots att `request_copilot_review` anropades. Kravet i `AGENTS.md` hade alltså ingen
 mekanism alls bakom sig, och den granskning jag trodde jag beställt fanns inte.
 
-### Fyndet mätningen gav på köpet: `main` låg RÖD i ett dygn
+### Fyndet mätningen gav på köpet: `main` låg RÖD i nio och en halv timme
 
 Första körningen av `node scripts/kor-vakter.mjs` på Linux: **22 av 23 gröna**.
 `check-provanropare.mjs` FAIL:

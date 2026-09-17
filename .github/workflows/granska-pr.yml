@@ -6,8 +6,8 @@
 # kan minnas är exakt den felklass repot försöker bli av med — därför är granskningen
 # en mekanism här, inte en rutin.
 #
-# Och behovet mättes samma dag: `check-provanropare.mjs` låg RÖD på main i ett dygn
-# utan att någon märkte det, eftersom ingenting körde vaktsviten automatiskt.
+# Och behovet mättes samma dag: `check-provanropare.mjs` låg RÖD på main i nio och en
+# halv timme utan att någon märkte det, eftersom ingenting körde vaktsviten automatiskt.
 #
 # DEN BLOCKERAR ALDRIG EN PUSH. Utlösaren är `pull_request`, aldrig `push`. Bevarande
 # (autocommit, autopush, radda/*-grenar) publicerar ingenting och passerar aldrig
@@ -23,6 +23,39 @@
 # VAD EN GRÖN KÖRNING SÄGER. Exakt: webbfabriken är inte söndrad, och de två
 # skalproven under tests/scripts/ håller. Ingenting om kärnan. Citera den aldrig som
 # bevis för kernelarbete (regel 8a — evidens är ytbunden).
+#
+# ── VERDIKTALGEBRAN I ETT TVÅVÄRT SYSTEM ────────────────────────────────────────
+# `kor-vakter.mjs` rad 25 och skalproven deklarerar alla `0 = PASS · 1 = FAIL ·
+# 2 = ODÖMBART`. GitHub Actions har bara grönt och rött. Första versionen av den här
+# filen körde proven rakt av och bokförde därmed varje ODÖMBART som ett FEL I
+# KANDIDATEN — precis det headern ovan förbjuder, applicerat på Darwin-grindarna men
+# inte på jobben som faktiskt körs. Fångat av granskningen av den PR som införde filen.
+#
+# VALET, uttalat för att kunna ifrågasättas: ett ODÖMBART blir RÖTT, men skriver
+# först en sammanfattning som säger i första raden att det ÄR odömbart och INTE ett
+# fel i kandidaten. Skälet är att av de två möjliga missläsningarna är den falska
+# gröna värre: en grön bock som betyder "kunde inte dömas" är den mekanism-som-ser-ut-
+# att-finnas som hela repot handlar om, medan ett rött kryss vars första rad säger
+# ODÖMBART inte går att missförstå och dessutom stoppar en merge tills någon tittar.
+# Bokföringsinvändningen — att en miljö bokförs som ett kandidatfel — besvaras av att
+# texten säger raka motsatsen, på den plats den läses.
+#
+# ── VAD DEN HÄR FILEN INTE KAN ──────────────────────────────────────────────────
+# EN WORKFLOW KAN INTE HINDRA EN MERGE. Utan branch protection (required status
+# checks) är varje jobb här rådgivande, och samma agent kan öppna och merga i samma
+# minut med checken pending. Det kräver ÄGARENS HAND, en gång, och det är en ANDRA
+# handling utöver nyckeln — se AGENTS.md.
+#
+#   Gör `vaktsviten` och `skalprov under tests/scripts` till REQUIRED.
+#   Gör ALDRIG `granskning av diffen` required: den är rådgivande — skillen säger det
+#   själv, *"Reviewer approval is never root of trust"* — och utan nyckel är den röd,
+#   vilket som required check hade låst repot helt.
+#
+# OCH: `.github/workflows/**` vaktas av ingenting. Ingen `scripts/check-*.mjs` läser
+# katalogen (`workflows/**` i regler.md §6 och `check-invariants.mjs` syftar på
+# ROTKATALOGEN `workflows/`, en annan sak). Granskningsmekanismen kan alltså stängas av
+# i en PR den själv granskar. `scripts/check-granskningsmekanismen.mjs` fäller den
+# grövsta formen; branch protection är det verkliga svaret.
 
 name: granska-pr
 
@@ -37,9 +70,13 @@ permissions:
   pull-requests: write
   issues: write
 
+# INGEN cancel-in-progress. Första versionen avbröt pågående körningar vid en ny push,
+# och en AVBRUTEN körning är varken grön eller röd — en push strax före merge kunde
+# alltså lämna PR:en utan dom alls. Att två körningar överlappar kostar sekunder;
+# att en dom tyst försvinner är felklassen filen finns emot.
 concurrency:
   group: granska-pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # ── Den mekaniska domen ────────────────────────────────────────────────────
@@ -56,7 +93,24 @@ jobs:
         with:
           node-version: '22'
       - name: node scripts/kor-vakter.mjs
-        run: node scripts/kor-vakter.mjs
+        run: |
+          set +e
+          node scripts/kor-vakter.mjs
+          K=$?
+          set -e
+          if [ "$K" = "2" ]; then
+            {
+              echo "## ⛔ ODÖMBART — vaktsviten kunde inte dömas (exit 2)"
+              echo
+              echo "**Detta är INTE ett fel i kandidaten.** Något gick inte att MÄTA:"
+              echo "en vakt nådde sin ODÖMBART-gren (saknad git-topp, hash som inte går"
+              echo "att fastställa, en vakt som inte skrev sin signaturfras)."
+              echo
+              echo "Rött därför att ett ODÖMBART aldrig blir grönt — inte därför att"
+              echo "diffen är fel. Läs jobbloggen och åtgärda mätbarheten, inte koden."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $K
 
   provsviter:
     name: skalprov under tests/scripts
@@ -67,10 +121,28 @@ jobs:
           fetch-depth: 0
       # Proven bygger sina egna engångsrepon och sitt eget $HOME. De når aldrig
       # nätet och rör aldrig arbetsträdet de ligger i.
-      - name: nortropic-autocommit
-        run: bash tests/scripts/nortropic-autocommit/fall.sh
-      - name: installera-hooks
-        run: bash tests/scripts/installera-hooks/fall.sh
+      - name: skalproven
+        run: |
+          rc=0
+          for p in tests/scripts/nortropic-autocommit/fall.sh \
+                   tests/scripts/installera-hooks/fall.sh; do
+            set +e
+            bash "$p"
+            K=$?
+            set -e
+            echo "── $p → exit $K"
+            if [ "$K" = "2" ]; then
+              {
+                echo "## ⛔ ODÖMBART — \`$p\` kunde inte dömas (exit 2)"
+                echo
+                echo "**Detta är INTE ett fel i kandidaten.** Provet vägrade köra —"
+                echo "det hittade inte skriptet det prövar, eller kunde inte bygga sin"
+                echo "engångsvärld. Rött därför att ett ODÖMBART aldrig blir grönt."
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            [ "$K" = "0" ] || rc="$K"
+          done
+          exit $rc
 
   # ── Granskningen ───────────────────────────────────────────────────────────
   granskning:
@@ -84,6 +156,11 @@ jobs:
       # Nyckeln läses som env, aldrig interpolerad in i ett kommando: en secret
       # som skrivs in i en `run`-rad hamnar i skalhistorik och felmeddelanden.
       # Bara tomheten prövas — värdet lämnar aldrig steget.
+      #
+      # Saknas den är jobbet ODÖMBART och alltså RÖTT, av samma skäl som ovan: en
+      # grön bock som betyder "granskningen kördes aldrig" är värre än ett rött kryss
+      # som säger varför. Därför får det här jobbet ALDRIG vara en required check —
+      # då hade repot varit låst tills nyckeln fanns.
       - name: finns en nyckel?
         id: nyckel
         env:
@@ -92,30 +169,26 @@ jobs:
         run: |
           if [ -n "$NYCKEL" ] || [ -n "$TOKEN" ]; then
             echo "finns=ja" >> "$GITHUB_OUTPUT"
-          else
-            echo "finns=nej" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-
-      # ODÖMBART, inte FAIL. Utan nyckel KAN granskningen inte köras, och en miljö
-      # får aldrig bokföras som ett fel i kandidaten. Steget faller därför inte —
-      # men det säger det högt i sammanfattningen i stället för att tiga, för ett
-      # grönt kryss som betyder "kördes aldrig" är den falska framgång hela repot
-      # handlar om. Den mekaniska domen ovan är grinden; det här är ett tillägg.
-      - name: ODÖMBART — ingen nyckel i repot
-        if: steps.nyckel.outputs.finns == 'nej'
-        run: |
+          echo "finns=nej" >> "$GITHUB_OUTPUT"
           {
-            echo "## ⚠️ ODÖMBART — granskningen kördes aldrig"
+            echo "## ⛔ ODÖMBART — granskningen kördes aldrig"
             echo
-            echo "Varken \`ANTHROPIC_API_KEY\` eller \`CLAUDE_CODE_OAUTH_TOKEN\` finns som"
-            echo "secret i repot. Det här jobbet är därför **inte** ett grönt kvitto på att"
-            echo "diffen är granskad — AGENTS.md:s reviewer-krav står kvar, och måste då"
-            echo "uppfyllas för hand innan merge."
+            echo "**Detta är INTE ett fel i kandidaten.** Det finns ingen nyckel i repot,"
+            echo "så Claude-steget kunde inte köra. Rött därför att ett ODÖMBART aldrig"
+            echo "blir grönt — en grön bock här hade betytt \"granskad\" utan att vara det."
             echo
-            echo "ÄGARENS HAND krävs, en gång: installera Claude-appen med \`/install-github-app\`"
-            echo "i Claude Code, eller lägg in en secret under repots"
-            echo "*Settings → Secrets and variables → Actions*. En agent kan inte sätta secrets."
+            echo "**ÄGARENS HAND, EN GÅNG:** kör \`/install-github-app\` i Claude Code."
+            echo "Den installerar appen och sätter repo-secreten. En agent kan inte sätta"
+            echo "secrets. (Manuellt: en secret under *Settings → Secrets and variables →"
+            echo "Actions*, \`ANTHROPIC_API_KEY\` eller \`CLAUDE_CODE_OAUTH_TOKEN\`.)"
+            echo
+            echo "Till dess gäller AGENTS.md steg 2 för hand: en oberoende granskare som"
+            echo "inte skrev koden läser diffen enligt"
+            echo "\`.agents/skills/nortropic-reviewer/SKILL.md\`."
           } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Claude granskar diffen
         if: steps.nyckel.outputs.finns == 'ja'
@@ -126,6 +199,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           use_sticky_comment: true
           display_report: true
+          claude_args: '--max-turns 20'
           prompt: |
             Du granskar en pull request i Nortropics trust kernel.
 
@@ -144,7 +218,8 @@ jobs:
             Du är inte en andra grind på pushen: bevarande får aldrig hindras.
 
             Skriv granskningen på svenska. Var kort. Ett fynd som inte är belagt i
-            diffen är brus — hellre tre skarpa än tolv möjliga.
+            diffen är brus — hellre tre skarpa än tolv möjliga. Verifiera varje
+            misstanke mekaniskt innan du rapporterar den; kör proven, kör mutationer.
 
             Leta i första hand efter repots egna återkommande felklasser, i den här
             ordningen:
@@ -156,8 +231,9 @@ jobs:
                (rad 3 är `/*`) tyst svalt, kod ingen anropar, en hook eller workflow
                som aldrig kan köra. Fråga alltid: skulle detta faktiskt köras?
             3. ETT PROV SOM INTE KAN FÄLLA NÅGOT. Om diffen lägger till eller ändrar
-               ett prov: skulle en rimlig mutation av det prövade fällas? Om inte är
-               det dekoration.
+               ett prov: mutera det prövade och kör provet. Fäller det inte, är det
+               dekoration. Pröva särskilt om provet fäller den SENAST LAGADE buggen i
+               filen — gör det inte det, skyddar det inte mot en regress.
             4. EN MILJÖ BOKFÖRD SOM ETT FEL. Verdiktalgebran är 0=PASS, 1=FAIL,
                2=ODÖMBART. Fel maskin, saknad nyckel eller saknat beroende är
                ODÖMBART och blir aldrig grönt av att något annat är grönt.
@@ -165,15 +241,21 @@ jobs:
                Hemvisten för kernelarbete är `docs/loop/drift.md` och
                `docs/05-beslutslogg.md`; rör ändringen webbfabrikslagret gäller
                `docs/00-borja-har.md`. Saknas raden, säg det.
-            6. EN §A-YTA ÄNDRAD. `docs/07-konstitution.md` och `docs/03-regelverk.md`
-               ändras bara av en människa. Rör diffen dem är det ett fynd, oavsett
-               hur rimlig ändringen ser ut.
+            6. EN §A-YTA ÄNDRAD. `docs/07-konstitution.md`, `docs/03-regelverk.md` och
+               `CLAUDE.md` ändras bara av en människa. Rör diffen dem är det ett fynd,
+               oavsett hur rimlig ändringen ser ut.
             7. EN HEMLIGHET I TRÄDET. Ägarens regel: konfigurationen bär SÖKVÄGEN till
                en hemlighet, aldrig värdet — en config visas i rapporter och
                felmeddelanden.
             8. ETT PÅSTÅENDE OM LÄGET I FEL FIL. Teknisk status hör hemma i
                `docs/loop/drift.md` och `docs/05-beslutslogg.md`. Står den någon
                annanstans i repot är det drift.
+            9. ETT TAL SOM INTE STÄMMER. Pröva varje siffra och varje tidsangivelse i
+               commit-texten, drift-posten och beslutsloggsraden mot repot. Nio av
+               tretton kända fel i det här repot låg i UNDERLAGET, inte i koden.
+
+            Granska HELA grenen mot basen, inte bara den senaste commiten — spetsen kan
+            ha flyttat sedan arbetet började.
 
             Avsluta med en rad: `DOM: TILLSTYRKS` eller `DOM: FYND` — och vid FYND en
             mening om vad som måste ändras. Domen är rådgivande; en människa eller en

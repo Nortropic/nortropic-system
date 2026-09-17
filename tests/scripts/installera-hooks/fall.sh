@@ -2,10 +2,17 @@
 # fall.sh — prov för scripts/installera-hooks.sh (regel 12a).
 #
 # Bygger ett eget engångs-$HOME med flera kloner av två skilda origin. Rör ALDRIG
-# den riktiga maskinen: installeraren härleder BÅDE sökroten och hookhemmet ur
-# $HOME, så en överskriven HOME sandlådar den helt — och att den gör det är ett av
-# fallen nedan, inte ett antagande. Når aldrig nätet, kräver ingen sudo.
-# Bash 3.2-säkert (macOS systembash).
+# den riktiga maskinen — men INTE av det skäl som först stod här.
+#
+# Första versionen påstod att installeraren "härleder BÅDE sökroten och hookhemmet
+# ur $HOME". Fel: `ROT` kommer från `git rev-parse --show-toplevel` (installeraren
+# rad 31), alltså ur CWD, och K9 cd:ar själv utanför $HOME för att visa det.
+# Sandlådan håller ändå, av två andra skäl: scanningen utgår från `find "$HOME"`
+# (rad 109) och varje träff filtreras på `remote get-url origin` (rad 75), så en
+# klon av ett annat repo rörs aldrig — vilket K4 prövar. Rättat 2026-09-17 efter
+# granskningens FYND 8; det angivna skälet stämde inte, slutsatsen gjorde det.
+#
+# Når aldrig nätet, kräver ingen sudo. Bash 3.2-säkert (macOS systembash).
 #
 #     bash tests/scripts/installera-hooks/fall.sh
 #     exit 0 = alla fall gröna · exit 1 = minst ett föll · exit 2 = ODÖMBART
@@ -14,14 +21,22 @@
 # "byggt, kanske granskat, men aldrig testat" — och hade rätt: skriptet skrevs kvällen
 # innan, mergades till main, och ingenting i repot körde det. Det är samma felklass som
 # kvällen bestod av: en mekanism som SER ut att finnas. Att den dessutom låg röd på main
-# i ett dygn utan att någon märkte det är skälet till att PR-granskningen automatiseras
-# i samma commit.
+# i 9 h 32 min utan att någon märkte det är skälet till att PR-granskningen
+# automatiseras i samma commit. (Talet stod först som "ett dygn" — mätt och rättat
+# efter granskningens FYND 3: skapad 2026-09-16T20:32:42Z, mergad 20:38:15Z, rättad
+# 2026-09-17T06:10:19Z. Argumentet höll, talet gjorde det inte.)
 #
 # VAD PROVET INTE PRÖVAR. Inte att en post-commit-hook faktiskt pushar — det är
 # .githooks/post-commit:s ansvar, inte installerarens. Här prövas bara att rätt
 # kloner får rätt core.hooksPath, att fel kloner inte rörs, och att torrkörningen
-# är sann när den säger att den inte ändrar något (regel 8a: provet dömer den yta
-# det läser).
+# är sann både om vad den ändrar och om vad som redan är installerat (regel 8a:
+# provet dömer den yta det läser).
+#
+# KÄND LUCKA, utskriven i stället för upptäckt senare: mutationsprovet visar att
+# `SEDDA`-dedupliceringen (installeraren rad 72) kan tas bort utan att något fall
+# faller. Det är sannolikt en likvärdig mutant — att sätta samma `core.hooksPath`
+# två gånger i samma git-dir är idempotent — men provet BEVISAR inte det, det
+# missar det. Dedupliceringen finns för utdatans skull, och utdata prövas inte här.
 
 set -u
 ROT_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -63,6 +78,15 @@ bygg_klon "$HOME/annan/klon2" "$T/fjarrA"
 # En klon av ett FRÄMMANDE origin.
 bygg_klon "$HOME/frammande" "$T/fjarrB"
 
+# En klon på DJUP 6 räknat från $HOME. Den finns för att provet annars inte kan
+# fälla den senaste lagningen av installeraren: commit baaaea5 höjde scandjupet
+# 4 → 6 efter att ägaren hittat ett git-repo på djup 4 som varje scan missade.
+# Utan den här klonen överlever mutationen `-maxdepth 6` → `-maxdepth 4` hela
+# provet — mätt, och rapporterat som FYND 1 av granskningen av den PR som införde
+# provet. Ett prov som inte fäller den senast lagade buggen i filen det prövar
+# skyddar inte mot en regress; det beskriver bara dagens beteende.
+bygg_klon "$HOME/a/b/c/d/djup" "$T/fjarrA"
+
 hooksPath() { git -C "$1" config --get core.hooksPath 2>/dev/null || true; }
 
 # ── K1: okänt argument → exit 2, ingenting rört ──────────────────────────────
@@ -72,6 +96,17 @@ if [ "$K" = "2" ] && printf '%s' "$UT" | grep -q "okänt argument"; then
   ok "K1 okänt argument vägras (exit 2)"
 else
   nej "K1 okänt argument — fick exit=$K [$UT]"
+fi
+
+# ── K1b: `--torr` är ett DOKUMENTERAT gränssnitt och måste fungera ───────────
+# Installerarens eget huvud lär ut `--torr`. Stryks raden ur dess `case` faller
+# flaggan igenom till "okänt argument" och exit 2 — en tyst gränssnittsregress som
+# inget annat fall märker, eftersom alla andra torrkörningar här anropas utan flagga.
+UT="$(bash "$SKRIPT" --torr 2>&1)"; K=$?
+if [ "$K" = "0" ] && printf '%s' "$UT" | grep -q "läge:    torr"; then
+  ok "K1b --torr accepteras och ger torrläge"
+else
+  nej "K1b --torr gav exit=$K [$UT]"
 fi
 
 # ── K2: torrkörning ÄNDRAR INGENTING ─────────────────────────────────────────
@@ -98,6 +133,16 @@ else
   nej "K3 --kor nådde inte båda — exit=$K kontroll='$(hooksPath "$HOME/kontroll")' klon2='$(hooksPath "$HOME/annan/klon2")' [$UT]"
 fi
 
+# ── K3b: klonen på DJUP 6 nås också ──────────────────────────────────────────
+# Egen rad, inte en tredje term i K3: fälls den här vill jag läsa "scandjupet",
+# inte "nådde inte båda". En sammanslagen kontroll säger vilket fall som föll,
+# aldrig varför.
+if [ "$(hooksPath "$HOME/a/b/c/d/djup")" = "$HOOKHEM" ]; then
+  ok "K3b klonen på djup 6 nås (scandjupet, commit baaaea5)"
+else
+  nej "K3b klonen på djup 6 missades — scandjupet är för smalt, exakt buggen baaaea5 lagade"
+fi
+
 # ── K4: främmande origin rörs ALDRIG ─────────────────────────────────────────
 if [ -z "$(hooksPath "$HOME/frammande")" ]; then
   ok "K4 klon av främmande origin lämnas orörd"
@@ -115,24 +160,46 @@ else
   nej "K5 hooken i $HOOKHEM saknas, är inte körbar eller skiljer sig från repots"
 fi
 
-# ── K6: den SATTA sökvägen ligger utanför varje arbetsträd ───────────────────
-# Första versionen lät varje klon peka på kontrollklonens katalog; raderas den
-# slutar autopushen fungera i 60 repon utan ett ljud. Provet håller den rättelsen.
+# ── K5b: torrläget säger sant om vad som REDAN är installerat ────────────────
+# Installeraren rad 56–63 rapporterar "redan installerad och identisk med repots"
+# eller "SKILJER från repots". Den grenen nåddes aldrig av något fall: K2 kör före
+# --kor, så hookhemmet fanns inte, och K8 avbryter tidigare. Mutationen
+# `cmp -s ...` → `true` överlevde därför hela provet — den låter torrläget påstå
+# att en FÖRÅLDRAD hook är identisk, alltså precis den falska framgång mekanismen
+# finns emot. FYND 1 i granskningen av den PR som införde provet.
+printf '#!/usr/bin/env bash\n# provhook, ÄNDRAD\n' > "$HOME/kontroll/.githooks/post-commit"
+UT="$(bash "$SKRIPT" 2>&1)"; K=$?
+if [ "$K" = "0" ] && printf '%s' "$UT" | grep -q "SKILJER"; then
+  ok "K5b torrläget ser att hookhemmet är föråldrat"
+else
+  nej "K5b torrläget sa inte SKILJER om en ändrad hook — exit=$K [$UT]"
+fi
+
+# ── K6: hookhemmet ÖVERLEVER att klonen försvinner ───────────────────────────
+# Detta är den egenskap hela rättelsen handlar om, och den prövas nu direkt.
 #
-# Fallet läser vad installeraren FAKTISKT SATTE, inte provets egen $HOOKHEM.
-# Första formen jämförde variabeln provet självt räknat fram — alltså ett GISSAT
-# NAMN, inte mekanismens utfall — och överlevde därför mutationen som flyttade
-# hookhemmet in i klonens träd. Samma fel som `smuts_sakrad` gjorde 2026-09-16.
-SATT="$(hooksPath "$HOME/kontroll")"
+# Första formen jämförde i stället en sökväg med ett par mönster — och det fallet
+# var DEKORATION: K3 kräver redan `SATT = $HOOKHEM`, så K6 kunde per konstruktion
+# aldrig falla när K3 passerade (K6 ⊆ K3, belagt i granskningens FYND 2). Mutationen
+# som flyttade hookhemmet in i klonens träd fälldes av K3 och K5, aldrig av K6.
+#
+# Nu raderas kontrollklonens `.githooks/` helt, och kravet är att den sökväg
+# installeraren SATTE fortfarande bär en körbar hook. Pekade konfigurationen in i
+# en klons arbetsträd — vilket den gjorde i första versionen av installeraren, för
+# 60 av 61 repon — faller detta, och inget annat fall märker det.
+SATT="$(hooksPath "$HOME/annan/klon2")"
+rm -rf "$HOME/kontroll/.githooks"
 if [ -z "$SATT" ]; then
   nej "K6 ingen hooksPath satt att döma — kunde inte mätas"
+elif [ -x "$SATT/post-commit" ]; then
+  ok "K6 hooken i $SATT överlever att klonens .githooks raderas"
 else
-  case "$SATT" in
-    "$HOME/kontroll"/*|"$HOME/annan/klon2"/*)
-      nej "K6 den satta sökvägen ligger i ett arbetsträd: $SATT" ;;
-    *) ok "K6 den satta sökvägen ($SATT) ligger utanför varje arbetsträd" ;;
-  esac
+  nej "K6 hooksPath=$SATT bär ingen körbar hook sedan klonens .githooks raderats — autopushen dör tyst"
 fi
+# Återställd för K7/K8, som båda passerar installerarens ODÖMBART-spärr på rad 34.
+mkdir -p "$HOME/kontroll/.githooks"
+printf '#!/usr/bin/env bash\n# provhook\n' > "$HOME/kontroll/.githooks/post-commit"
+chmod +x "$HOME/kontroll/.githooks/post-commit"
 
 # ── K7: --av tar bort den igen, i båda ───────────────────────────────────────
 UT="$(bash "$SKRIPT" --av 2>&1)"; K=$?

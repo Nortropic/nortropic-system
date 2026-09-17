@@ -228,6 +228,22 @@ passerar den alltså inte, och kan per konstruktion inte fastna i den.
 > i körningens sammanfattning. **Ett grönt `granska-pr` betyder därför inte att diffen är
 > granskad förrän nyckeln finns.** Till dess gäller steg 2 för hand.
 
+> ⚠️ **ANDRA ägarhandlingen: branch protection.** En workflow kan **per konstruktion
+> inte hindra en merge** utan att vara en *required status check*. Utan den är varje
+> jobb rådgivande, och samma agent kan öppna och merga i samma minut med checken
+> pending — alltså exakt 28-mergarmönstret, oförändrat. Mätt 2026-09-17: repot har
+> ingen branch protection och inget ruleset.
+>
+> Gör `vaktsviten (webbfabriken)` och `skalprov under tests/scripts` till **required**
+> på `main`. Gör **aldrig** `granskning av diffen` required: den är rådgivande — skillen
+> säger det själv, *"Reviewer approval is never root of trust"* — och utan nyckel är den
+> röd, vilket som required check hade låst repot helt.
+>
+> Och: **`.github/workflows/**` vaktas av ingen `check-*.mjs`** (`workflows/**` i
+> `regler.md` §6 syftar på rotkatalogen, en annan sak). `check-granskningsmekanismen.mjs`
+> fäller att mekanismen tas bort eller lamslås — att den *kringgås* stoppas bara av
+> branch protection.
+
 **Skillen och nyckeln svarar på olika frågor — blanda inte ihop dem.**
 `.agents/skills/nortropic-reviewer/SKILL.md` säger **hur** man granskar, och workflowens
 prompt pekar på den i stället för att skriva av den. Nyckeln säger **vem som kör den när
