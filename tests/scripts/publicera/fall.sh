@@ -24,6 +24,9 @@ fel()  { FAIL=$((FAIL+1)); echo "  ❌ $1 — $2"; }
 cat > "$T/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "$*" >> "$T/gh.log"
+# Riktiga gh faller utan giltigt --repo utanför ett git-repo — stubben ska inte vara snällare.
+# (Mekanismens första körning mot sig själv stannade på just detta: REPO blev tomt.)
+case " $* " in *" --repo "[A-Za-z0-9._-]*/[A-Za-z0-9._-]*" "*) ;; *) echo "gh-stub: --repo saknas eller ogiltigt: $*" >&2; exit 9 ;; esac
 C="$(cat "$T/gh.case")"; N="$(grep -c . "$T/gh.log")"
 case "$1 $2" in
   "pr list")   if [ "$C" = "ingen-pr" ] && [ ! -f "$T/pr-skapad" ]; then echo ''; else echo 42; fi ;;
@@ -75,6 +78,13 @@ kor() { bash "$PUB" --repo "$T/arb" "$@" > "$T/ut.txt" 2>&1; echo $?; }
 ingen_merge() { [ ! -f "$T/merge-anropad" ]; }
 
 echo "publicera.sh — fall"
+# P0 owner/repo ur origin-URL:en, alla tre former (macOS sed saknar icke-giriga kvantifierare)
+bygg; git -C "$T/arb" remote set-url origin git@github.com:Org/repo-x.git
+[ "$(bash "$PUB" --repo "$T/arb" --visa-repo)" = "Org/repo-x" ] && ok "P0a ssh-URL → Org/repo-x" || fel "P0a" "$(bash "$PUB" --repo "$T/arb" --visa-repo)"
+git -C "$T/arb" remote set-url origin https://github.com/Org/repo-y
+[ "$(bash "$PUB" --repo "$T/arb" --visa-repo)" = "Org/repo-y" ] && ok "P0b https-URL utan .git → Org/repo-y" || fel "P0b" "$(bash "$PUB" --repo "$T/arb" --visa-repo)"
+git -C "$T/arb" remote set-url origin https://github.com/Org/repo-z.git/
+[ "$(bash "$PUB" --repo "$T/arb" --visa-repo)" = "Org/repo-z" ] && ok "P0c https-URL med .git/ → Org/repo-z" || fel "P0c" "$(bash "$PUB" --repo "$T/arb" --visa-repo)"
 bygg; echo ingen > "$T/claude.case"
 rc="$(kor --granskare ingen)"; [ "$rc" = 1 ] && ingen_merge && ok "N1 --granskare ingen → stopp, ingen merge" || fel "N1" "rc=$rc"
 bygg; echo ingen-dom > "$T/claude.case"

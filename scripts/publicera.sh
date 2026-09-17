@@ -31,7 +31,7 @@
 # (granskaren gav inget dömbart svar) · 3 fel i anropet.
 set -u
 
-ROT=""; GREN=""; GRANSKARE="claude"; UTAN_MERGE=0; TORR=0; ODOK=""
+ROT=""; GREN=""; GRANSKARE="claude"; UTAN_MERGE=0; TORR=0; ODOK=""; VISA_REPO=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) ROT="$2"; shift 2 ;;
@@ -40,6 +40,7 @@ while [ $# -gt 0 ]; do
     --utan-merge) UTAN_MERGE=1; shift ;;
     --odombart-ok) ODOK="$2"; shift 2 ;;
     --torr) TORR=1; shift ;;
+    --visa-repo) VISA_REPO=1; shift ;;
     *) echo "okänt argument: $1" >&2; exit 3 ;;
   esac
 done
@@ -47,6 +48,13 @@ GH="${NORTROPIC_GH:-gh}"; CLAUDE="${NORTROPIC_CLAUDE:-claude}"
 [ -n "$ROT" ] || ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "STOPP: --repo saknas och cwd är inget repo" >&2; exit 3; }
 ROT="$(cd "$ROT" && pwd -P)" || exit 3
 g() { git -C "$ROT" "$@"; }
+# owner/repo ur origin-URL:en, för gh --repo. Portabelt: macOS sed -E saknar icke-giriga
+# kvantifierare (`+?` gav "RE error" — funnet av mekanismens första körning mot sig själv).
+# Former: git@github.com:Org/repo.git · https://github.com/Org/repo(.git) · lokal bare-sökväg.
+repo_namn() { printf '%s' "$1" | sed -E 's#/+$##; s#\.git$##; s#.*[:/]([^/:]+/[^/]+)$#\1#'; }
+REPO="$(repo_namn "$(g remote get-url origin 2>/dev/null)")"
+if [ "$VISA_REPO" = 1 ]; then printf '%s\n' "$REPO"; exit 0; fi
+case "$REPO" in */*) ;; *) echo "STOPP: kunde inte utvinna owner/repo ur origin ('$REPO')" >&2; exit 1 ;; esac
 stopp() { echo "STOPP: $*" >&2; exit 1; }
 odombart() { echo "ODÖMBART: $*" >&2; exit 2; }
 
@@ -71,8 +79,7 @@ fi
 echo "1 bevarat:   $GREN @ ${HEAD_SHA:0:12} finns på origin"
 
 # ── 2. PR ────────────────────────────────────────────────────────────────────
-PRNR="$($GH pr list --repo "$(g remote get-url origin | sed -E 's#.*[:/]([^/]+/[^/]+?)(\.git)?$#\1#')" --head "$GREN" --base main --state open --json number --jq '.[0].number // empty' 2>/dev/null || echo '')"
-REPO="$(g remote get-url origin | sed -E 's#.*[:/]([^/]+/[^/]+?)(\.git)?$#\1#')"
+PRNR="$($GH pr list --repo "$REPO" --head "$GREN" --base main --state open --json number --jq '.[0].number // empty' 2>/dev/null || echo '')"
 case "$PRNR" in ''|*[!0-9]*) PRNR="" ;; esac   # bara ett tal är ett PR-nummer
 if [ -z "$PRNR" ]; then
   [ "$TORR" = 1 ] && { echo "torr: skulle öppna PR för $GREN"; exit 0; }
