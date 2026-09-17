@@ -1,0 +1,171 @@
+# granska-pr.yml — automatisk granskning av varje pull request.
+#
+# VARFÖR DEN FINNS. AGENTS.md kräver sedan 2026-09-17 att en PR granskas av någon
+# annan än den som skrev den, innan merge. Kravet stod som text och följdes inte:
+# 28 PR:er mergades av samma agent som öppnade dem. En regel som bara en människa
+# kan minnas är exakt den felklass repot försöker bli av med — därför är granskningen
+# en mekanism här, inte en rutin.
+#
+# Och behovet mättes samma dag: `check-provanropare.mjs` låg RÖD på main i ett dygn
+# utan att någon märkte det, eftersom ingenting körde vaktsviten automatiskt.
+#
+# DEN BLOCKERAR ALDRIG EN PUSH. Utlösaren är `pull_request`, aldrig `push`. Bevarande
+# (autocommit, autopush, radda/*-grenar) publicerar ingenting och passerar aldrig
+# den här filen — regel 12a. Att arbete kan bli liggande opushat är det problem
+# mekanismen finns för att hindra, inte ett verktyg den får använda.
+#
+# DEN KÖR ALDRIG KÄRNANS EXITPROV. `controller/verify/cli` och `verify/bin/h-*-exit`
+# är Darwin-bundna och faller på `undefined symbol: sysctl` under Linux. Fel maskin är
+# ODÖMBART, aldrig FAIL (CLAUDE.md). Kördes de här hade varje PR bokfört en MILJÖ som
+# ett fel i kandidaten, och röd CI hade slutat betyda något. Kärnans dom ligger kvar
+# på Macen.
+#
+# VAD EN GRÖN KÖRNING SÄGER. Exakt: webbfabriken är inte söndrad, och de två
+# skalproven under tests/scripts/ håller. Ingenting om kärnan. Citera den aldrig som
+# bevis för kernelarbete (regel 8a — evidens är ytbunden).
+
+name: granska-pr
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Minsta möjliga. Granskaren läser koden och skriver en kommentar — den mergar
+# aldrig, pushar aldrig och rör aldrig en gren.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: granska-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Den mekaniska domen ────────────────────────────────────────────────────
+  vakter:
+    name: vaktsviten (webbfabriken)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fullt djup: flera vakter läser historik, inte bara trädet. En grund
+          # klon hade gjort dem ODÖMBARA utan att säga det.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: node scripts/kor-vakter.mjs
+        run: node scripts/kor-vakter.mjs
+
+  provsviter:
+    name: skalprov under tests/scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Proven bygger sina egna engångsrepon och sitt eget $HOME. De når aldrig
+      # nätet och rör aldrig arbetsträdet de ligger i.
+      - name: nortropic-autocommit
+        run: bash tests/scripts/nortropic-autocommit/fall.sh
+      - name: installera-hooks
+        run: bash tests/scripts/installera-hooks/fall.sh
+
+  # ── Granskningen ───────────────────────────────────────────────────────────
+  granskning:
+    name: granskning av diffen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Nyckeln läses som env, aldrig interpolerad in i ett kommando: en secret
+      # som skrivs in i en `run`-rad hamnar i skalhistorik och felmeddelanden.
+      # Bara tomheten prövas — värdet lämnar aldrig steget.
+      - name: finns en nyckel?
+        id: nyckel
+        env:
+          NYCKEL: ${{ secrets.ANTHROPIC_API_KEY }}
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$NYCKEL" ] || [ -n "$TOKEN" ]; then
+            echo "finns=ja" >> "$GITHUB_OUTPUT"
+          else
+            echo "finns=nej" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ODÖMBART, inte FAIL. Utan nyckel KAN granskningen inte köras, och en miljö
+      # får aldrig bokföras som ett fel i kandidaten. Steget faller därför inte —
+      # men det säger det högt i sammanfattningen i stället för att tiga, för ett
+      # grönt kryss som betyder "kördes aldrig" är den falska framgång hela repot
+      # handlar om. Den mekaniska domen ovan är grinden; det här är ett tillägg.
+      - name: ODÖMBART — ingen nyckel i repot
+        if: steps.nyckel.outputs.finns == 'nej'
+        run: |
+          {
+            echo "## ⚠️ ODÖMBART — granskningen kördes aldrig"
+            echo
+            echo "Varken \`ANTHROPIC_API_KEY\` eller \`CLAUDE_CODE_OAUTH_TOKEN\` finns som"
+            echo "secret i repot. Det här jobbet är därför **inte** ett grönt kvitto på att"
+            echo "diffen är granskad — AGENTS.md:s reviewer-krav står kvar, och måste då"
+            echo "uppfyllas för hand innan merge."
+            echo
+            echo "ÄGARENS HAND krävs, en gång: installera Claude-appen med \`/install-github-app\`"
+            echo "i Claude Code, eller lägg in en secret under repots"
+            echo "*Settings → Secrets and variables → Actions*. En agent kan inte sätta secrets."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Claude granskar diffen
+        if: steps.nyckel.outputs.finns == 'ja'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          use_sticky_comment: true
+          display_report: true
+          prompt: |
+            Du granskar en pull request i Nortropics trust kernel. Läs `CLAUDE.md`,
+            `AGENTS.md` och `docs/loop/regler.md` i repot först — de är bindande och
+            du refererar dem, du återger dem inte.
+
+            Du MERGAR ALDRIG och PUSHAR ALDRIG. Du skriver en granskning, inget annat.
+            Du är inte en andra grind på pushen: bevarande får aldrig hindras.
+
+            Skriv granskningen på svenska. Var kort. Ett fynd som inte är belagt i
+            diffen är brus — hellre tre skarpa än tolv möjliga.
+
+            Leta i första hand efter repots egna återkommande felklasser, i den här
+            ordningen:
+
+            1. ATT PRÖVA VAD UTDATA SÄGER I STÄLLET FÖR VAD MEKANISMEN GÖR. Ett prov
+               som jämför ett namn, en sträng eller ett påstående i stället för ett
+               utfall. Elva av tretton fel i det här repot kom av den metoden.
+            2. EN MEKANISM SOM SER UT ATT FINNAS. Ny fil som `.gitignore`-vitlistan
+               (rad 3 är `/*`) tyst svalt, kod ingen anropar, en hook eller workflow
+               som aldrig kan köra. Fråga alltid: skulle detta faktiskt köras?
+            3. ETT PROV SOM INTE KAN FÄLLA NÅGOT. Om diffen lägger till eller ändrar
+               ett prov: skulle en rimlig mutation av det prövade fällas? Om inte är
+               det dekoration.
+            4. EN MILJÖ BOKFÖRD SOM ETT FEL. Verdiktalgebran är 0=PASS, 1=FAIL,
+               2=ODÖMBART. Fel maskin, saknad nyckel eller saknat beroende är
+               ODÖMBART och blir aldrig grönt av att något annat är grönt.
+            5. REGEL 22 — teknisk ändring och dess dokumentation i samma commit.
+               Hemvisten för kernelarbete är `docs/loop/drift.md` och
+               `docs/05-beslutslogg.md`; rör ändringen webbfabrikslagret gäller
+               `docs/00-borja-har.md`. Saknas raden, säg det.
+            6. EN §A-YTA ÄNDRAD. `docs/07-konstitution.md` och `docs/03-regelverk.md`
+               ändras bara av en människa. Rör diffen dem är det ett fynd, oavsett
+               hur rimlig ändringen ser ut.
+            7. EN HEMLIGHET I TRÄDET. Ägarens regel: konfigurationen bär SÖKVÄGEN till
+               en hemlighet, aldrig värdet — en config visas i rapporter och
+               felmeddelanden.
+            8. ETT PÅSTÅENDE OM LÄGET I FEL FIL. Teknisk status hör hemma i
+               `docs/loop/drift.md` och `docs/05-beslutslogg.md`. Står den någon
+               annanstans i repot är det drift.
+
+            Avsluta med en rad: `DOM: TILLSTYRKS` eller `DOM: FYND` — och vid FYND en
+            mening om vad som måste ändras. Domen är rådgivande; en människa eller en
+            annan agent fattar beslutet.

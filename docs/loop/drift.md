@@ -1,5 +1,62 @@
 # Att köra loopen
 
+## 2026-09-17 — Granskningen blev en mekanism, och mätningen fällde main på köpet
+
+Ägaren: *"jag vill att den pr reviewar och sen pushar, det är väl praxis"* och *"detta
+måste vi ha, det ska ske per automatik så vi inte fastnar med opushade commits etc."*
+
+**Mätt före bygget, inte efter:** `actions_list` → `total_count: 0`. Noll workflows i
+repot. `get_check_runs` på PR #261 → noll. `get_reviews` på PR #261 → **tom lista**,
+trots att `request_copilot_review` anropades. Kravet i `AGENTS.md` hade alltså ingen
+mekanism alls bakom sig, och den granskning jag trodde jag beställt fanns inte.
+
+### Fyndet mätningen gav på köpet: `main` låg RÖD i ett dygn
+
+Första körningen av `node scripts/kor-vakter.mjs` på Linux: **22 av 23 gröna**.
+`check-provanropare.mjs` FAIL:
+
+> `scripts/installera-hooks.sh` körs av ingenting och står inte i `UTAN_ANROPARE` —
+> byggt, kanske granskat, men aldrig testat
+
+Vakten hade rätt. Installeraren skrevs kvällen innan, mergades till `main`, och
+ingenting i repot körde den. **Ingen märkte det, för ingenting körde sviten.** Det är
+exakt argumentet för automatiken, levererat av den sak automatiken skulle införas för.
+
+### Åtgärdat
+
+| Vad | Hur det prövades |
+|---|---|
+| `tests/scripts/installera-hooks/fall.sh` — tio fall mot ett engångs-`$HOME` | **Fem mutationer av installeraren, alla dödade.** Två överlevde första formen |
+| Registerrader för installeraren och provet i `check-provanropare.mjs` | Vaktens egna blindfläcksresonemang, samma form som autocommit-raderna |
+| `.github/workflows/granska-pr.yml` | YAML parsad; `git check-ignore` prövad **före** filen skrevs |
+| `!/.github/` i `.gitignore`, katalogen omedelbart stängd igen | `.github/losfil.md` och `.github/ISSUE_TEMPLATE/x.md` prövade — båda ignorerade |
+
+**De två mutanterna som överlevde är det som gör provet värt något.** `K6` jämförde
+provets EGEN uträknade `$HOOKHEM` i stället för den sökväg installeraren faktiskt satte
+— ett gissat namn, inte ett utfall, alltså samma fel som `smuts_sakrad` gjorde dagen
+innan. `K8` prövade bara `--kor`, där ett andra `cp`-fel råkar fånga samma sak; i
+torrläget fanns ingen andra linje, så en klon utan hook hade glatt rapporterat
+"skulle sätta". Båda lagade, båda nu dödade.
+
+### Vad workflowen INTE gör
+
+Den kör **aldrig** `verify/bin/h-*-exit` eller `controller/verify/cli`. Darwin-bundna,
+faller på `undefined symbol: sysctl` under Linux, och fel maskin är `ODÖMBART` — kördes
+de på `ubuntu-latest` hade varje PR bokfört en miljö som ett fel i kandidaten och röd CI
+slutat betyda något. Kärnans dom ligger kvar på Macen.
+
+Den kör **aldrig** på `push`. Bevarande (autocommit, autopush, `radda/*`) passerar den
+inte och kan inte fastna i den. Regel 12a oförändrad.
+
+### Ägarens hand krävs, en gång
+
+Claude-steget är `ODÖMBART` tills `ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN`
+finns som repo-secret — `/install-github-app` i Claude Code, eller
+*Settings → Secrets and variables → Actions*. **En agent kan inte sätta secrets.** Steget
+fäller inget under tiden, men skriver `ODÖMBART` i sammanfattningen i stället för att
+tiga, så ett grönt kryss aldrig läses som "granskad". De två mekaniska jobben kräver
+ingen nyckel och gäller från första körningen.
+
 ## 2026-09-17 — Tog vi bort mer än vi vet? Mätt: fyra av 38, och de 24 andra var redan borta
 
 Ägaren frågade: *"Frågan är ju om vi tog bort någon annan evidens som vi inte bara har

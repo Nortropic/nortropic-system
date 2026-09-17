@@ -207,9 +207,25 @@ publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
 | Steg | Mekanism |
 |---|---|
 | 1 | Öppna PR |
-| 2 | **Kör en oberoende granskning av diffen** — `/code-review` i egen agent, eller `request_copilot_review`. Granskaren får inte vara den som skrev koden i samma tråd |
+| 2 | **Granskningen startar av sig själv** — `.github/workflows/granska-pr.yml` kör på `pull_request`. Uteblir den (se nedan) körs en oberoende granskning för hand; granskaren får aldrig vara den som skrev koden i samma tråd |
 | 3 | Åtgärda varje fynd, eller svara varför det inte åtgärdas |
 | 4 | Merga, och skriv granskningens utfall i PR-texten |
+
+**Granskningen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha, det ska
+ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör tre jobb
+på varje PR: vaktsviten, de två skalproven under `tests/scripts/`, och en Claude-granskning
+av diffen mot repots egna felklasser.
+
+**Den gäller PR:en, aldrig pushen.** Utlösaren är `pull_request`, aldrig `push`. Bevarande
+passerar den alltså inte, och kan per konstruktion inte fastna i den.
+
+> ⚠️ **Granskningsjobbet är ODÖMBART tills ägaren lagt in en nyckel.** Utan
+> `ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN` som repo-secret kan Claude-steget
+> inte köra. Det fäller då ingenting — en miljö bokförs aldrig som ett fel i kandidaten —
+> utan skriver `ODÖMBART` i körningens sammanfattning. **Ett grönt `granska-pr` betyder
+> därför inte att diffen är granskad förrän nyckeln finns.** En agent kan inte sätta
+> secrets; ägaren kör `/install-github-app` eller lägger in den under
+> *Settings → Secrets and variables → Actions*. Till dess gäller steg 2 för hand.
 
 **Detta är workflow-separation, inte en mekanisk säkerhetsgräns** — `CLAUDE.md` säger det
 rakt ut, och en Claude-granskare av en Claude-kandidat är inte äkta oberoende. Men det är
