@@ -1,13 +1,31 @@
-# granska-pr.yml — automatisk granskning av varje pull request.
+# granska-pr.yml — mekaniska kontroller på varje pull request.
 #
 # VARFÖR DEN FINNS. AGENTS.md kräver sedan 2026-09-17 att en PR granskas av någon
 # annan än den som skrev den, innan merge. Kravet stod som text och följdes inte:
 # 28 PR:er mergades av samma agent som öppnade dem. En regel som bara en människa
-# kan minnas är exakt den felklass repot försöker bli av med — därför är granskningen
-# en mekanism här, inte en rutin.
+# kan minnas är exakt den felklass repot försöker bli av med.
 #
 # Och behovet mättes samma dag: `check-provanropare.mjs` låg RÖD på main i nio och en
 # halv timme utan att någon märkte det, eftersom ingenting körde vaktsviten automatiskt.
+#
+# ── SJÄLVA DIFFGRANSKNINGEN KÖRS INTE HÄR ───────────────────────────────────────
+# ÄGARBESLUT 2026-09-17: *"Nej i nuläget"* på `/install-github-app`. Jobbet som lät
+# Claude läsa diffen krävde en repo-secret, och utan den var det RÖTT PÅ VARJE PR —
+# ett kryss som aldrig kunde bli grönt. Ett sådant kryss lär bara ut att ignorera
+# rött, och en vakt som skriker varg är värre än ingen
+# (`raddning/11-tre-vakter-mot-aterfall.md`). Jobbet är därför borttaget, inte
+# lämnat rött.
+#
+# GRANSKNINGEN FINNS KVAR — den flyttade dit den faktiskt fungerade samma dag: till
+# den session som driver kedjan. Den granskningen fann åtta fynd i den PR som införde
+# den här filen, och den behövde ingen nyckel, eftersom en session redan är
+# inloggad. Texten ligger i `.agents/skills/nortropic-reviewer/SKILL.md` plus
+# `PR-TILLAGG.md` — EN text, läst av både handen och (om den slås på) maskinen.
+# Se AGENTS.md steg 2.
+#
+# VAD SOM GÅR FÖRLORAT, sagt rakt ut: granskning när ingen session är igång. Släpps
+# Codex autonomt över natten är det den luckan som öppnas, och då är det här beslutet
+# värt att ta om. Så här slås jobbet på — det står längst ned i filen.
 #
 # DEN BLOCKERAR ALDRIG EN PUSH. Utlösaren är `pull_request`, aldrig `push`. Bevarande
 # (autocommit, autopush, radda/*-grenar) publicerar ingenting och passerar aldrig
@@ -46,10 +64,12 @@
 # minut med checken pending. Det kräver ÄGARENS HAND, en gång, och det är en ANDRA
 # handling utöver nyckeln — se AGENTS.md.
 #
-#   Gör `vaktsviten` och `skalprov under tests/scripts` till REQUIRED.
-#   Gör ALDRIG `granskning av diffen` required: den är rådgivande — skillen säger det
-#   själv, *"Reviewer approval is never root of trust"* — och utan nyckel är den röd,
-#   vilket som required check hade låst repot helt.
+#   Gör `vaktsviten (webbfabriken)` och `skalprov under tests/scripts` till REQUIRED
+#   på `main`. Båda kräver ingen nyckel och är gröna i dag.
+#
+#   Slås diffgranskningen på senare: gör den ALDRIG required. Den är rådgivande —
+#   skillen säger det själv, *"Reviewer approval is never root of trust"* — och utan
+#   nyckel är den röd, vilket som required check hade låst repot helt.
 #
 # OCH: `.github/workflows/**` vaktas av ingenting. Ingen `scripts/check-*.mjs` läser
 # katalogen (`workflows/**` i regler.md §6 och `check-invariants.mjs` syftar på
@@ -144,119 +164,63 @@ jobs:
           done
           exit $rc
 
-  # ── Granskningen ───────────────────────────────────────────────────────────
-  granskning:
-    name: granskning av diffen
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # Nyckeln läses som env, aldrig interpolerad in i ett kommando: en secret
-      # som skrivs in i en `run`-rad hamnar i skalhistorik och felmeddelanden.
-      # Bara tomheten prövas — värdet lämnar aldrig steget.
-      #
-      # Saknas den är jobbet ODÖMBART och alltså RÖTT, av samma skäl som ovan: en
-      # grön bock som betyder "granskningen kördes aldrig" är värre än ett rött kryss
-      # som säger varför. Därför får det här jobbet ALDRIG vara en required check —
-      # då hade repot varit låst tills nyckeln fanns.
-      - name: finns en nyckel?
-        id: nyckel
-        env:
-          NYCKEL: ${{ secrets.ANTHROPIC_API_KEY }}
-          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          if [ -n "$NYCKEL" ] || [ -n "$TOKEN" ]; then
-            echo "finns=ja" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "finns=nej" >> "$GITHUB_OUTPUT"
-          {
-            echo "## ⛔ ODÖMBART — granskningen kördes aldrig"
-            echo
-            echo "**Detta är INTE ett fel i kandidaten.** Det finns ingen nyckel i repot,"
-            echo "så Claude-steget kunde inte köra. Rött därför att ett ODÖMBART aldrig"
-            echo "blir grönt — en grön bock här hade betytt \"granskad\" utan att vara det."
-            echo
-            echo "**ÄGARENS HAND, EN GÅNG:** kör \`/install-github-app\` i Claude Code."
-            echo "Den installerar appen och sätter repo-secreten. En agent kan inte sätta"
-            echo "secrets. (Manuellt: en secret under *Settings → Secrets and variables →"
-            echo "Actions*, \`ANTHROPIC_API_KEY\` eller \`CLAUDE_CODE_OAUTH_TOKEN\`.)"
-            echo
-            echo "Till dess gäller AGENTS.md steg 2 för hand: en oberoende granskare som"
-            echo "inte skrev koden läser diffen enligt"
-            echo "\`.agents/skills/nortropic-reviewer/SKILL.md\`."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
-
-      - name: Claude granskar diffen
-        if: steps.nyckel.outputs.finns == 'ja'
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          use_sticky_comment: true
-          display_report: true
-          claude_args: '--max-turns 20'
-          prompt: |
-            Du granskar en pull request i Nortropics trust kernel.
-
-            LÄS FÖRST, i denna ordning:
-            `.agents/skills/nortropic-reviewer/SKILL.md` — repots EGEN granskarroll, och
-            den som gäller. Följ dess hårda gräns och dess arbetsordning. Listan längre
-            ner ersätter den inte; den lägger till vad som är PR-specifikt.
-            Sedan `CLAUDE.md`, `AGENTS.md` och `docs/loop/regler.md`. De är bindande —
-            du refererar dem, du återger dem inte.
-
-            Att peka på rollskillen i stället för att skriva av den är avsiktligt: två
-            definitioner av "granskning" i samma repo driver isär, och den som läses av
-            en maskin vinner tyst över den som läses av en människa.
-
-            Du MERGAR ALDRIG och PUSHAR ALDRIG. Du skriver en granskning, inget annat.
-            Du är inte en andra grind på pushen: bevarande får aldrig hindras.
-
-            Skriv granskningen på svenska. Var kort. Ett fynd som inte är belagt i
-            diffen är brus — hellre tre skarpa än tolv möjliga. Verifiera varje
-            misstanke mekaniskt innan du rapporterar den; kör proven, kör mutationer.
-
-            Leta i första hand efter repots egna återkommande felklasser, i den här
-            ordningen:
-
-            1. ATT PRÖVA VAD UTDATA SÄGER I STÄLLET FÖR VAD MEKANISMEN GÖR. Ett prov
-               som jämför ett namn, en sträng eller ett påstående i stället för ett
-               utfall. Elva av tretton fel i det här repot kom av den metoden.
-            2. EN MEKANISM SOM SER UT ATT FINNAS. Ny fil som `.gitignore`-vitlistan
-               (rad 3 är `/*`) tyst svalt, kod ingen anropar, en hook eller workflow
-               som aldrig kan köra. Fråga alltid: skulle detta faktiskt köras?
-            3. ETT PROV SOM INTE KAN FÄLLA NÅGOT. Om diffen lägger till eller ändrar
-               ett prov: mutera det prövade och kör provet. Fäller det inte, är det
-               dekoration. Pröva särskilt om provet fäller den SENAST LAGADE buggen i
-               filen — gör det inte det, skyddar det inte mot en regress.
-            4. EN MILJÖ BOKFÖRD SOM ETT FEL. Verdiktalgebran är 0=PASS, 1=FAIL,
-               2=ODÖMBART. Fel maskin, saknad nyckel eller saknat beroende är
-               ODÖMBART och blir aldrig grönt av att något annat är grönt.
-            5. REGEL 22 — teknisk ändring och dess dokumentation i samma commit.
-               Hemvisten för kernelarbete är `docs/loop/drift.md` och
-               `docs/05-beslutslogg.md`; rör ändringen webbfabrikslagret gäller
-               `docs/00-borja-har.md`. Saknas raden, säg det.
-            6. EN §A-YTA ÄNDRAD. `docs/07-konstitution.md`, `docs/03-regelverk.md` och
-               `CLAUDE.md` ändras bara av en människa. Rör diffen dem är det ett fynd,
-               oavsett hur rimlig ändringen ser ut.
-            7. EN HEMLIGHET I TRÄDET. Ägarens regel: konfigurationen bär SÖKVÄGEN till
-               en hemlighet, aldrig värdet — en config visas i rapporter och
-               felmeddelanden.
-            8. ETT PÅSTÅENDE OM LÄGET I FEL FIL. Teknisk status hör hemma i
-               `docs/loop/drift.md` och `docs/05-beslutslogg.md`. Står den någon
-               annanstans i repot är det drift.
-            9. ETT TAL SOM INTE STÄMMER. Pröva varje siffra och varje tidsangivelse i
-               commit-texten, drift-posten och beslutsloggsraden mot repot. Nio av
-               tretton kända fel i det här repot låg i UNDERLAGET, inte i koden.
-
-            Granska HELA grenen mot basen, inte bara den senaste commiten — spetsen kan
-            ha flyttat sedan arbetet började.
-
-            Avsluta med en rad: `DOM: TILLSTYRKS` eller `DOM: FYND` — och vid FYND en
-            mening om vad som måste ändras. Domen är rådgivande; en människa eller en
-            annan agent fattar beslutet.
+# ── SÅ HÄR SLÅR DU PÅ DIFFGRANSKNINGEN IGEN ─────────────────────────────────────
+# Två steg, i den ordningen. Hoppa inte över steg 1 — utan nyckel blir jobbet rött
+# på varje PR, vilket är exakt varför det togs bort 2026-09-17.
+#
+#   1. ÄGARENS HAND: `/install-github-app` i Claude Code, på
+#      Nortropic/nortropic-system. Eller en secret under
+#      Settings → Secrets and variables → Actions. En agent kan inte sätta secrets.
+#
+#   2. Klistra in jobbet nedan under `jobs:`, och uppdatera
+#      `scripts/check-granskningsmekanismen.mjs` (`FORVANTADE_JOBB` och
+#      `MIN_ODOMBART`) i SAMMA commit — annars fäller vakten, vilket är meningen.
+#
+# Prompten skrivs INTE av här. Den ligger i .agents/skills/nortropic-reviewer/ och
+# läses ordagrant, så att handens och maskinens granskning är samma text. Att skriva
+# av den var det första felet den här filen gjorde.
+#
+#   granskning:
+#     name: granskning av diffen
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+#       # Nyckeln läses som env, aldrig interpolerad in i ett kommando: en secret i en
+#       # `run`-rad hamnar i skalhistorik och felmeddelanden. Bara tomheten prövas.
+#       - name: finns en nyckel?
+#         id: nyckel
+#         env:
+#           NYCKEL: ${{ secrets.ANTHROPIC_API_KEY }}
+#           TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#         run: |
+#           if [ -n "$NYCKEL" ] || [ -n "$TOKEN" ]; then
+#             echo "finns=ja" >> "$GITHUB_OUTPUT"; exit 0
+#           fi
+#           echo "finns=nej" >> "$GITHUB_OUTPUT"
+#           {
+#             echo "## ⛔ ODÖMBART — granskningen kördes aldrig"
+#             echo
+#             echo "**Detta är INTE ett fel i kandidaten.** Ingen nyckel i repot."
+#             echo "Kör \`/install-github-app\`. En agent kan inte sätta secrets."
+#           } >> "$GITHUB_STEP_SUMMARY"
+#           exit 1
+#       - name: Claude granskar diffen
+#         if: steps.nyckel.outputs.finns == 'ja'
+#         uses: anthropics/claude-code-action@v1
+#         with:
+#           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+#           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           use_sticky_comment: true
+#           display_report: true
+#           claude_args: '--max-turns 20'
+#           prompt: |
+#             Du granskar en pull request i Nortropics trust kernel.
+#             Läs och FÖLJ, i denna ordning, ordagrant:
+#               1. .agents/skills/nortropic-reviewer/SKILL.md   (granskarrollen)
+#               2. .agents/skills/nortropic-reviewer/PR-TILLAGG.md  (de nio felklasserna)
+#             Sedan CLAUDE.md, AGENTS.md och docs/loop/regler.md — bindande, du
+#             refererar dem och återger dem inte.
+#             Du MERGAR ALDRIG och PUSHAR ALDRIG. Du skriver en granskning, inget annat.

@@ -44,6 +44,13 @@ const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
 
 const VAG = '.github/workflows/granska-pr.yml'
+const TILLAGG = '.agents/skills/nortropic-reviewer/PR-TILLAGG.md'
+
+// Mekanismens definition, inte en spegling av den. Lägg till 'granskning' här i samma
+// commit som jobbet slås på igen — annars fäller vakten på att det saknas, vilket är
+// precis vad en definition ska göra.
+const FORVANTADE_JOBB = ['vakter', 'provsviter']
+const MIN_ODOMBART = FORVANTADE_JOBB.length
 
 // ---- MEKANISMEN, FAKTORISERAD UT -------------------------------------------
 // `dom` avgör allt ur en textmängd och rör inget globalt. Därför kan den köras mot
@@ -63,9 +70,15 @@ function dom(text) {
     if (/^\s{2}push:/m.test(onBlock[1])) rad('on: bär push — bevarande skulle passera granskningen (regel 12a)')
   }
 
-  // De tre jobben. Försvinner ett är mekanismen halverad utan att något syns.
-  for (const j of ['vakter:', 'provsviter:', 'granskning:']) {
-    if (!text.includes(`\n  ${j}\n`)) rad(`jobbet \`${j.slice(0, -1)}\` saknas`)
+  // Jobben. Försvinner ett är mekanismen halverad utan att något syns.
+  //
+  // DIFFGRANSKNINGEN STÅR INTE HÄR. Ägarbeslut 2026-09-17 (*"Nej i nuläget"* på
+  // /install-github-app): utan nyckel var jobbet rött på varje PR, och ett kryss som
+  // aldrig kan bli grönt lär bara ut att ignorera rött. Slås det på igen läggs
+  // 'granskning:' till nedan i SAMMA commit — vakten fäller annars, vilket är
+  // meningen: listan är mekanismens definition, inte en spegling av den.
+  for (const j of FORVANTADE_JOBB) {
+    if (!text.includes(`\n  ${j}:\n`)) rad(`jobbet \`${j}\` saknas`)
   }
 
   // Kärnans exitprov får ALDRIG köras här: Darwin-bundna, och på ubuntu-latest
@@ -80,9 +93,13 @@ function dom(text) {
 
   // ODÖMBART får inte tyst bli grönt eller tyst bli ett kandidatfel. Varje jobb som
   // kör ett prov måste nämna exit 2 OCH skriva till sammanfattningen.
-  const antalOdombart = (text.match(/GITHUB_STEP_SUMMARY/g) || []).length
-  if (antalOdombart < 3) rad(`bara ${antalOdombart} ODÖMBART-sammanfattningar — varje jobb måste kunna säga att något inte gick att mäta`)
-  if (!/"2"/.test(text)) rad('ingen hantering av exit 2 — ODÖMBART skulle bokföras som ett fel i kandidaten')
+  // Räknas bara i KODRADER: det återstartbara jobbet längst ned i filen ligger
+  // bortkommenterat och skulle annars räknas som en mekanism som finns.
+  const kodrad = (l) => !/^\s*#/.test(l)
+  const kod = text.split('\n').filter(kodrad).join('\n')
+  const antalOdombart = (kod.match(/GITHUB_STEP_SUMMARY/g) || []).length
+  if (antalOdombart < MIN_ODOMBART) rad(`bara ${antalOdombart} ODÖMBART-sammanfattningar i kod — varje jobb måste kunna säga att något inte gick att mäta`)
+  if (!/"2"/.test(kod)) rad('ingen hantering av exit 2 — ODÖMBART skulle bokföras som ett fel i kandidaten')
 
   // En avbruten körning är varken grön eller röd; en push strax före merge kunde
   // annars lämna PR:en helt utan dom.
@@ -91,16 +108,23 @@ function dom(text) {
   // En secret får bara stå som ett mappningsvärde, aldrig inbakad i ett skalkommando:
   // en interpolerad secret hamnar i skalhistorik och felmeddelanden. Ägarens regel
   // (beslutslogg 2026-08-XX): configen bär sökvägen, aldrig värdet.
+  // BARA KODRADER. En `${{ secrets.X }}` i en YAML-KOMMENTAR interpoleras aldrig av
+  // Actions — den är text. Första formen läste hela filen och fällde därför det
+  // återstartbara jobbet längst ned, som ligger bortkommenterat just för att inte
+  // köras. Vakten prövade vad raden SÅG UT SOM i stället för vad den GÖR; felklass 1,
+  // begången av vakten mot felklass 2. Fångad av vaktens egen körning, 2026-09-17.
   for (const l of text.split('\n')) {
+    if (!kodrad(l)) continue
     if (!/\$\{\{\s*secrets\./.test(l)) continue
     if (!/^\s*[A-Za-z_][A-Za-z0-9_]*:\s*\$\{\{\s*secrets\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}\s*$/.test(l)) {
       rad(`secret interpolerad utanför ett mappningsvärde: ${l.trim().slice(0, 60)}`)
     }
   }
 
-  // Granskningen ska peka på repots egen roll, inte skriva av den.
-  if (!text.includes('.agents/skills/nortropic-reviewer/SKILL.md')) {
-    rad('prompten pekar inte på nortropic-reviewer-skillen — två definitioner av granskning driver isär')
+  // Granskningen ska peka på repots egen roll, inte skriva av den. Gäller oavsett om
+  // jobbet är påslaget: filen ska aldrig bära en andra definition av "granskning".
+  if (!text.includes('.agents/skills/nortropic-reviewer/')) {
+    rad('filen pekar inte på nortropic-reviewer-rollen — två definitioner av granskning driver isär')
   }
   return f
 }
@@ -123,13 +147,9 @@ jobs:
     steps:
       - run: |
           if [ "$K" = "2" ]; then echo x >> "$GITHUB_STEP_SUMMARY"; fi
-  granskning:
-    steps:
       - env:
           NYCKEL: \${{ secrets.ANTHROPIC_API_KEY }}
-        run: echo "$GITHUB_STEP_SUMMARY"
-      - with:
-          prompt: las .agents/skills/nortropic-reviewer/SKILL.md
+        run: las .agents/skills/nortropic-reviewer/SKILL.md
 `
 const KONTROLL = [
   ['giltig workflow flaggar INGENTING', GILTIG, (f) => f.length === 0],
@@ -137,8 +157,19 @@ const KONTROLL = [
     (f) => f.some((x) => x.includes('pull_request'))],
   ['on: MED push FLAGGAS', GILTIG.replace('on:\n', 'on:\n  push:\n'),
     (f) => f.some((x) => x.includes('bevarande'))],
-  ['ett borttaget jobb FLAGGAS', GILTIG.replace('\n  granskning:\n', '\n  nagot_annat:\n'),
-    (f) => f.some((x) => x.includes('granskning'))],
+  ['ett borttaget jobb FLAGGAS', GILTIG.replace('\n  provsviter:\n', '\n  nagot_annat:\n'),
+    (f) => f.some((x) => x.includes('provsviter'))],
+  // Det återstartbara jobbet längst ned i den verkliga filen ligger bortkommenterat.
+  // Räknades kommentarer som kod skulle vakten både fälla dess secrets OCH tro att
+  // dess ODÖMBART-sammanfattning finns. Båda hållen prövas.
+  ['en BORTKOMMENTERAD secret flaggas INTE',
+    `${GILTIG}#       - env:\n#           K: \${{ secrets.ANTHROPIC_API_KEY }}\n#         run: echo hej\n`,
+    (f) => f.length === 0],
+  ['en BORTKOMMENTERAD sammanfattning RÄKNAS INTE som en mekanism',
+    GILTIG.replace('          if [ "$K" = "2" ]; then echo x >> "$GITHUB_STEP_SUMMARY"; fi\n  provsviter:',
+      '          echo inget\n  provsviter:')
+      + '#          if [ "$K" = "2" ]; then echo x >> "$GITHUB_STEP_SUMMARY"; fi\n',
+    (f) => f.some((x) => x.includes('ODÖMBART-sammanfattningar'))],
   ['kärnans exitprov i en KODRAD FLAGGAS', GILTIG.replace('      - run: |', '      - run: verify/bin/h-013-exit\n      - run: |'),
     (f) => f.some((x) => x.includes('Darwin'))],
   ['en NÄMNING i en kommentar flaggas INTE', `# kör aldrig verify/bin/h-013-exit här\n${GILTIG}`,
@@ -148,12 +179,23 @@ const KONTROLL = [
   ['cancel-in-progress: true FLAGGAS', GILTIG.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
     (f) => f.some((x) => x.includes('utan dom'))],
   ['secret INBAKAD I ETT SKALKOMMANDO FLAGGAS',
-    GILTIG.replace('        run: echo "$GITHUB_STEP_SUMMARY"', '        run: echo \${{ secrets.ANTHROPIC_API_KEY }} > /tmp/k'),
+    GILTIG.replace('        run: las .agents/skills/nortropic-reviewer/SKILL.md',
+      '        run: echo \${{ secrets.ANTHROPIC_API_KEY }} > /tmp/k .agents/skills/nortropic-reviewer/SKILL.md'),
     (f) => f.some((x) => x.includes('interpolerad'))],
-  ['borttagen skillpekare FLAGGAS', GILTIG.replace('.agents/skills/nortropic-reviewer/SKILL.md', 'granska noga'),
-    (f) => f.some((x) => x.includes('skillen'))],
+  ['borttagen rollpekare FLAGGAS', GILTIG.replace('.agents/skills/nortropic-reviewer/SKILL.md', 'granska noga'),
+    (f) => f.some((x) => x.includes('nortropic-reviewer'))],
 ]
+// EN MUTATION SOM INTE MUTERAR PRÖVAR INGENTING. Varje fall utom det första bygger
+// på `GILTIG.replace(...)`, och en `replace` vars mönster inte längre finns är en
+// tyst no-op: fallet fortsätter vara grönt medan det slutat mäta. Det hände direkt —
+// jag ändrade en rad i GILTIG och två kontrollprov slutade testa något utan att säga
+// det. Därför prövas först att texten FAKTISKT skiljer sig.
 for (const [namn, text, vantat] of KONTROLL) {
+  if (namn !== 'giltig workflow flaggar INGENTING' && text === GILTIG) {
+    check(`Kontrollprov: ${namn}`, false,
+      'mutationen ändrade ingenting — mönstret finns inte längre i GILTIG, så fallet mäter inget')
+    continue
+  }
   let f
   try { f = dom(text) } catch (e) { f = [`kastade: ${e.message}`] }
   check(`Kontrollprov: ${namn}`, vantat(f), `fynden blev [${f.join(' · ')}]`)
@@ -177,6 +219,17 @@ try {
 } catch { ignorerad = false }
 check('Vitlistan ignorerar den inte', !ignorerad,
   `${VAG} matchas av .gitignore — samma tysta svälj som drabbade .githooks/post-commit`)
+
+// Granskartexten är mekanismens andra halva sedan diffgranskningsjobbet togs bort
+// 2026-09-17: den läses av handen i dag och av maskinen om jobbet slås på. Försvinner
+// den, eller blir den ospårad, finns ingen granskning alls — bara en rutin.
+let tillaggSparad = false
+try {
+  execFileSync('git', ['ls-files', '--error-unmatch', TILLAGG], { cwd: ROT, stdio: 'pipe' })
+  tillaggSparad = true
+} catch { tillaggSparad = false }
+check('Granskartexten är SPÅRAD i git', tillaggSparad,
+  `${TILLAGG} är inte spårad — AGENTS.md steg 2 pekar då på en text som inte finns för nästa session`)
 
 if (!existsSync(join(ROT, VAG))) odombart(`${VAG} finns inte på disk — innehållet går inte att döma`)
 const text = readFileSync(join(ROT, VAG), 'utf8')

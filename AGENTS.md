@@ -207,26 +207,31 @@ publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
 | Steg | Mekanism |
 |---|---|
 | 1 | Öppna PR |
-| 2 | **Granskningen startar av sig själv** — `.github/workflows/granska-pr.yml` kör på `pull_request`. Uteblir den (se nedan) körs en oberoende granskning för hand; granskaren får aldrig vara den som skrev koden i samma tråd |
-| 3 | Åtgärda varje fynd, eller svara varför det inte åtgärdas |
-| 4 | Merga, och skriv granskningens utfall i PR-texten |
+| 2 | **Den mekaniska domen startar av sig själv** — `.github/workflows/granska-pr.yml` kör vaktsviten och skalproven på `pull_request` |
+| 3 | **Granskningen av diffen körs av den drivande sessionen**, i en egen agent, enligt `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`. Granskaren får aldrig vara den som skrev koden i samma tråd |
+| 4 | Åtgärda varje fynd, eller svara varför det inte åtgärdas |
+| 5 | Merga, och skriv granskningens utfall i PR-texten |
 
-**Granskningen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha, det ska
-ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör tre jobb
-på varje PR: vaktsviten, de två skalproven under `tests/scripts/`, och en Claude-granskning
-av diffen mot repots egna felklasser.
+**Den mekaniska domen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha,
+det ska ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör två
+jobb på varje PR: vaktsviten och de två skalproven under `tests/scripts/`. Den gäller
+**PR:en, aldrig pushen** — utlösaren är `pull_request`, så bevarande passerar den inte och
+kan per konstruktion inte fastna i den.
 
-**Den gäller PR:en, aldrig pushen.** Utlösaren är `pull_request`, aldrig `push`. Bevarande
-passerar den alltså inte, och kan per konstruktion inte fastna i den.
-
-> ⚠️ **Granskningsjobbet är ODÖMBART tills ägaren kört `/install-github-app`.** Ett steg,
-> i Claude Code; det installerar appen och sätter repo-secreten. **En agent kan inte sätta
-> secrets** — det är ägarens hand, en gång. (Manuellt alternativ: en secret under
-> *Settings → Secrets and variables → Actions*, `ANTHROPIC_API_KEY` eller
-> `CLAUDE_CODE_OAUTH_TOKEN`.) Utan den kan Claude-steget inte köra. Det fäller då
-> ingenting — en miljö bokförs aldrig som ett fel i kandidaten — utan skriver `ODÖMBART`
-> i körningens sammanfattning. **Ett grönt `granska-pr` betyder därför inte att diffen är
-> granskad förrän nyckeln finns.** Till dess gäller steg 2 för hand.
+> ⚠️ **Diffgranskningen körs INTE i CI.** Ägarbeslut 2026-09-17: *"Nej i nuläget"* på
+> `/install-github-app`. Jobbet krävde en repo-secret, och utan den var det **rött på varje
+> PR** — ett kryss som aldrig kunde bli grönt lär bara ut att ignorera rött. Jobbet är
+> därför **borttaget, inte lämnat rött**; hur det slås på igen står längst ned i
+> `granska-pr.yml`, och `check-granskningsmekanismen.mjs` fäller om det görs halvvägs.
+>
+> **Granskningen försvann inte — den ligger i steg 3.** Den vägen är den som faktiskt
+> fungerade: den fann åtta fynd i den PR som införde mekanismen, och behövde ingen nyckel,
+> eftersom en session redan är inloggad. **Texten är EN:**
+> `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`, läst av handen i dag och
+> av maskinen om jobbet slås på.
+>
+> **Vad som saknas, sagt rakt ut:** granskning när ingen session är igång. Släpps Codex
+> autonomt över natten är det den luckan som öppnas — då är beslutet värt att ta om.
 
 > ⚠️ **ANDRA ägarhandlingen: branch protection.** En workflow kan **per konstruktion
 > inte hindra en merge** utan att vara en *required status check*. Utan den är varje
@@ -235,7 +240,10 @@ passerar den alltså inte, och kan per konstruktion inte fastna i den.
 > ingen branch protection och inget ruleset.
 >
 > Gör `vaktsviten (webbfabriken)` och `skalprov under tests/scripts` till **required**
-> på `main`. Gör **aldrig** `granskning av diffen` required: den är rådgivande — skillen
+> på `main`. Båda kräver ingen nyckel och är gröna i dag. **Detta är den enda spaken som
+> faktiskt stoppar 28-mergarmönstret** — allt annat här är rådgivande.
+>
+> Slås diffgranskningen på senare: gör den **aldrig** required. Den är rådgivande — skillen
 > säger det själv, *"Reviewer approval is never root of trust"* — och utan nyckel är den
 > röd, vilket som required check hade låst repot helt.
 >

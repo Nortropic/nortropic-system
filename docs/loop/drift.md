@@ -1,5 +1,75 @@
 # Att köra loopen
 
+## 2026-09-17 — ÄGARBESLUT "Nej i nuläget": diffgranskningen ur CI, inte lämnad röd
+
+Ägaren på frågan om `/install-github-app`: **"Nej i nuläget"**.
+
+Jag hade sagt i förväg vad ett nej innebär, och gör det: **jobbet tas bort, det lämnas
+inte permanent rött.** Ett kryss som aldrig kan bli grönt lär bara ut att ignorera rött,
+och `raddning/11-tre-vakter-mot-aterfall.md` säger det om sig själv — *"en vakt som skriker
+varg blir ignorerad, och en ignorerad vakt är värre än ingen."*
+
+**Granskningen försvann inte. Den flyttade dit den redan fungerade samma dag:** till den
+session som driver kedjan. Den vägen fann åtta fynd i den PR som införde mekanismen, och
+den behövde ingen nyckel — en session är redan inloggad. Det är nu steg 3 i `AGENTS.md`.
+
+### Texten ligger på ETT ställe, inte två
+
+Prompten låg begravd i workflowens `prompt:`. Den flyttade till
+`.agents/skills/nortropic-reviewer/PR-TILLAGG.md`, bredvid rollskillen, och läses
+ordagrant av båda vägarna — handen i dag, maskinen om jobbet slås på.
+
+Det är inte kosmetik. Att skriva av rollskillen i YAML var det **första** felet den filen
+gjorde, rättat samma morgon: två definitioner av "granskning" i samma repo driver isär,
+och den som läses av en maskin vinner tyst över den som läses av en människa.
+
+### Vad som faktiskt går förlorat, sagt rakt ut
+
+**Granskning när ingen session är igång.** Släpps Codex autonomt över natten är det den
+luckan som öppnas, och då är beslutet värt att ta om. Det står i `granska-pr.yml`, i
+`AGENTS.md` och här — inte som en fotnot.
+
+Återstartblocket ligger längst ned i workflowen: två steg, färdig YAML, och kravet att
+`check-granskningsmekanismen.mjs` uppdateras i **samma** commit. Görs det halvvägs fäller
+vakten, vilket är meningen — listan `FORVANTADE_JOBB` är mekanismens definition, inte en
+spegling av den.
+
+### Vakten fällde sig själv, två gånger, och båda var äkta
+
+**1. Den läste en BORTKOMMENTERAD secret som om den vore ett skalkommando.** Det
+återstartbara jobbet ligger i kommentarer just för att inte köras; `${{ secrets.X }}` i en
+YAML-kommentar interpoleras aldrig av Actions. Vakten prövade vad raden SÅG UT SOM i
+stället för vad den GÖR — **felklass 1, begången av vakten mot felklass 2.** Lagat: både
+secret-kontrollen och ODÖMBART-räkningen läser nu bara kodrader, och två nya kontrollprov
+håller båda hållen (en bortkommenterad secret flaggas inte; en bortkommenterad
+sammanfattning räknas inte som en mekanism).
+
+**2. Ett kontrollprov hade tyst slutat mäta.** Jag ändrade en rad i den syntetiska
+`GILTIG`-workflowen, och två `GILTIG.replace(...)` blev **no-ops** — mönstret fanns inte
+längre. Fallet förblev grönt medan det slutat pröva något. Det är samma felklass som
+`K6`, en nivå upp: *provet på provet* var dekoration.
+
+Lagat med en spärr som fäller varje fall vars mutation inte ändrade texten. **Prövad
+genom att göras nödvändig:** jag ändrade en rad i `GILTIG` så att en mutation blev en
+no-op, och spärren fällde med *"mutationen ändrade ingenting — mönstret finns inte längre
+i GILTIG, så fallet mäter inget"*.
+
+### Mätt efter ändringen
+
+| Prov | Utfall |
+|---|---|
+| `kor-vakter` | **24/24** |
+| `check-granskningsmekanismen` | **16/16** |
+| Mutationer av workflowen (6) | **6 dödade** — push som utlösare, borttaget jobb, borttagen exit-2-hantering, `cancel-in-progress: true`, kärnans Darwin-prov inlagt, borttagen rollpekare |
+| Mutationer av vakten (2 prövbara) | **2 dödade** — kommentarsfiltret bort, push-kontrollen bort |
+| No-op-spärren | **fäller när den ska** |
+
+### Kvar hos ägaren, och det är nu EN sak
+
+**Branch protection.** `vaktsviten` och `skalprov` → required på `main`. Det är den enda
+spaken som faktiskt stoppar 28-mergarmönstret; allt annat här är rådgivande. Nyckeln är
+avförd tills vidare.
+
 ## 2026-09-17 — Granskningen fällde sitt eget införande: åtta fynd, sju mina
 
 Mekanismen infördes 06:10 och granskades 06:19. **Domen blev `FYND`, inte `TILLSTYRKS`** —
