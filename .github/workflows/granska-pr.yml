@@ -212,6 +212,17 @@ jobs:
 #   granskning:
 #     name: granskning av diffen
 #     runs-on: ubuntu-latest
+#     # PER JOBB, aldrig på toppnivå. Kommentaren vid `permissions:` överst lovade
+#     # detta, men mallen saknade nyckeln helt: klistrades den in ordagrant — vilket
+#     # steg 2 ovan säger åt en att göra — ärvde jobbet `contents: read`, och
+#     # claude-code-action kunde inte posta sin kommentar. Samma klass som `exit 1`
+#     # på nästa rad, oåtgärdad i samma mall. Fångad av en andra granskning av 10cd342.
+#     #
+#     # Det här jobbet kör INTE PR-spetsens kod — det läser diffen och skriver en
+#     # kommentar — så skrivrätten är avgränsad hit och når aldrig `vakter`/`provsviter`.
+#     permissions:
+#       contents: read
+#       pull-requests: write
 #     steps:
 #       - uses: actions/checkout@v4
 #         with:

@@ -21,8 +21,21 @@
 # "byggt, kanske granskat, men aldrig testat" — och hade rätt: skriptet skrevs kvällen
 # innan, mergades till main, och ingenting i repot körde det. Det är samma felklass som
 # kvällen bestod av: en mekanism som SER ut att finnas. Att den dessutom låg röd på main
-# i 9 h 37 min utan att någon märkte det är skälet till att PR-granskningen
-# automatiseras i samma commit. (Talet stod först som "ett dygn", sedan "9 h 32 min" —
+# i 13 h 53 min utan att någon märkte det är skälet till att PR-granskningen
+# automatiseras i samma commit.
+#
+# TALET VAR FEL TRE GÅNGER, och den tredje gången var lärorikast: "ett dygn" →
+# "9 h 32 min" → "9 h 37 min" → **13 h 53 min**. De två sista mäter OLIKA SAKER.
+# `20:33:06Z` (PR #242, filen når main) → `06:10:19Z` (rättelsen finns på en GREN)
+# är 9 h 37 min — men det är tiden tills en RÄTTELSE FANNS, inte tiden main var röd.
+# Main bar den röda vakten till `10:25:43Z`, när PR #261 mergades: **13 h 53 min**.
+# Att kalla den första storheten för den andra är samma felklass som resten av
+# dagen — ett tal som mäter något annat än meningen påstår. Fångat av den andra
+# granskningen av 10cd342, efter att den första dömt TILLSTYRKS.
+#
+# Och intervallet växte DÄRFÖR att granskningen gjordes ordentligt: fyra rundor,
+# arton fynd. Det är en kostnad värd att se, inte att dölja.
+# (Historik: "9 h 32 min" —
 # andra granskningen mätte om: installeraren mergades i PR #242 2026-09-16T20:33:06Z,
 # rättad 2026-09-17T06:10:19Z. Argumentet höll, talet gjorde det inte, två gånger.)
 #

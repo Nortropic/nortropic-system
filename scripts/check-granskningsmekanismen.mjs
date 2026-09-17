@@ -88,14 +88,22 @@ function dom(text) {
   // aldrig att olistade SAKNAS — ett halvvägs påslaget granskningsjobb passerade med
   // 16/16 (andra granskningen av PR #261, mutation M5) medan fem texter påstod att
   // vakten fäller det. Listan är definitionen; ett jobb utanför den är ett fynd.
+  // JOBBRUBRIKEN MÅSTE MATCHAS SOM GITHUB SER DEN, inte som den brukar skrivas.
+  // Första formen krävde `^  namn:\s*$` — alltså inget efter kolonet. Tre triviala
+  // varianter är RIKTIGA JOBB för GitHub men var osynliga för vakten (mätt med en
+  // YAML-parser, och alla tre passerade 19/19):
+  //     `  smyg: # ser oskyldig ut`   `  "smyg":`   `  smyg: {runs-on: …}`
+  // M5-kringgåendet överlevde alltså sin egen lagning med ETT TECKEN. Fångat av en
+  // andra, oberoende granskning av samma commit — den första hade dömt TILLSTYRKS.
+  // Tillåter nu citat och godtycklig svans efter kolonet.
   const jobbIKod = []
   let iJobs = false, aktuelltJobb = ''
   const jobbPerRad = []
   for (const l of kod.split('\n')) {
     if (/^jobs:\s*$/.test(l)) { iJobs = true; jobbPerRad.push(''); continue }
     if (iJobs && /^\S/.test(l)) iJobs = false
-    const m = iJobs && l.match(/^  ([A-Za-z_][A-Za-z0-9_-]*):\s*$/)
-    if (m) { aktuelltJobb = m[1]; jobbIKod.push(m[1]) }
+    const m = iJobs && l.match(/^ {2}(?:"([^"]+)"|'([^']+)'|([A-Za-z_][A-Za-z0-9_-]*))\s*:/)
+    if (m) { aktuelltJobb = m[1] || m[2] || m[3]; jobbIKod.push(aktuelltJobb) }
     jobbPerRad.push(iJobs ? aktuelltJobb : '')
   }
   for (const j of jobbIKod) {
@@ -134,6 +142,25 @@ function dom(text) {
   // annars lämna PR:en helt utan dom.
   if (/cancel-in-progress:\s*true/.test(text)) rad('cancel-in-progress: true — en avbruten körning lämnar PR:en utan dom')
 
+  // TOPPNIVÅNS `permissions` MÅSTE FINNAS OCH VARA MINIMAL. Jobben här kör PR-SPETSENS
+  // EGEN KOD; en skrivtoken hade låtit en kandidat skriva sitt eget "DOM: TILLSTYRKS".
+  // Sänkningen till `contents: read` gjordes som en säkerhetsåtgärd men var OVAKTAD —
+  // blocket kunde tas bort, eller bytas mot `contents: write`, och vakten passerade.
+  // En säkerhetsåtgärd utan vakt är en rutin, inte en mekanism (granskningens A2).
+  // Slås granskningsjobbet på ges det `pull-requests: write` PER JOBB, aldrig här.
+  const permBlock = kod.match(/^permissions:\n((?:[ \t]+.*\n|\n)*)/m)
+  if (!permBlock) {
+    rad('ingen `permissions:` i kodraderna — jobben ärver då repots standardtoken och kandidatkod kan skriva till PR:en')
+  } else {
+    const rader = permBlock[1].split('\n').map((l) => l.trim()).filter(Boolean)
+    for (const r of rader) {
+      if (!/^contents:\s*read$/.test(r)) {
+        rad(`toppnivåns permissions bär \`${r}\` — bara \`contents: read\` är tillåtet, kandidatkod får ingen skrivtoken`)
+      }
+    }
+    if (rader.length === 0) rad('`permissions:` är tomt — omfattningen går inte att avgöra')
+  }
+
   // En secret får bara stå som ett mappningsvärde, aldrig inbakad i ett skalkommando:
   // en interpolerad secret hamnar i skalhistorik och felmeddelanden. Ägarens regel
   // (beslutslogg 2026-08-XX): configen bär sökvägen, aldrig värdet.
@@ -155,6 +182,9 @@ function dom(text) {
   if (!text.includes('.agents/skills/nortropic-reviewer/')) {
     rad('filen pekar inte på nortropic-reviewer-rollen — två definitioner av granskning driver isär')
   }
+  // Jobbmängden bärs ut som en EGENSKAP på fyndlistan, inte som en ny returtyp:
+  // kontrollproven dömer på `f.length`, och en ändrad returform hade gjort dem tysta.
+  f.jobb = jobbIKod
   return f
 }
 
@@ -164,6 +194,8 @@ const GILTIG = `name: granska-pr
 on:
   pull_request:
     types: [opened]
+permissions:
+  contents: read
 concurrency:
   group: g
   cancel-in-progress: false
@@ -203,6 +235,17 @@ const KONTROLL = [
     (f) => f.length === 0],
   ['borttagen exit-2-hantering FLAGGAS', GILTIG.replace(/"2"/g, '"9"'),
     (f) => f.some((x) => x.includes('exit 2'))],
+  // Säkerhetsåtgärden `contents: read` var ovaktad tills granskningens A2 — en
+  // säkerhetsåtgärd utan vakt är en rutin, inte en mekanism. Tre håll prövas.
+  ['BORTTAGET permissions-block FLAGGAS', GILTIG.replace('permissions:\n  contents: read\n', ''),
+    (f) => f.some((x) => x.includes('ingen `permissions:`'))],
+  ['`contents: write` FLAGGAS', GILTIG.replace('  contents: read', '  contents: write'),
+    (f) => f.some((x) => x.includes('contents: write'))],
+  ['`pull-requests: write` FLAGGAS', GILTIG.replace('  contents: read', '  contents: read\n  pull-requests: write'),
+    (f) => f.some((x) => x.includes('pull-requests: write'))],
+  ['ett BORTKOMMENTERAT permissions-block räknas INTE',
+    GILTIG.replace('permissions:\n  contents: read\n', '#permissions:\n#  contents: read\n'),
+    (f) => f.some((x) => x.includes('ingen `permissions:`'))],
   ['cancel-in-progress: true FLAGGAS', GILTIG.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
     (f) => f.some((x) => x.includes('utan dom'))],
   ['secret INBAKAD I ETT SKALKOMMANDO FLAGGAS',
@@ -276,6 +319,46 @@ if (text.length < 500) odombart(`${VAG} är ${text.length} tecken — för kort 
 const verkliga = dom(text)
 check('Den verkliga workflowen bär mekanismen', verkliga.length === 0, verkliga.join(' · '))
 
+// ---- KORSPROV MOT EN RIKTIG YAML-PARSER --------------------------------------
+// Allt ovan läser TEXT. Det som avgör är vad GITHUB SER, och skillnaden är inte
+// teoretisk: tre jobbrubriker som en regex missade var riktiga jobb för en parser,
+// och den luckan överlevde sin egen lagning. Att svara med ännu en regex vore att
+// göra om felet — så regexens jobbmängd jämförs nu med en verklig parsers.
+//
+// Ingen npm-beroende (`check-invariants` förbjuder det), så korsprovet lånar
+// python3 + PyYAML om de finns. Saknas de kan korsprovet inte köras, och då säger
+// det DET — det blir varken grönt eller rött, och regexen är fortfarande grinden.
+// En kontroll som tiger när den inte kan mäta är den falska tryggheten repot består av.
+let korsprov = 'kunde inte köras (python3/PyYAML saknas) — regexen är ensam grind'
+try {
+  const ut = execFileSync('python3', ['-c',
+    'import sys,json,yaml;d=yaml.safe_load(open(sys.argv[1]));print(json.dumps(sorted((d.get("jobs") or {}).keys())))',
+    join(ROT, VAG)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const parserJobb = JSON.parse(ut)
+  const regexJobb = [...(verkliga.jobb || [])].sort()
+  const lika = parserJobb.length === regexJobb.length && parserJobb.every((j, i) => j === regexJobb[i])
+  check('Korsprov: regexens jobbmängd = en YAML-parsers',
+    lika, `parsern ser [${parserJobb.join(', ')}], regexen ser [${regexJobb.join(', ')}] — ett jobb som GitHub kör men vakten inte ser är en öppen dörr`)
+  korsprov = `kört · parsern och regexen ser samma ${parserJobb.length} jobb`
+} catch (e) {
+  // ETT SAKNAT VERKTYG OCH EN TRASIG KONTROLL ÄR INTE SAMMA SAK, och första formen
+  // kunde inte skilja dem: ett `catch {}` utan diskriminering rapporterade en
+  // ReferenceError i MIN EGEN kod som "python3/PyYAML saknas". Korsprovet såg
+  // avstängt ut i stället för sönder — alltså exakt den falska trygghet hela filen
+  // finns emot, i kontrollen som skulle bevisa att jag inte gör det felet.
+  //
+  // Bara ett fel FRÅN PROCESSEN är ODÖMBART. Allt annat är vaktens eget fel och
+  // fäller, för en vakt som inte kan köra sin egen kod får aldrig se grön ut.
+  const processfel = e && (e.code === 'ENOENT' || typeof e.status === 'number')
+  if (processfel) {
+    korsprov = `kunde inte köras (python3/PyYAML saknas) — regexen är ensam grind`
+  } else {
+    check('Korsprov: regexens jobbmängd = en YAML-parsers', false,
+      `korsprovet kastade i vaktens EGEN kod, inte i python3: ${e && e.message ? e.message.slice(0, 120) : e}`)
+    korsprov = 'FÖLL — se kontrollen ovan'
+  }
+}
+
 // ---- Verdikt ---------------------------------------------------------------
 for (const p of passes) console.log(`PASS: ${p}`)
 if (fails.length) {
@@ -284,5 +367,6 @@ if (fails.length) {
   process.exit(1)
 }
 console.log(`\nRESULTAT: PASS — ${passes.length}/${passes.length} kontroller`)
+console.log(`\nKORSPROV mot YAML-parser: ${korsprov}`)
 console.log('\nGRÄNS: vakten läser vad workflowen SÄGER. Att den FUNGERAR bevisas bara av')
 console.log('en körning i Actions, och att en merge stoppas kräver branch protection.')

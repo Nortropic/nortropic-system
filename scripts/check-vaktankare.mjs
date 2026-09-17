@@ -70,7 +70,7 @@ const PINNAR = {
   'check-forbattring.mjs': '8ebe9f9e2b6a1170',
   'check-foundation-smoke.mjs': '91817873a3de3fe0',
   'check-gate-parameterization.mjs': '991c3cc5ea86447f',
-  'check-granskningsmekanismen.mjs': '128681a772ece686',
+  'check-granskningsmekanismen.mjs': 'f53acf3578830815',
   'check-gym-contract.mjs': '75747980fcc0340a',
   'check-integrationer.mjs': '6ac685656bd60406',
   'check-invariants.mjs': 'd37e45b46cdc92a0',

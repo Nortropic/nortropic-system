@@ -1,5 +1,56 @@
 # Att köra loopen
 
+## 2026-09-17 — Tredje granskningen: TILLSTYRKS, och sex rådgivande varav ett var en ovaktad säkerhetsåtgärd
+
+En **parallell session** (Fable 5.1, `015mdyFoJvWVV7ZzNKsBKciw`) granskade hela intervallet
+och pushade `10cd342`. Dess dom på PR:en: **`DOM: TILLSTYRKS @10cd342`**, noll blockerande,
+sex rådgivande. Fyra av dess tidigare fynd var riktade mot **mitt** arbete, och tre höll:
+
+| Fynd | Min kontrollmätning | |
+|---|---|---|
+| Vakten fällde **inte** ett halvvägs påslaget granskningsjobb | muterade in ett `granskning:`-jobb — passerade förut, **fälls nu** | ✅ |
+| `permissions: pull-requests: write` på jobb som kör **PR-spetsens kod** | en kandidat kunde ha skrivit sin egen `DOM: TILLSTYRKS` | ✅ **min säkerhetsbrist** |
+| *"9 h 32 min"* | installeraren nådde main i **PR #242 `20:33:06Z`**, inte PR #244 — jag räknade från fel merge | ✅ **9 h 37 min** |
+| *"ingen branch protection och inget ruleset"* | de mätte med `gh api`, som jag inte har | ⚠️ se nedan |
+
+### Mitt påstående om branch protection var starkare än mitt bevis
+
+Jag härledde *"ingen branch protection"* ur `mergeable_state: "unstable"`. Det visar bara
+att **ingenting blockerar en merge** — inte att inget skydd finns. Deras mätning: skyddet
+finns (PR krävs, **0** approvals, `enforce_admins`, force-push av) men **utan required
+checks**, och rulesetet `main` (1 approval) har `ref_name.include: []`, alltså träffar det
+inga refs alls.
+
+Slutsatsen jag drog höll. Formuleringen gjorde det inte, och skillnaden spelar roll: ett
+skydd som finns men inte biter är något annat än inget skydd, och remedyn är en annan.
+
+### A2 var mer än rådgivande: en säkerhetsåtgärd utan vakt är en rutin
+
+Sänkningen till `contents: read` var **helt ovaktad** — blocket kunde tas bort, eller bytas
+mot `contents: write`, och `check-granskningsmekanismen` passerade. Nu prövas att
+`permissions:` finns i kodraderna och bär **enbart** `contents: read`, med fyra nya
+kontrollprov (borttaget block · `contents: write` · tillagd `pull-requests: write` · ett
+bortkommenterat block räknas inte). **Prövat mot den verkliga filen åt båda hållen**, och
+vakten fäller båda.
+
+### A4 och A5 — de föråldrade talen, och en egen felklass i A4
+
+`README.md` beskrev vakten som den såg ut i `463989e`: *"Tio kontrollprov"* och *"två
+mekanismprov"*. Faktiskt **15 kontrollprov och 3 mekanismprov** (19 totalt, 23 efter A2).
+
+`LOOP-FYND38`-raden stod **halvrättad**: tidsstämplarna i meningen gav 9 h 32 medan
+resultatet efter likhetstecknet sa 9 h 37. Det är en egen felklass värd ett namn — **en
+rättelse som rör slutsatsen och lämnar underlaget kvar**. Läsaren som räknar efter får ett
+annat svar än den som läser slutsatsen, och det är precis den sortens text repot fylldes av.
+
+### Läget
+
+`kor-vakter` **24/24** · `check-granskningsmekanismen` **23/23** · båda skalproven gröna ·
+CI grön på spetsen. **Kvar hos ägaren: branch protection med required checks** —
+`vaktsviten` och `skalprov`. Skyddet som finns kräver en PR men släpper igenom vad som
+helst i den.
+
+
 ## 2026-09-17 — PR #261, andra oberoende granskningen av hela intervallet: fyra blockerande, sex rådgivande — alla åtgärdade
 
 Granskaren (separat read-only-kontext, `nortropic-reviewer` + `PR-TILLAGG.md`, körningar bara i en
@@ -259,7 +310,7 @@ repot. `get_check_runs` på PR #261 → noll. `get_reviews` på PR #261 → **to
 trots att `request_copilot_review` anropades. Kravet i `AGENTS.md` hade alltså ingen
 mekanism alls bakom sig, och den granskning jag trodde jag beställt fanns inte.
 
-### Fyndet mätningen gav på köpet: `main` låg RÖD i nio och en halv timme
+### Fyndet mätningen gav på köpet: `main` låg RÖD i 13 h 53 min
 
 Första körningen av `node scripts/kor-vakter.mjs` på Linux: **22 av 23 gröna**.
 `check-provanropare.mjs` FAIL:
