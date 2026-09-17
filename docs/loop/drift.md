@@ -23,12 +23,15 @@ rapport postad · N5 ny commit efter granskning → stopp · N6 röd check utan 
 med uttryckligt skäl → merge · N7 smutsig arbetskopia → stopp före granskning · N8 granskaren smutsar
 trädet → stopp · N9 på main → stopp · P1 legitim grön kandidat → granskad, mergad med
 `--match-head-commit`, kvitto · P2 ingen PR → öppnas, granskad, mergad · P3 opushad commit → pushas,
-`--utan-merge` stannar efter granskningen · P0a–c owner/repo ur ssh-/https-URL. **17 gröna.** Åtta mutanter (utan SHA-kontroll,
+`--utan-merge` stannar efter granskningen · P0a–c owner/repo ur ssh-/https-URL · P1b granskaren körs med cwd = repot och utan `CLAUDECODE` i miljön. **18 gröna.** Åtta mutanter (utan SHA-kontroll,
 utan omkontroll av head, utan `--match-head-commit`, FYND mergar, röda checks ignoreras, smuts efter
 granskning, saknad DOM blir OK, gammal repo-regex) fälls alla. **Mekanismens första körning mot sin egen PR fann en
 bugg stubbarna dolde:** macOS `sed -E` saknar icke-giriga kvantifierare, `REPO` blev tomt och skriptet stannade
 fail-closed vid steg 2 — rättat med portabel regex, `--visa-repo` och en gh-stub som kräver giltigt `--repo`
-(P0a–c). Lokala fixturer bevisar inte GitHubs serverkonfiguration —
+(P0a–c). **Andra körningen mot sig själv fann nästa:** `--allowedTools`/`--disallowedTools` är variadiska och svalde
+prompten som sista argument (`Input must be provided…`); mekanismen stannade ODÖMBART i steg 4 (rätt beteende).
+Rättat: prompten på stdin, `MultiEdit` (okänt verktygsnamn) borttaget; stubben kräver prompten på stdin,
+bokför cwd och miljö (P1b). Lokala fixturer bevisar inte GitHubs serverkonfiguration —
 den evidensen står nedan.
 
 ### Serverbevis för required status checks (satta 12:27, L1c)
@@ -64,7 +67,7 @@ Från #261:s andra granskning: A1 (reläet) är nu mekanism — `publicera.sh` s
 `publicera.sh` väljer **merge-commit** (`--merge`), aldrig squash/rebase (AGENTS.md:288); autopilotens
 "rebase-merga" (AGENTS.md:336) är ett äldre block som arkiveras i L2.
 
-Mätt vid spetsen: publicera 17 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
+Mätt vid spetsen: publicera 18 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
 check-granskningsmekanismen 22/22 · provanropare 20/20 (56 kandidater) · vaktankare 34/34 · kor-vakter 24/24.
 Denna PR granskas av **båda** vägarna: `publicera.sh --utan-merge` (den nya mekanismen dömer sin egen
 kandidat i separat `claude -p`) och en separat read-only-subagent; mergen sker med `publicera.sh`.

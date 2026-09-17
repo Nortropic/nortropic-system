@@ -51,6 +51,12 @@ chmod +x "$T/bin/gh"
 # claude-stubben skriver rapporten enligt $T/claude.case
 cat > "$T/bin/claude" <<'CL'
 #!/usr/bin/env bash
+# Prompten ska komma på STDIN (variadiska --*Tools svalde annars den) och nämna domformen;
+# cwd ska vara repot och sessionsvariablerna ska vara borta — allt bokförs för P1.
+PROMPT="$(cat)"
+case "$PROMPT" in *"DOM: TILLSTYRKS @"*) ;; *) echo "claude-stub: ingen prompt med domform på stdin" >&2; exit 9 ;; esac
+pwd -P > "$T/claude.pwd"; env | grep -c '^CLAUDECODE' > "$T/claude.env" || true
+case " $* " in *" --disallowedTools "*) ;; *) echo "claude-stub: inga --disallowedTools" >&2; exit 9 ;; esac
 touch "$T/granskad"
 H="$(git rev-parse HEAD)"
 case "$(cat "$T/claude.case")" in
@@ -64,6 +70,7 @@ esac
 CL
 chmod +x "$T/bin/claude"
 export PATH="$T/bin:$PATH" NORTROPIC_GH="$T/bin/gh" NORTROPIC_CLAUDE="$T/bin/claude"
+export CLAUDECODE=1   # som inuti en Claude Code-session: mekanismen ska ta bort den för granskaren
 
 # ── fixtur: bare origin + arbetsklon med gren + hjälpklon för stub-merge ─────
 bygg() {
@@ -110,6 +117,7 @@ rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && ok "N9 på main → stopp" || fel "
 bygg
 rc="$(kor)"; H="$(git -C "$T/arb" rev-parse HEAD)"
 if [ "$rc" = 0 ] && grep -q -- "--match-head-commit $H" "$T/merge.args" && [ "$(git -C "$T/mrg" rev-parse origin/main^2)" = "$H" ] && grep -q '^KVITTO' "$T/ut.txt" && [ -f "$T/review-postad" ]; then ok "P1 legitim grön kandidat → granskad, mergad med --match-head-commit, kvitto"; else fel "P1" "rc=$rc $(tail -2 "$T/ut.txt" | tr '\n' ' ')"; fi
+[ "$(cat "$T/claude.pwd")" = "$(cd "$T/arb" && pwd -P)" ] && [ "$(cat "$T/claude.env")" = 0 ] && ok "P1b granskaren körs med cwd = repot och utan CLAUDECODE i miljön" || fel "P1b" "pwd=$(cat "$T/claude.pwd") CLAUDECODE-var=$(cat "$T/claude.env")"
 bygg; echo ingen-pr > "$T/gh.case"
 rc="$(kor)"; [ "$rc" = 0 ] && [ -f "$T/pr-skapad" ] && [ -f "$T/merge-anropad" ] && ok "P2 ingen PR → öppnas, sedan granskad och mergad" || fel "P2" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; git -C "$T/arb" commit -q --allow-empty -m "opushad"

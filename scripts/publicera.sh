@@ -114,12 +114,14 @@ case "$GRANSKARE" in
     [ -f "$ROT/.agents/skills/nortropic-reviewer/SKILL.md" ] || stopp "granskarrollen saknas i repot"
     PROMPT="Du är nortropic-reviewer: OBEROENDE och READ-ONLY. Du har inte skrivit denna kod. Läs och följ ordagrant .agents/skills/nortropic-reviewer/SKILL.md och .agents/skills/nortropic-reviewer/PR-TILLAGG.md. Granska HELA intervallet origin/main..HEAD (kommando: git diff origin/main...HEAD; git log --oneline origin/main..HEAD) i detta repo. Ändra ingenting, committa inget. Verifiera varje misstanke mekaniskt innan du rapporterar. Skriv fynden numrerade, allvarligast först, med fil:rad, kommando, observerat, verdikt (BLOCKERANDE/ADVISORY/OK) och minsta åtgärd. AVSLUTA med exakt en rad på formen 'DOM: TILLSTYRKS @$HEAD_SHA' eller 'DOM: FYND @$HEAD_SHA — blockerande: #n, #m'. SHA:t måste vara exakt $HEAD_SHA."
     [ "$TORR" = 1 ] && { echo "torr: skulle starta granskare för ${HEAD_SHA:0:12}"; exit 0; }
-    # Ren process: inga ärvda sessionsvariabler, inga skrivverktyg, cwd = repot.
-    ( cd "$ROT" && env -u CLAUDECODE -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_ENTRYPOINT \
+    # Ren process: inga ärvda sessionsvariabler, inga skrivverktyg, cwd = repot. Prompten går
+    # på STDIN: --allowedTools/--disallowedTools är variadiska och svalde annars prompten som
+    # ett verktygsnamn (mekanismens andra körning mot sig själv, 2026-09-17 12:59).
+    printf '%s' "$PROMPT" | ( cd "$ROT" && env -u CLAUDECODE -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_ENTRYPOINT \
         "$CLAUDE" -p --max-turns 60 --output-format text \
-        --disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(git commit:*),Bash(git push:*),Bash(git checkout:*),Bash(git reset:*),Bash(git stash:*),Bash(git merge:*),Bash(git rebase:*)" \
+        --disallowedTools "Edit,Write,NotebookEdit,Bash(git commit:*),Bash(git push:*),Bash(git checkout:*),Bash(git reset:*),Bash(git stash:*),Bash(git merge:*),Bash(git rebase:*)" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git ls-files:*),Bash(git ls-tree:*),Bash(git rev-parse:*),Bash(git status:*),Bash(node scripts/:*),Bash(bash tests/:*),Bash(shasum:*),Bash(wc:*),Bash(sed -n:*),Bash(cat:*),Bash(ls:*)" \
-        "$PROMPT" ) > "$RAPPORT" 2> "$RAPPORT.stderr" < /dev/null
+        ) > "$RAPPORT" 2> "$RAPPORT.stderr"
     RC=$?
     [ -z "$(g status --porcelain)" ] || stopp "granskaren lämnade arbetskopian smutsig — kandidaten är inte längre den granskade (git status)"
     [ "$RC" = 0 ] && [ -s "$RAPPORT" ] || odombart "granskaren avslutade med rc=$RC eller tom rapport ($RAPPORT)"
