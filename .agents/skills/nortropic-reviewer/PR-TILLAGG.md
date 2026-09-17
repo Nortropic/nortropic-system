@@ -65,9 +65,13 @@ beroende är `ODÖMBART` och blir aldrig grönt av att något annat är grönt. 
 Hemvisten för kernelarbete är `docs/loop/drift.md` och `docs/05-beslutslogg.md`; rör
 ändringen webbfabrikslagret gäller `docs/00-borja-har.md`. Saknas raden, säg det.
 
-**6. En §A-yta ändrad.**
+**6. En §A-yta ändrad — eller granskarens egen konfiguration.**
 `docs/07-konstitution.md`, `docs/03-regelverk.md` och `CLAUDE.md` ändras bara av en
 människa. Rör diffen dem är det ett fynd, oavsett hur rimlig ändringen ser ut.
+`.github/workflows/**`, `.agents/skills/nortropic-reviewer/**` och
+`scripts/check-granskningsmekanismen.mjs` är inte §A men är **granskarens konfiguration**:
+en kandidat som ändrar dem granskas av en text den själv skrivit. Rör diffen dem är det ett
+eget fynd att pröva särskilt noga (uppdraget §6, 2026-09-17).
 
 **7. En hemlighet i trädet.**
 Ägarens regel: konfigurationen bär **sökvägen** till en hemlighet, aldrig värdet — en
@@ -96,19 +100,25 @@ ut som en lösning. Det har redan hänt här en gång.
 
 ## Domen
 
-Avsluta med exakt en rad:
+Avsluta med exakt en rad som bär det head-SHA du faktiskt läste:
 
 ```
-DOM: TILLSTYRKS
+DOM: TILLSTYRKS @<head-sha>
 ```
 
 eller
 
 ```
-DOM: FYND
+DOM: FYND @<head-sha> — blockerande: #n, #m
 ```
 
-— och vid `FYND` en mening om vad som måste ändras.
+— och vid `FYND` en mening per blockerande fynd om vad som måste ändras. **Domen gäller
+exakt det SHA:t.** En commit efter domen ogiltigförklarar den, och nästa granskning läser
+hela intervallet igen — spetsen har redan flyttat under en granskning två gånger i den PR
+som införde mekanismen. Domen postas av **granskaren** som PR-review-kommentar
+(`gh pr review <nr> --comment --body-file <rapport>`), aldrig av författaren i PR-texten:
+protokollet skrivs av den som dömde. *(SHA-bindningen tillagd vid andra granskningen av
+PR #261, ägaruppdraget §6: granskningen ska gälla RÄTT kandidat.)*
 
 **Domen är rådgivande.** En människa eller en annan agent fattar beslutet; `SKILL.md`
 säger det rakt ut: *"Reviewer approval is never root of trust."*

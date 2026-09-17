@@ -21,10 +21,10 @@
 # "byggt, kanske granskat, men aldrig testat" — och hade rätt: skriptet skrevs kvällen
 # innan, mergades till main, och ingenting i repot körde det. Det är samma felklass som
 # kvällen bestod av: en mekanism som SER ut att finnas. Att den dessutom låg röd på main
-# i 9 h 32 min utan att någon märkte det är skälet till att PR-granskningen
-# automatiseras i samma commit. (Talet stod först som "ett dygn" — mätt och rättat
-# efter granskningens FYND 3: skapad 2026-09-16T20:32:42Z, mergad 20:38:15Z, rättad
-# 2026-09-17T06:10:19Z. Argumentet höll, talet gjorde det inte.)
+# i 9 h 37 min utan att någon märkte det är skälet till att PR-granskningen
+# automatiseras i samma commit. (Talet stod först som "ett dygn", sedan "9 h 32 min" —
+# andra granskningen mätte om: installeraren mergades i PR #242 2026-09-16T20:33:06Z,
+# rättad 2026-09-17T06:10:19Z. Argumentet höll, talet gjorde det inte, två gånger.)
 #
 # VAD PROVET INTE PRÖVAR. Inte att en post-commit-hook faktiskt pushar — det är
 # .githooks/post-commit:s ansvar, inte installerarens. Här prövas bara att rätt

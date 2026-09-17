@@ -55,13 +55,13 @@ elif [ -n "$HP" ]; then rod "core.hooksPath=$HP men post-commit saknas eller är
 else gul "AV — arbete kan bli kvar lokalt. bash scripts/installera-hooks.sh"; fi; echo
 
 printf '   granskning  '
-# Provet påstår ALDRIG att granskningen fungerar. Två skilda saker mäts, och bara
-# den ena går att mäta härifrån: att workflowen finns SPÅRAD på grenen (en fil som
-# inte är committad existerar inte för GitHub Actions), och att nyckeln finns —
-# vilket är en repo-secret som ingen lokal körning kan se. Den är därför ODÖMBART,
-# aldrig grön, och blir aldrig grön av att filen finns.
+# Provet påstår ALDRIG att granskningen fungerar. Härifrån går bara att mäta att
+# workflowen (vaktsvit + skalprov) finns SPÅRAD på grenen — en fil som inte är
+# committad existerar inte för GitHub Actions. Diffgranskningen sker av en separat
+# process (AGENTS.md steg 3), och om main kräver checkarna är en serverinställning
+# som ingen lokal körning kan se: ODÖMBART, aldrig grön, blir aldrig grön av filen.
 if git ls-files --error-unmatch .github/workflows/granska-pr.yml >/dev/null 2>&1; then
-  gul "workflow spårad · nyckeln ODÖMBART härifrån (repo-secret, ägarens hand)"
+  gul "workflow spårad (vaktsvit + skalprov) · diffgranskning = separat process · required checks på main: ODÖMBART härifrån"
 elif [ -f .github/workflows/granska-pr.yml ]; then
   rod "filen finns men är OSPÅRAD — vitlistan har svalt den, Actions ser den aldrig"
 else

@@ -83,12 +83,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-# Minsta möjliga. Granskaren läser koden och skriver en kommentar — den mergar
-# aldrig, pushar aldrig och rör aldrig en gren.
+# Minsta möjliga, på riktigt: jobben här kör PR-SPETSENS EGEN KOD (kor-vakter, skalproven),
+# och en token som kan skriva PR-kommentarer hade låtit en kandidat skriva sitt eget
+# "DOM: TILLSTYRKS" (andra granskningen av PR #261, fynd 5). Slås granskningsjobbet på
+# ges det `pull-requests: write` PER JOBB, aldrig här på toppnivå.
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 # INGEN cancel-in-progress. Första versionen avbröt pågående körningar vid en ny push,
 # och en AVBRUTEN körning är varken grön eller röd — en push strax före merge kunde

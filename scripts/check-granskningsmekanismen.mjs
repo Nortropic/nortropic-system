@@ -12,9 +12,9 @@
 // falsk trygghet. Den läser en YAML-fil som bara GitHub kan EXEKVERA; den kan aldrig
 // pröva vad workflowen GÖR, bara vad den SÄGER. Det är precis den lexikala metod som
 // gav elva av repots tretton falska påståenden, och den används här för att inget
-// annat är möjligt utan att köra Actions. Två av kontrollerna är dock verkliga
-// mekanismprov och inte lexikala: att filen är SPÅRAD, och att vitlistan inte
-// ignorerar den — och det är just de två som hade fångat natten 16–17 september,
+// annat är möjligt utan att köra Actions. Tre av kontrollerna är dock verkliga
+// mekanismprov och inte lexikala: att filen är SPÅRAD, att vitlistan inte
+// ignorerar den, och att granskartexten är spårad — och det är de som hade fångat natten 16–17 september,
 // då `.gitignore` tyst svalde `.githooks/post-commit` och en mergad PR påstod en
 // mekanism som aldrig fanns i repot.
 //
@@ -63,7 +63,11 @@ function dom(text) {
   // Utlösaren. `pull_request` krävs; `push` på on-nivå är förbjuden, eftersom en
   // granskning som körs på push gör bevarande till något som kan fastna (regel 12a,
   // och ägarens uttryckliga villkor: "så vi inte fastnar med opushade commits").
-  const onBlock = text.match(/^on:\n((?:[ \t]+.*\n|\n)*)/m)
+  // Läses ur KODRADERNA: en `push:` efter en kommentarsrad inne i on-blocket är giltig
+  // YAML men hade stoppat den gamla regexen vid kommentaren (andra granskningen, M12).
+  const kodrad = (l) => !/^\s*#/.test(l)
+  const kod = text.split('\n').filter(kodrad).join('\n')
+  const onBlock = kod.match(/^on:\n((?:[ \t]+.*\n|\n)*)/m)
   if (!onBlock) rad('ingen on:-blockdeklaration — utlösaren går inte att avgöra')
   else {
     if (!/^\s+pull_request:/m.test(onBlock[1])) rad('on: saknar pull_request — granskningen utlöses aldrig')
@@ -80,6 +84,33 @@ function dom(text) {
   for (const j of FORVANTADE_JOBB) {
     if (!text.includes(`\n  ${j}:\n`)) rad(`jobbet \`${j}\` saknas`)
   }
+  // MÄNGDLIKHET, inte bara närvaro. Första formen prövade att listade jobb FINNS och
+  // aldrig att olistade SAKNAS — ett halvvägs påslaget granskningsjobb passerade med
+  // 16/16 (andra granskningen av PR #261, mutation M5) medan fem texter påstod att
+  // vakten fäller det. Listan är definitionen; ett jobb utanför den är ett fynd.
+  const jobbIKod = []
+  let iJobs = false, aktuelltJobb = ''
+  const jobbPerRad = []
+  for (const l of kod.split('\n')) {
+    if (/^jobs:\s*$/.test(l)) { iJobs = true; jobbPerRad.push(''); continue }
+    if (iJobs && /^\S/.test(l)) iJobs = false
+    const m = iJobs && l.match(/^  ([A-Za-z_][A-Za-z0-9_-]*):\s*$/)
+    if (m) { aktuelltJobb = m[1]; jobbIKod.push(m[1]) }
+    jobbPerRad.push(iJobs ? aktuelltJobb : '')
+  }
+  for (const j of jobbIKod) {
+    if (!FORVANTADE_JOBB.includes(j)) rad(`oväntat jobb \`${j}\` — FORVANTADE_JOBB är mekanismens definition och uppdateras i samma commit`)
+  }
+  // Kandidatkod får aldrig köra med en hemlighet: varje levande jobb kör PR-spetsens egen
+  // kod. En secret i ett sådant jobb — även som env-mappning till steget — är ett fynd
+  // (ägarkrav 2026-09-17: kör inte obetrodd kandidatkod med produktionshemligheter).
+  // Slås granskningsjobbet på igen läggs dess namn till TILLATNA_SECRET_JOBB i samma commit.
+  const TILLATNA_SECRET_JOBB = ['granskning']
+  kod.split('\n').forEach((l, i) => {
+    if (/secrets\./.test(l) && !TILLATNA_SECRET_JOBB.includes(jobbPerRad[i] || '')) {
+      rad(`secret i jobbet \`${jobbPerRad[i] || '?'}\` som kör kandidatkod: ${l.trim().slice(0, 50)}`)
+    }
+  })
 
   // Kärnans exitprov får ALDRIG köras här: Darwin-bundna, och på ubuntu-latest
   // hade varje PR bokfört en MILJÖ som ett fel i kandidaten.
@@ -95,8 +126,6 @@ function dom(text) {
   // kör ett prov måste nämna exit 2 OCH skriva till sammanfattningen.
   // Räknas bara i KODRADER: det återstartbara jobbet längst ned i filen ligger
   // bortkommenterat och skulle annars räknas som en mekanism som finns.
-  const kodrad = (l) => !/^\s*#/.test(l)
-  const kod = text.split('\n').filter(kodrad).join('\n')
   const antalOdombart = (kod.match(/GITHUB_STEP_SUMMARY/g) || []).length
   if (antalOdombart < MIN_ODOMBART) rad(`bara ${antalOdombart} ODÖMBART-sammanfattningar i kod — varje jobb måste kunna säga att något inte gick att mäta`)
   if (!/"2"/.test(kod)) rad('ingen hantering av exit 2 — ODÖMBART skulle bokföras som ett fel i kandidaten')
@@ -147,9 +176,7 @@ jobs:
     steps:
       - run: |
           if [ "$K" = "2" ]; then echo x >> "$GITHUB_STEP_SUMMARY"; fi
-      - env:
-          NYCKEL: \${{ secrets.ANTHROPIC_API_KEY }}
-        run: las .agents/skills/nortropic-reviewer/SKILL.md
+      - run: las .agents/skills/nortropic-reviewer/SKILL.md
 `
 const KONTROLL = [
   ['giltig workflow flaggar INGENTING', GILTIG, (f) => f.length === 0],
@@ -179,11 +206,22 @@ const KONTROLL = [
   ['cancel-in-progress: true FLAGGAS', GILTIG.replace('cancel-in-progress: false', 'cancel-in-progress: true'),
     (f) => f.some((x) => x.includes('utan dom'))],
   ['secret INBAKAD I ETT SKALKOMMANDO FLAGGAS',
-    GILTIG.replace('        run: las .agents/skills/nortropic-reviewer/SKILL.md',
-      '        run: echo \${{ secrets.ANTHROPIC_API_KEY }} > /tmp/k .agents/skills/nortropic-reviewer/SKILL.md'),
+    GILTIG.replace('      - run: las .agents/skills/nortropic-reviewer/SKILL.md',
+      '      - run: echo \${{ secrets.ANTHROPIC_API_KEY }} > /tmp/k .agents/skills/nortropic-reviewer/SKILL.md'),
     (f) => f.some((x) => x.includes('interpolerad'))],
   ['borttagen rollpekare FLAGGAS', GILTIG.replace('.agents/skills/nortropic-reviewer/SKILL.md', 'granska noga'),
     (f) => f.some((x) => x.includes('nortropic-reviewer'))],
+  // Andra granskningen av PR #261: tre överlevande mutationer, nu fällda.
+  ['ett OVÄNTAT jobb FLAGGAS (halvvägs påslagen granskning)',
+    `${GILTIG}  granskning:\n    steps:\n      - run: echo hej\n`,
+    (f) => f.some((x) => x.includes('oväntat jobb'))],
+  ['push: efter en KOMMENTARSRAD i on-blocket FLAGGAS',
+    GILTIG.replace('  pull_request:\n', '  # kommentar\n  push:\n  pull_request:\n'),
+    (f) => f.some((x) => x.includes('bevarande'))],
+  ['secret som env till ett levande jobb FLAGGAS',
+    GILTIG.replace('      - run: las .agents/skills/nortropic-reviewer/SKILL.md',
+      '      - env:\n          NYCKEL: \${{ secrets.ANTHROPIC_API_KEY }}\n        run: las .agents/skills/nortropic-reviewer/SKILL.md'),
+    (f) => f.some((x) => x.includes('kör kandidatkod'))],
 ]
 // EN MUTATION SOM INTE MUTERAR PRÖVAR INGENTING. Varje fall utom det första bygger
 // på `GILTIG.replace(...)`, och en `replace` vars mönster inte längre finns är en
@@ -202,7 +240,7 @@ for (const [namn, text, vantat] of KONTROLL) {
 }
 
 // ---- DEN VERKLIGA FILEN ------------------------------------------------------
-// De två kontrollerna nedan är de ENDA i vakten som prövar en mekanism och inte en
+// De tre kontrollerna nedan är de enda i vakten som prövar en mekanism och inte en
 // text — och det är de som hade fångat att vitlistan svalde .githooks/post-commit.
 let spararad = false
 try {

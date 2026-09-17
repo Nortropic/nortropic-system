@@ -208,9 +208,9 @@ publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
 |---|---|
 | 1 | Öppna PR |
 | 2 | **Den mekaniska domen startar av sig själv** — `.github/workflows/granska-pr.yml` kör vaktsviten och skalproven på `pull_request` |
-| 3 | **Granskningen av diffen körs av den drivande sessionen**, i en egen agent, enligt `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`. Granskaren får aldrig vara den som skrev koden i samma tråd |
-| 4 | Åtgärda varje fynd, eller svara varför det inte åtgärdas |
-| 5 | Merga, och skriv granskningens utfall i PR-texten |
+| 3 | **Granskningen av diffen körs av den drivande sessionen**, i en egen agent, enligt `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`. Granskaren får aldrig vara den som skrev koden i samma tråd. Domen bär exakt det head-SHA granskaren läste (`DOM: TILLSTYRKS @<sha>`) och postas av granskaren som PR-review-kommentar |
+| 4 | Åtgärda varje fynd, eller svara varför det inte åtgärdas — på samma gren, och granska om hela intervallet |
+| 5 | Merga **endast** om domen är `TILLSTYRKS @` exakt PR-spetsen och checks är gröna: en commit efter domen ogiltigförklarar den. Författaren skriver aldrig protokollet — kvittot är granskarens kommentar. Tills mekanismen finns i repot (`scripts/publicera.sh`, nästa leverans) gör kedjedrivaren stegen för hand: `gh pr review --comment`, sedan `gh pr merge --merge --match-head-commit <sha>` |
 
 **Den mekaniska domen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha,
 det ska ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör två
@@ -236,8 +236,14 @@ kan per konstruktion inte fastna i den.
 > ⚠️ **ANDRA ägarhandlingen: branch protection.** En workflow kan **per konstruktion
 > inte hindra en merge** utan att vara en *required status check*. Utan den är varje
 > jobb rådgivande, och samma agent kan öppna och merga i samma minut med checken
-> pending — alltså exakt 28-mergarmönstret, oförändrat. Mätt 2026-09-17: repot har
-> ingen branch protection och inget ruleset.
+> pending — alltså exakt 28-mergarmönstret, oförändrat. Mätt 2026-09-17 11:20
+> (`gh api repos/…/rules/branches/main` → `[]`, `…/branches/main/protection`,
+> `…/rulesets/20553421`): `main` har legacy-skydd (PR krävs, 0 approvals, admins enforced,
+> ingen force-push) men **inga required status checks**; rulesetet "main" (1 approval,
+> aktivt sedan 2026-08-07) har **tom ref-selektor** och träffar inga refs. **Rikta aldrig
+> det rulesetet mot main** — då blir ägaren permanent godkännare av varje PR, vilket ägaren
+> uttryckligen inte vill. Rätt spak är required status checks. *(Rättat vid andra
+> granskningen av PR #261; här stod "ingen branch protection och inget ruleset".)*
 >
 > Gör `vaktsviten (webbfabriken)` och `skalprov under tests/scripts` till **required**
 > på `main`. Båda kräver ingen nyckel och är gröna i dag. **Detta är den enda spaken som

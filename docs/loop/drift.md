@@ -1,5 +1,34 @@
 # Att köra loopen
 
+## 2026-09-17 — PR #261, andra oberoende granskningen av hela intervallet: fyra blockerande, sex rådgivande — alla åtgärdade
+
+Granskaren (separat read-only-kontext, `nortropic-reviewer` + `PR-TILLAGG.md`, körningar bara i en
+arkivkopia) läste `eb9483e9..f3aa4f92` och gav `DOM: FYND @f3aa4f92 — blockerande: #1–#4`. Varje fynd
+omprövades av kedjedrivaren innan åtgärd; alla höll.
+
+| # | Fynd | Åtgärd i denna commit |
+|---|---|---|
+| 1 | Domen band inte head-SHA och protokollet skrevs av författaren i PR-texten — spetsen flyttade under granskning två gånger i denna PR | `PR-TILLAGG.md` "Domen": `DOM: TILLSTYRKS @<sha>` / `FYND @<sha>`, postad av granskaren som PR-review-kommentar; `AGENTS.md` steg 3–5: merge bara vid dom på exakt spetsen, ny commit ogiltigförklarar |
+| 2 | `check-granskningsmekanismen.mjs` fällde **inte** ett halvvägs påslaget granskningsjobb (mutation M5: 16/16 PASS med `granskning:` live och `FORVANTADE_JOBB` orört) trots påståendet på fem ställen | jobbmängden läses ur kodraderna och måste vara lika med `FORVANTADE_JOBB`; nytt kontrollprov "ett OVÄNTAT jobb FLAGGAS" |
+| 3 | `AGENTS.md`: "repot har ingen branch protection och inget ruleset" — falskt | ersatt med mätt läge: legacy-skydd (PR krävs, 0 approvals, admins enforced) utan required checks; rulesetet "main" (1 approval) har tom ref-selektor. Varning: rikta aldrig rulesetet mot main |
+| 4 | PR-texten beskrev inte spetsen (tre jobb, /install-github-app, tio prov) | PR-texten omskriven mot spetsen |
+| 5 | `permissions: pull-requests/issues: write` gav kandidatkod en token som kan skriva "DOM: TILLSTYRKS" | `contents: read` enbart; per jobb när granskningsjobbet slås på |
+| 6 | "9 h 32 min" fel med fem minuter: installeraren mergades i PR #242 `20:33:06Z`, inte #244 | 9 h 37 min på alla ställen (`fall.sh`, drift, beslutslogg ×2) |
+| 7 | Vakten blind för `push:` efter kommentarsrad i on-blocket och för secret som `env:` till levande jobb | on-blocket läses ur kodrader; secret i annat jobb än `granskning` flaggas; två nya kontrollprov |
+| 8 | Vaktens huvud sa "två mekanismprov", det är tre | rättat |
+| 9 | `helhetsbilden.sh` talade om en nyckel som inte längre finns | raden mäter spårad workflow; diffgranskning = separat process; required checks ODÖMBART härifrån |
+| 10 | Granskarkonfigurationen (`.github/workflows/**`, `nortropic-reviewer/**`, vakten) kunde ändras av kandidaten utan extra granskning | felklass 6 i `PR-TILLAGG.md` utvidgad |
+
+Mätt efter åtgärd (i `~/kernel-arbete`, gren `claude/inspiring-galileo-6w1pvw`): `check-granskningsmekanismen.mjs`
+**19/19** (tre nya kontrollprov, no-op-spärren fällde först det gamla skalkommando-fallet — rättat);
+`check-vaktankare.mjs --pinna-om` 29 vakter; `installera-hooks/fall.sh` 13 gröna; `nortropic-autocommit/fall.sh`
+7 PASS; `kor-vakter.mjs` **24/24**; `check-provanropare.mjs` 20/20; `check-vaktankare.mjs` 34/34. Regel 22: drift + beslutslogg + AGENTS + PR-TILLAGG i samma commit.
+
+Kvar från granskningen som **UNVERIFIED**: Darwin-grindarna kördes inte (avsiktligt, se L0-posten om
+hook-läckan); att `${{ }}` i YAML-kommentarer aldrig interpoleras är specgrundat, inte mätt i Actions.
+Efter merge: required status checks på `main` sätts för `vaktsviten (webbfabriken)` och `skalprov under
+tests/scripts` (ägarval 11:45), aldrig för ett granskningsjobb.
+
 ## 2026-09-17 — Andra granskningen: fyra fynd till, och ett av dem var en riktig bugg
 
 `DOM: FYND`. Den granskade `eb9483e..463989e` med uppdraget att pröva om **åtgärderna
@@ -159,8 +188,8 @@ ett påstående.
 |---|---|---|---|
 | **4** | Workflowen bokförde ODÖMBART som FAIL | `kor-vakter.mjs` rad 25 deklarerar `exit 2 = ODÖMBART` och når den på sex ställen; Actions har ingen exit-2-algebra | **BEKRÄFTAT** |
 | **1** | Provet fäller inte den senast lagade buggen | `-maxdepth 6 → 4` kört mot provet: **10/10 gröna** | **BEKRÄFTAT** |
-| **3** | *"main låg röd i ett dygn"* | skapad `20:32:42Z`, mergad `20:38:15Z`, rättad `06:10:19Z` → **9 h 32 min** | **BEKRÄFTAT** |
-| **5** | Mekanismen kan inte hindra en merge | ingen branch protection; ingen `check-*.mjs` läser `.github/`; `check-invariants.mjs` menar rot-`workflows/` | **BEKRÄFTAT** |
+| **3** | *"main låg röd i ett dygn"* | installeraren mergades i PR #242 `20:33:06Z`, rättad `06:10:19Z` → **9 h 37 min** *(andra granskningen: "9 h 32" blandade 064870a:s författartid med #244:s mergetid)* | **BEKRÄFTAT** |
+| **5** | Mekanismen kan inte hindra en merge | inga required status checks (legacy-skydd finns, rulesetet "main" träffar inga refs — rättat vid andra granskningen; här stod "ingen branch protection"); ingen `check-*.mjs` läser `.github/`; `check-invariants.mjs` menar rot-`workflows/` | **BEKRÄFTAT** |
 | **2** | `K6` ⊆ `K3`, alltså dekoration | K3 kräver redan `SATT = $HOOKHEM`; mutanten fälldes av K3 och K5, aldrig av K6 | **BEKRÄFTAT** |
 | **8** | Falskt skäl i provets huvud | `ROT` kommer ur `git rev-parse`, inte ur `$HOME` | **BEKRÄFTAT** |
 | **7** | `CLAUDE.md` nämner mekanismen noll gånger | grep: noll träffar | **BEKRÄFTAT — ägarens hand, se nedan** |
