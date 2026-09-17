@@ -219,13 +219,22 @@ av diffen mot repots egna felklasser.
 **Den gäller PR:en, aldrig pushen.** Utlösaren är `pull_request`, aldrig `push`. Bevarande
 passerar den alltså inte, och kan per konstruktion inte fastna i den.
 
-> ⚠️ **Granskningsjobbet är ODÖMBART tills ägaren lagt in en nyckel.** Utan
-> `ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN` som repo-secret kan Claude-steget
-> inte köra. Det fäller då ingenting — en miljö bokförs aldrig som ett fel i kandidaten —
-> utan skriver `ODÖMBART` i körningens sammanfattning. **Ett grönt `granska-pr` betyder
-> därför inte att diffen är granskad förrän nyckeln finns.** En agent kan inte sätta
-> secrets; ägaren kör `/install-github-app` eller lägger in den under
-> *Settings → Secrets and variables → Actions*. Till dess gäller steg 2 för hand.
+> ⚠️ **Granskningsjobbet är ODÖMBART tills ägaren kört `/install-github-app`.** Ett steg,
+> i Claude Code; det installerar appen och sätter repo-secreten. **En agent kan inte sätta
+> secrets** — det är ägarens hand, en gång. (Manuellt alternativ: en secret under
+> *Settings → Secrets and variables → Actions*, `ANTHROPIC_API_KEY` eller
+> `CLAUDE_CODE_OAUTH_TOKEN`.) Utan den kan Claude-steget inte köra. Det fäller då
+> ingenting — en miljö bokförs aldrig som ett fel i kandidaten — utan skriver `ODÖMBART`
+> i körningens sammanfattning. **Ett grönt `granska-pr` betyder därför inte att diffen är
+> granskad förrän nyckeln finns.** Till dess gäller steg 2 för hand.
+
+**Skillen och nyckeln svarar på olika frågor — blanda inte ihop dem.**
+`.agents/skills/nortropic-reviewer/SKILL.md` säger **hur** man granskar, och workflowens
+prompt pekar på den i stället för att skriva av den. Nyckeln säger **vem som kör den när
+ingen är här.** En skill är en instruktion, inte en motor: i en Claude Code-session är
+motorn sessionen självt och ingen nyckel behövs, men på en runner finns ingen session.
+Skillen låg i repot hela tiden medan 28 PR:er mergades ogranskade — den var aldrig det
+som saknades.
 
 **Detta är workflow-separation, inte en mekanisk säkerhetsgräns** — `CLAUDE.md` säger det
 rakt ut, och en Claude-granskare av en Claude-kandidat är inte äkta oberoende. Men det är

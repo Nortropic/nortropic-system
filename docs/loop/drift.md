@@ -66,14 +66,25 @@ och den skiljer på tre lägen som inte får blandas ihop: *spårad* (Actions ka
 *saknas*. Att nyckeln finns går **inte** att mäta lokalt — den är en repo-secret — så
 raden är `ODÖMBART` och blir aldrig grön av att filen finns.
 
-### Ägarens hand krävs, en gång
+### Ägarens hand krävs, en gång: `/install-github-app`
 
-Claude-steget är `ODÖMBART` tills `ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN`
-finns som repo-secret — `/install-github-app` i Claude Code, eller
-*Settings → Secrets and variables → Actions*. **En agent kan inte sätta secrets.** Steget
-fäller inget under tiden, men skriver `ODÖMBART` i sammanfattningen i stället för att
-tiga, så ett grönt kryss aldrig läses som "granskad". De två mekaniska jobben kräver
-ingen nyckel och gäller från första körningen.
+Ett steg i Claude Code — det installerar appen och sätter repo-secreten. **En agent kan
+inte sätta secrets.** Manuellt alternativ: en secret under *Settings → Secrets and
+variables → Actions* (`ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN`). Steget fäller
+inget under tiden, men skriver `ODÖMBART` i sammanfattningen i stället för att tiga, så
+ett grönt kryss aldrig läses som "granskad". De två mekaniska jobben kräver ingen nyckel
+och gäller från första körningen.
+
+**Rättat samma dag, på ägarens invändning:** *"vad pratar du om api? det finns ju review
+skill"*. Han har rätt i sakfrågan, och min betoning var fel — jag ledde med
+`ANTHROPIC_API_KEY` när svaret är ett kommando. **Men skillen och nyckeln svarar på olika
+frågor.** `.agents/skills/nortropic-reviewer/SKILL.md` säger HUR man granskar; nyckeln
+säger VEM SOM KÖR DEN NÄR INGEN ÄR HÄR. En skill är en instruktion, inte en motor: i en
+Claude Code-session är motorn sessionen självt och ingen nyckel behövs — därför kunde
+granskningen av denna PR köras utan en — men på en GitHub-runner finns ingen session.
+**Skillen låg i repot hela tiden medan 28 PR:er mergades ogranskade.** Den var aldrig det
+som saknades; motorn var det. Huruvida abonnemanget räcker eller separat API-fakturering
+krävs är **omätt** och besvaras av `/install-github-app`, inte av mig.
 
 ## 2026-09-17 — Tog vi bort mer än vi vet? Mätt: fyra av 38, och de 24 andra var redan borta
 
