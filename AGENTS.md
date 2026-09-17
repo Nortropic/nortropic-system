@@ -193,6 +193,91 @@ som redan var beslutat fyra gånger**, inte en ny befogenhet.
 | **Rollagent** — test-author, builder, reviewer | **NEJ, aldrig** | Rollseparationen ÄR integriteten: den som bygger får inte attestera sin egen kandidat |
 | **Den som driver kedjan** — autopiloten, eller Codex i arkitekt-/exekverarroll | **JA, utan ny prompt per transition** | Efter de mekaniska identity/scope/gate/reviewer-kontrollerna |
 
+### Reviewer-kontrollen är ett VILLKOR, inte en formalitet
+
+*Tillagt 2026-09-17 på ägarens anvisning: "jag vill att den pr reviewar och sen pushar,
+det är väl praxis."*
+
+Raden ovan säger att kedjedrivaren får publicera **efter de mekaniska identity/scope/
+gate/reviewer-kontrollerna**. Villkoret stod i tabellen från början. **Det uppfylldes
+inte:** natten 16–17 september öppnades och mergades **28 PR:er utan en enda granskning**
+— PR skapad och mergad av samma agent, i samma minut.
+
+Befogenheten fanns. Kontrollen hoppades över. Det är självcertifiering i
+publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
+
+**Vad som gäller nu, före varje merge:**
+
+| Steg | Mekanism |
+|---|---|
+| 1 | Öppna PR |
+| 2 | **Den mekaniska domen startar av sig själv** — `.github/workflows/granska-pr.yml` kör vaktsviten och skalproven på `pull_request` |
+| 3 | **Granskningen av diffen körs av den drivande sessionen**, i en egen agent, enligt `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`. Granskaren får aldrig vara den som skrev koden i samma tråd. Domen bär exakt det head-SHA granskaren läste (`DOM: TILLSTYRKS @<sha>`) och postas av granskaren som PR-review-kommentar |
+| 4 | Åtgärda varje fynd, eller svara varför det inte åtgärdas — på samma gren, och granska om hela intervallet |
+| 5 | Merga **endast** om domen är `TILLSTYRKS @` exakt PR-spetsen och checks är gröna: en commit efter domen ogiltigförklarar den. Författaren skriver aldrig protokollet — kvittot är granskarens kommentar. Tills mekanismen finns i repot (`scripts/publicera.sh`, nästa leverans) gör kedjedrivaren stegen för hand: `gh pr review --comment`, sedan `gh pr merge --merge --match-head-commit <sha>` |
+
+**Den mekaniska domen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha,
+det ska ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör två
+jobb på varje PR: vaktsviten och de två skalproven under `tests/scripts/`. Den gäller
+**PR:en, aldrig pushen** — utlösaren är `pull_request`, så bevarande passerar den inte och
+kan per konstruktion inte fastna i den.
+
+> ⚠️ **Diffgranskningen körs INTE i CI.** Ägarbeslut 2026-09-17: *"Nej i nuläget"* på
+> `/install-github-app`. Jobbet krävde en repo-secret, och utan den var det **rött på varje
+> PR** — ett kryss som aldrig kunde bli grönt lär bara ut att ignorera rött. Jobbet är
+> därför **borttaget, inte lämnat rött**; hur det slås på igen står längst ned i
+> `granska-pr.yml`, och `check-granskningsmekanismen.mjs` fäller om det görs halvvägs.
+>
+> **Granskningen försvann inte — den ligger i steg 3.** Den vägen är den som faktiskt
+> fungerade: den fann åtta fynd i den PR som införde mekanismen, och behövde ingen nyckel,
+> eftersom en session redan är inloggad. **Texten är EN:**
+> `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`, läst av handen i dag och
+> av maskinen om jobbet slås på.
+>
+> **Vad som saknas, sagt rakt ut:** granskning när ingen session är igång. Släpps Codex
+> autonomt över natten är det den luckan som öppnas — då är beslutet värt att ta om.
+
+> ⚠️ **ANDRA ägarhandlingen: branch protection.** En workflow kan **per konstruktion
+> inte hindra en merge** utan att vara en *required status check*. Utan den är varje
+> jobb rådgivande, och samma agent kan öppna och merga i samma minut med checken
+> pending — alltså exakt 28-mergarmönstret, oförändrat. Mätt 2026-09-17 11:20
+> (`gh api repos/…/rules/branches/main` → `[]`, `…/branches/main/protection`,
+> `…/rulesets/20553421`): `main` har legacy-skydd (PR krävs, 0 approvals, admins enforced,
+> ingen force-push) men **inga required status checks**; rulesetet "main" (1 approval,
+> aktivt sedan 2026-08-07) har **tom ref-selektor** och träffar inga refs. **Rikta aldrig
+> det rulesetet mot main** — då blir ägaren permanent godkännare av varje PR, vilket ägaren
+> uttryckligen inte vill. Rätt spak är required status checks. *(Rättat vid andra
+> granskningen av PR #261; här stod "ingen branch protection och inget ruleset".)*
+>
+> Gör `vaktsviten (webbfabriken)` och `skalprov under tests/scripts` till **required**
+> på `main`. Båda kräver ingen nyckel och är gröna i dag. **Detta är den enda spaken som
+> faktiskt stoppar 28-mergarmönstret** — allt annat här är rådgivande.
+>
+> Slås diffgranskningen på senare: gör den **aldrig** required. Den är rådgivande — skillen
+> säger det själv, *"Reviewer approval is never root of trust"* — och utan nyckel är den
+> röd, vilket som required check hade låst repot helt.
+>
+> Och: **`.github/workflows/**` vaktas av ingen `check-*.mjs`** (`workflows/**` i
+> `regler.md` §6 syftar på rotkatalogen, en annan sak). `check-granskningsmekanismen.mjs`
+> fäller att mekanismen tas bort eller lamslås — att den *kringgås* stoppas bara av
+> branch protection.
+
+**Skillen och nyckeln svarar på olika frågor — blanda inte ihop dem.**
+`.agents/skills/nortropic-reviewer/SKILL.md` säger **hur** man granskar, och workflowens
+prompt pekar på den i stället för att skriva av den. Nyckeln säger **vem som kör den när
+ingen är här.** En skill är en instruktion, inte en motor: i en Claude Code-session är
+motorn sessionen självt och ingen nyckel behövs, men på en runner finns ingen session.
+Skillen låg i repot hela tiden medan 28 PR:er mergades ogranskade — den var aldrig det
+som saknades.
+
+**Detta är workflow-separation, inte en mekanisk säkerhetsgräns** — `CLAUDE.md` säger det
+rakt ut, och en Claude-granskare av en Claude-kandidat är inte äkta oberoende. Men det är
+skillnaden mellan en diff som lästs av något annat än sin författare och en som inte
+lästs alls. Tjugoåtta gånger var den inte läst.
+
+**Undantag: bevarande.** `radda/*`-pushar, autocommit och autopush granskas aldrig —
+de publicerar ingenting och rör aldrig `main`. Regel 12a står oförändrad.
+
 **Scope: hela vägen till `KERNEL_COMPLETE`** — inte en namngiven tasklista.
 
 > ⚠️ Skälet till att scopet inte namnger task: delegationens
