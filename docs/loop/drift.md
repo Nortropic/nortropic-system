@@ -48,6 +48,24 @@ slutat betyda något. Kärnans dom ligger kvar på Macen.
 Den kör **aldrig** på `push`. Bevarande (autocommit, autopush, `radda/*`) passerar den
 inte och kan inte fastna i den. Regel 12a oförändrad.
 
+### Två svagheter i mitt eget bygge, hittade innan granskaren svarat
+
+**Workflowen skrev av granskarrollen i stället för att peka på den.** Repot har redan
+`.agents/skills/nortropic-reviewer/SKILL.md` — rollskillen ur `AGENTS.md`:s
+rollseparation, med hård gräns (`PRODUCTION_FILES_MODIFIED=NO`, `PUSH=NO`, `MERGE=NO`)
+och egen arbetsordning. Min prompt uppfann en egen lista bredvid den. **Två definitioner
+av "granskning" i samma repo driver isär, och den som läses av en maskin vinner tyst över
+den som läses av en människa** — samma kategorifel som Doctor #12(e) WARN:ar om mellan
+lagren. Prompten läser nu skillen först; felklasslistan lägger till det som är
+PR-specifikt och ersätter ingenting.
+
+**Helhetsbilden mätte inte granskningen.** Den bär en `autopush`-rad sedan i går men
+sa ingenting om PR-granskningen, alltså precis den mekanism som just infördes. Ny rad,
+och den skiljer på tre lägen som inte får blandas ihop: *spårad* (Actions kan se den),
+*ospårad fil* (vitlistan har svalt den — röd, för det är natten innans felklass), och
+*saknas*. Att nyckeln finns går **inte** att mäta lokalt — den är en repo-secret — så
+raden är `ODÖMBART` och blir aldrig grön av att filen finns.
+
 ### Ägarens hand krävs, en gång
 
 Claude-steget är `ODÖMBART` tills `ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN`

@@ -54,6 +54,20 @@ if [ -n "$HP" ] && [ -x "$HP/post-commit" ]; then gron "på — varje commit pus
 elif [ -n "$HP" ]; then rod "core.hooksPath=$HP men post-commit saknas eller är inte körbar"
 else gul "AV — arbete kan bli kvar lokalt. bash scripts/installera-hooks.sh"; fi; echo
 
+printf '   granskning  '
+# Provet påstår ALDRIG att granskningen fungerar. Två skilda saker mäts, och bara
+# den ena går att mäta härifrån: att workflowen finns SPÅRAD på grenen (en fil som
+# inte är committad existerar inte för GitHub Actions), och att nyckeln finns —
+# vilket är en repo-secret som ingen lokal körning kan se. Den är därför ODÖMBART,
+# aldrig grön, och blir aldrig grön av att filen finns.
+if git ls-files --error-unmatch .github/workflows/granska-pr.yml >/dev/null 2>&1; then
+  gul "workflow spårad · nyckeln ODÖMBART härifrån (repo-secret, ägarens hand)"
+elif [ -f .github/workflows/granska-pr.yml ]; then
+  rod "filen finns men är OSPÅRAD — vitlistan har svalt den, Actions ser den aldrig"
+else
+  rod "ingen granska-pr.yml — PR:er mergas ogranskade (AGENTS.md steg 2)"
+fi; echo
+
 printf '   färskhet    '
 if git fetch -q origin main 2>/dev/null; then
   BAK="$(git rev-list --count HEAD..origin/main 2>/dev/null || echo '?')"
