@@ -189,6 +189,36 @@ som redan var beslutat fyra gånger**, inte en ny befogenhet.
 | **Rollagent** — test-author, builder, reviewer | **NEJ, aldrig** | Rollseparationen ÄR integriteten: den som bygger får inte attestera sin egen kandidat |
 | **Den som driver kedjan** — autopiloten, eller Codex i arkitekt-/exekverarroll | **JA, utan ny prompt per transition** | Efter de mekaniska identity/scope/gate/reviewer-kontrollerna |
 
+### Reviewer-kontrollen är ett VILLKOR, inte en formalitet
+
+*Tillagt 2026-09-17 på ägarens anvisning: "jag vill att den pr reviewar och sen pushar,
+det är väl praxis."*
+
+Raden ovan säger att kedjedrivaren får publicera **efter de mekaniska identity/scope/
+gate/reviewer-kontrollerna**. Villkoret stod i tabellen från början. **Det uppfylldes
+inte:** natten 16–17 september öppnades och mergades **28 PR:er utan en enda granskning**
+— PR skapad och mergad av samma agent, i samma minut.
+
+Befogenheten fanns. Kontrollen hoppades över. Det är självcertifiering i
+publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
+
+**Vad som gäller nu, före varje merge:**
+
+| Steg | Mekanism |
+|---|---|
+| 1 | Öppna PR |
+| 2 | **Kör en oberoende granskning av diffen** — `/code-review` i egen agent, eller `request_copilot_review`. Granskaren får inte vara den som skrev koden i samma tråd |
+| 3 | Åtgärda varje fynd, eller svara varför det inte åtgärdas |
+| 4 | Merga, och skriv granskningens utfall i PR-texten |
+
+**Detta är workflow-separation, inte en mekanisk säkerhetsgräns** — `CLAUDE.md` säger det
+rakt ut, och en Claude-granskare av en Claude-kandidat är inte äkta oberoende. Men det är
+skillnaden mellan en diff som lästs av något annat än sin författare och en som inte
+lästs alls. Tjugoåtta gånger var den inte läst.
+
+**Undantag: bevarande.** `radda/*`-pushar, autocommit och autopush granskas aldrig —
+de publicerar ingenting och rör aldrig `main`. Regel 12a står oförändrad.
+
 **Scope: hela vägen till `KERNEL_COMPLETE`** — inte en namngiven tasklista.
 
 > ⚠️ Skälet till att scopet inte namnger task: delegationens
