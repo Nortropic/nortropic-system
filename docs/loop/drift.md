@@ -1,5 +1,54 @@
 # Att köra loopen
 
+## 2026-09-17 — L1c: post-commit-hooken pushar inte längre från länkade worktrees eller utförarcommits; L1 landad; required status checks satta
+
+### Hook-vakten (L1c)
+Fyndet ur L0 (skärpt av oberoende granskare): `core.hooksPath` delas av varje länkad worktree, och de
+fjorton grindarna (`h-007-exit:18` m.fl.) samt kernelns kandidatytor (`controller/workspace/cli:184`,
+`controller/utforare/cli:105`) committar i sådana — hooken hade pushat fixturgrenar (`h007-prov-<pid>`,
+`radda/auto-*`) och utförarens kandidater till origin. Två vakter i `.githooks/post-commit`, före
+`case "$GREN"`: (1) länkad worktree (`git rev-parse --git-dir` ≠ `--git-common-dir`) → `exit 0` med skäl på
+stderr; (2) senaste commit av `nortropic-utforare` (author eller committer — `controller/utforare/cli`
+sätter båda via `-c` med rensad `GIT_*`-miljö) → `exit 0` med skäl. `NORTROPIC_AUTOPUSH=0` kvar.
+Konsekvens som accepteras: en människoskapad länkad worktree på gren autopushas inte längre (regel 13:
+rollkataloger är fristående kloner sedan städningen; 1 registrerad worktree per klon i dag).
+
+Prov `tests/scripts/post-commit-hook/fall.sh` (eget `$HOME`, bare origin, hooksPath → kopia av repots hook):
+P1 huvudträd på gren → pushad · P2 huvudträd detached → `radda/auto-*` (oförändrat) · N1 länkad worktree
+detached → ingen push, skäl på stderr · N1b länkad worktree på gren `h007-prov-123` → ingen push · N2 commit
+av `nortropic-utforare` i huvudträdet → ingen push · N3 på main → ingen push · N4 `NORTROPIC_AUTOPUSH=0` →
+ingen push. **7 gröna.** Mutanter: utan vakt 1 → N1+N1b faller; utan vakt 2 → N2 faller; gamla hooken →
+N1/N1b/N2 faller. Registerrad i `check-provanropare.mjs` (källhash ompinnad `e7f20a7d91064a1b`), provet
+tillagt i `granska-pr.yml`-jobbet `provsviter`.
+
+⚠️ **Efter merge måste hooken ominstalleras** i varje klon som ska köra grindar: `bash
+scripts/installera-hooks.sh --kor` (kopierar till `~/.nortropic/githooks`); kontroll `cmp -s
+.githooks/post-commit ~/.nortropic/githooks/post-commit`. Först därefter får `--kor-grindar` köras där.
+
+### L1 landad: PR #261 mergad efter oberoende granskning i två pass
+Merge-commit `371b4a76`, andra förälder = granskad spets `10cd342` (`git rev-parse origin/main^2`).
+Domen `DOM: TILLSTYRKS @10cd342…` postad som PR-review-kommentar av kedjedrivaren för granskarens räkning
+(mekanismen `scripts/publicera.sh` kommer i L1b). Rådgivande fynd A1–A6 från andra passet: **A2** (permissions
+ovaktad), **A4** (halvrättad räknemening i `LOOP-FYND38`) och **A5** (README beskrev vakten som i `463989e`)
+åtgärdade i denna leverans — vakten prövar nu att `permissions:` finns i kodraderna och är exakt
+`contents: read` och att inget jobb bär egen `permissions:` (tre nya kontrollprov, **22/22**); **A1** (kedje-
+drivaren postar domen som relä) och **A6** (AGENTS.md:288 "aldrig squash/rebase" vs :336 "rebase-merga")
+tas i L1b där `publicera.sh` väljer merge-commit. **A3** rättad i PR-texten utan commit.
+
+### Required status checks på `main` — satta 12:27 (ägarval 11:45)
+`PUT repos/Nortropic/nortropic-system/branches/main/protection` med oförändrade övriga fält (kvitto
+före/efter sparat: PR krävs · 0 approvals · `enforce_admins` · ingen force-push/radering · ingen linjär
+historik · inga restrictions) och nytt `required_status_checks`: `strict: false`, checks
+`vaktsviten (webbfabriken)` och `skalprov under tests/scripts`, båda bundna till avsändare app 15368
+(GitHub Actions) — en status från fel avsändare räknas inte. Rulesetet "main" (id 20553421, tom selektor)
+rördes inte; `rules/branches/main` → fortfarande `[]` (rulesets och legacy-skydd är två system).
+Serverbevis: denna PR ska visa `mergeStateStatus: BLOCKED` tills båda checkarna är gröna, `CLEAN` därefter.
+Negativt serverbevis (röd check → blocked) körs som en engångs-PR i L1b.
+
+### Läge efter denna leverans
+`origin/main` = `371b4a76` (L1). Öppna: L0-grenen `nortropic/loop-r0-lagesforstaelse` (5a1142e, mergar in
+main härnäst), denna gren. Nästa: L0 → L1b (`publicera.sh`) → L2.
+
 ## 2026-09-17 — PR #261, andra oberoende granskningen av hela intervallet: fyra blockerande, sex rådgivande — alla åtgärdade
 
 Granskaren (separat read-only-kontext, `nortropic-reviewer` + `PR-TILLAGG.md`, körningar bara i en
