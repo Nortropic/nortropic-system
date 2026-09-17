@@ -49,7 +49,7 @@ const odombart = (skal) => { console.error(`ODÖMBART: ${skal}`); process.exit(2
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = 'f8bb5876772d6aff'
+const FORVANTAD_KALLHASH = '903268f14ac3231c'
 
 // ---- DET SOM FÖRLITAR SIG PÅ MÄNSKLIGT MINNE, utskrivet ---------------------
 // Varje rad är en skuld, inte ett undantag. Skälet måste säga VEM som kör och NÄR.
@@ -70,6 +70,11 @@ const UTAN_ANROPARE = {
   'tests/scripts/post-commit-hook/fall.sh': 'provet för .githooks/post-commit (hooken själv är ingen kandidat, den ligger utanför scripts/ och tests/) — körs av .github/workflows/granska-pr.yml på varje PR och för hand; samma blindfläck som raderna ovan (2026-09-17, L1c: vakterna mot autopush från länkade worktrees och utförarcommits)',
   'scripts/publicera.sh': 'ÄR prövad — tests/scripts/publicera/fall.sh kör den i 79 fall med stubbade gh och claude (skalen och Bash-vakten mot riktig git och riktig hook-form), och 35 byggda, 35 fällda (merge-villkoren, repo-utvinningen, kvitto, ci-filter, granskarens spärrar, väggklockan, check-pollning). Körs av kedjedrivaren vid varje avslutad leverans (AGENTS.md "Före varje merge"); samma blindfläck som autocommit-raden: vaktens körarmängd når inget prov under tests/ (2026-09-17, L1b)',
   'tests/scripts/publicera/fall.sh': 'provet självt — körs av .github/workflows/granska-pr.yml på varje PR och för hand; en workflow är ingen scripts/check-*.mjs (2026-09-17, L1b)',
+  'tests/scripts/helhetsbilden/fall.sh': 'provet för docs/loop/raddning/artefakter/helhetsbilden.sh + _grindlage.sh (räddningsskripten är inga kandidater) — 17 fall mot syntetiska grindar och en kopia av controller/verify/cli; körs av granska-pr.yml och för hand (2026-09-17, L3/AUD-01)',
+  'tests/scripts/redo-for-codex/fall.sh': 'provet för artefakter/redo-for-codex.sh — 11 fall med stubbad validator/inventering (AUD-02); körs av granska-pr.yml och för hand (2026-09-17, L3)',
+  'tests/scripts/validera-underlaget/fall.sh': 'provet för artefakter/validera-underlaget.sh — 11 fall för historiska rader vid REV och --operativt (AUD-03); körs av granska-pr.yml och för hand (2026-09-17, L3)',
+  'tests/scripts/inventera-lokalt-arbete/fall.sh': 'provet för artefakter/inventera-lokalt-arbete.sh — 6 fall, PA_REMOTE bara mot origin och ingen städningsfullmakt över omätt ignorerat (AUD-09); körs av granska-pr.yml och för hand (2026-09-17, L3)',
+  'tests/scripts/matning-pa-macen/fall.sh': 'provet för artefakter/matning-pa-macen.sh — 5 fall: kvalificerad vs diagnostisk körning, full utdata, restkontroll på innehåll, aggregerad exitkod (AUD-10); körs av granska-pr.yml och för hand (2026-09-17, L3)',
 }
 
 // ---- MEKANISMEN, FAKTORISERAD UT -------------------------------------------

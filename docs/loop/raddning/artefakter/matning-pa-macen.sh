@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-# matning-pa-macen.sh — LÄSER BARA. Ändrar ingenting, committar ingenting, pushar inget.
+# matning-pa-macen.sh — DIAGNOSTIK. Committar inget, pushar inget; grindarna själva skriver i
+# worktrees de skapar, och restkontrollen nedan mäter om något blev kvar.
+#
+# KVALIFICERING vs DIAGNOSTIK (AUD-10, 2026-09-17). En grind som står i
+# controller/verify/register.json körs genom controller/verify/cli (hash-bunden = kvalificerad
+# körning, "·kval"). En grind som är fryst men OREGISTRERAD körs direkt med bash och märks
+# "·diag": den säger vad grinden gör, men är aldrig en kvalificerad dom. Varje grinds fulla
+# utdata sparas i en fil; skärmen visar de sista 40 raderna. Restkontrollen jämför SÖKVÄGAR
+# och INNEHÅLL (sorterad status inkl. ignorerat + HEAD), inte antal rader. Exitkod:
+# 1 = minst en grind FAIL/KRASCH/VÄGRAN/INTEGRITET eller trädet smutsat · 2 = worktree,
+# fel plattform, någon ODÖMBART, eller minst en grind bara diagnostiskt körd · 0 = alla
+# slutningens grindar kvalificerat PASS och trädet orört.
 #
 # Syfte: fälla den dom som ingen maskin utom Macen kan fälla — är h-015:s
 # beroendeslutning faktiskt grön? Hela vägen till KERNEL_COMPLETE vilar på att
@@ -14,8 +25,13 @@
 # hänger; loggen bevaras ändå.
 
 set -u
-LOGG="/tmp/nortropic-matning-$(date +%Y%m%d-%H%M%S).txt"
+ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "inte ett git-repo"; exit 2; }
+LOGGKAT="${NORTROPIC_LOGG_KAT:-$HOME/.nortropic/matningar}/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$LOGGKAT"
+LOGG="$LOGGKAT/matning.txt"
 exec > >(tee "$LOGG") 2>&1
+GL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/grindlage-run.XXXXXX")"; trap 'rm -rf "$GL_TMP"' EXIT; export GL_TMP
+GL_ROT="$ROT"; . "$ROT/docs/loop/raddning/artefakter/_grindlage.sh"
+AGG_NEJ=0; AGG_OD=0
 
 echo "=== NORTROPIC — MÄTNING PÅ MACEN ==="
 echo "datum:    $(date '+%Y-%m-%d %H:%M:%S %Z')"
@@ -47,6 +63,10 @@ fi
 
 # ── 0b. Arbetsträdet före: grindarna ska inte smutsa ner det ─────────────────
 FORE="$(git status --porcelain | wc -l | tr -d ' ')"
+# Innehållsjämförelse (AUD-10): sorterad status med ignorerat + HEAD före/efter. Lika ANTAL
+# rader bevisade inte orört träd — en borttagen och en tillkommen fil gav "OK orört".
+git status --porcelain --ignored=matching -uall 2>/dev/null | sort > "$LOGGKAT/trad-fore.txt"
+HEAD_FORE="$(git rev-parse HEAD)"
 # IGNORERADE FILER RÄKNAS SEPARAT. `git status --porcelain` ser dem inte, och
 # .gitignore rad 3 är `/*` — en vitlista, så nästan allt är ignorerat. Mätt
 # 2026-09-16: efter kvällens körningar bar ägarens kontrollklon 1149
@@ -73,39 +93,52 @@ echo
 BAS="001:0 002:0 003:1 004:1 005:0 006:0 007:0 008:0 009:2 010:1 011:1 012:2 013:1 016:1"
 basvarde() { for p in $BAS; do case "$p" in "$1:"*) echo "${p#*:}"; return;; esac; done; echo "-"; }
 
-PASS=0; FAIL=0; ANNAT=0; RESULTAT=""; VANDA=0; KVAR=0
-printf "%-6s %-6s %-11s %-7s %s\n" TASK MACEN VERDIKT LINUX KOMMENTAR
-for h in 001 002 003 004 005 006 007 008 009 010 011 012 013 016; do
-  G="verify/bin/h-$h-exit"
-  if [ ! -f "$G" ]; then
-    printf "h-%s  %-14s %s\n" "$h" "GRIND SAKNAS" "$G"; ANNAT=$((ANNAT+1)); continue
-  fi
-  UT="$(bash "$G" 2>&1)"; K=$?
-  case $K in
-    0) V="PASS";      PASS=$((PASS+1)) ;;
-    1) V="FAIL";      FAIL=$((FAIL+1)) ;;
-    2) V="ODÖMBART";  ANNAT=$((ANNAT+1)) ;;
-    3) V="VÄGRAN";    ANNAT=$((ANNAT+1)) ;;
-    4) V="INTEGRITET";ANNAT=$((ANNAT+1)) ;;
-    *) V="OVÄNTAD($K)";ANNAT=$((ANNAT+1)) ;;
+PASS=0; FAIL=0; ANNAT=0; DIAG=0; RESULTAT=""; VANDA=0; KVAR=0; N=0; SPECFEL=0
+# Slutningen läses ur specen (depends_on från h-015), aldrig en hårdkodad lista: h-017 och
+# h-027–h-030 kommer med den dag h-030 finns. Ett saknat id är ett fynd, inte en tystnad.
+SLUTNING="$(gl_slutning h-015)"
+# Hook-vakt (L1c): grindarna skapar worktrees och committar i denna klon; utan vakterna i
+# hooken pushas fixturgrenar. Samma spärr som helhetsbilden.sh — stoppa före första grinden.
+HP="$(git config --get core.hooksPath 2>/dev/null || true)"
+if [ -n "$HP" ] && [ -f "${HP/#\~/$HOME}/post-commit" ] && ! cmp -s .githooks/post-commit "${HP/#\~/$HOME}/post-commit"; then
+  echo "STOPP: hooken i $HP är inte repots (.githooks/post-commit) — grindkörning skulle pusha fixturcommits. Kör: bash scripts/installera-hooks.sh --kor" >&2; exit 2
+fi
+printf "%-6s %-8s %-22s %-7s %s\n" TASK MACEN VERDIKT LINUX KOMMENTAR
+for id in $SLUTNING; do
+  case "$id" in FEL:spec) SPECFEL=1; continue;; esac
+  case "$id" in SAKNAS:*) printf "%-6s %-8s %-22s %-7s %s\n" "${id#SAKNAS:}" "-" "EJ_SPECAD" "-" "⚠️ saknas i specen — slutningen är inte hel"; ANNAT=$((ANNAT+1)); AGG_NEJ=$((AGG_NEJ+1)); RESULTAT="$RESULTAT ${id#SAKNAS:}:EJ_SPECAD"; continue;; esac
+  N=$((N+1)); h="${id#h-}"
+  grindlage "$id" 1 1 "$LOGGKAT/$id.txt" >/dev/null
+  K="$GL_KOD"; V="$GL_TOKEN"
+  case "$V" in PASS) VF="PASS·kval"; PASS=$((PASS+1)) ;;
+    PASS·diag) VF="PASS·diag"; DIAG=$((DIAG+1)); AGG_OD=$((AGG_OD+1)) ;;
+    FAIL|FAIL·diag) VF="$V"; FAIL=$((FAIL+1)); AGG_NEJ=$((AGG_NEJ+1)) ;;
+    *) VF="$V"; ANNAT=$((ANNAT+1)); case "$(gl_klass "$V")" in nej) AGG_NEJ=$((AGG_NEJ+1));; *) AGG_OD=$((AGG_OD+1));; esac ;;
   esac
   B="$(basvarde "$h")"
-  if [ "$B" != "0" ] && [ "$K" = "0" ]; then KOM="plattformsbunden — frisk"; VANDA=$((VANDA+1))
-  elif [ "$B" != "0" ] && [ "$K" != "0" ]; then KOM="⚠️ RÖD ÄVEN HÄR — verkligt fel"; KVAR=$((KVAR+1))
-  elif [ "$B" = "0" ] && [ "$K" != "0" ]; then KOM="⚠️ GRÖN I LINUX MEN RÖD HÄR — oväntat"
+  if [ "$B" = "-" ]; then KOM="ingen Linux-baslinje (ny i slutningen)"
+  elif [ "$B" != "0" ] && [ "$K" = "0" ]; then KOM="plattformsbunden — frisk"; VANDA=$((VANDA+1))
+  elif [ "$B" != "0" ] && [ "$K" != "0" ] && [ "$K" != "-" ]; then KOM="⚠️ RÖD ÄVEN HÄR — verkligt fel"; KVAR=$((KVAR+1))
+  elif [ "$B" = "0" ] && [ "$K" != "0" ] && [ "$K" != "-" ]; then KOM="⚠️ GRÖN I LINUX MEN RÖD HÄR — oväntat"
   else KOM=""; fi
-  printf "h-%-4s exit=%-2s %-11s linux=%-2s %s\n" "$h" "$K" "$V" "$B" "$KOM"
-  RESULTAT="$RESULTAT h-$h:$K"
-  # Full utdata för allt som inte är grönt — det är där svaret ligger
-  if [ "$K" != "0" ]; then
-    echo "----- h-$h full utdata -----"
-    printf '%s\n' "$UT" | tail -40
-    echo "----- slut h-$h -----"
+  case "$V" in *diag) KOM="$KOM (direkt bash — DIAGNOSTIK, ej kvalificering: grinden är inte registrerad)";; esac
+  printf "%-6s exit=%-3s %-22s linux=%-2s %s\n" "$id" "$K" "$VF" "$B" "$KOM"
+  RESULTAT="$RESULTAT $id:$V($K)"
+  # Full utdata sparas ALLTID i $LOGGKAT/<id>.txt; skärmen visar de sista 40 raderna av det röda.
+  if [ "$K" != "0" ] && [ -s "$LOGGKAT/$id.txt" ]; then
+    echo "----- $id sista 40 rader (full: $LOGGKAT/$id.txt) -----"
+    tail -40 "$LOGGKAT/$id.txt"
+    echo "----- slut $id -----"
   fi
 done
 echo
-echo "SUMMA: $PASS PASS · $FAIL FAIL · $ANNAT ODÖMBART/annat   av 14"
-echo "RAD:  $RESULTAT"
+# Tom eller oläsbar slutning är NEJ, aldrig "0 av 0 = allt grönt" (mekanismens granskning 2026-09-17).
+if [ "$SPECFEL" = 1 ]; then echo "NEJ: specs/tasks.spec.json kan inte läsas — ingen slutning, ingen mätning"; AGG_NEJ=$((AGG_NEJ+1)); fi
+if [ "$N" = 0 ] && [ "$SPECFEL" = 0 ]; then echo "NEJ: tom slutning — h-015 saknar depends_on eller finns inte i specen"; AGG_NEJ=$((AGG_NEJ+1)); fi
+echo "SUMMA: $PASS PASS·kval · $DIAG PASS·diag · $FAIL FAIL · $ANNAT ODÖMBART/annat   av $N (slutning ur specen)"
+# Mätraden i den form redo-for-codex.sh binder: revisionen direkt ovanför, ett blanksteg efter RAD:
+echo "mätrevision: \`$(git rev-parse HEAD 2>/dev/null)\`"
+echo "RAD: $(printf '%s' "$RESULTAT" | sed 's/^ *//')"
 echo "DELTA mot Linux-baslinjen: $VANDA vände till grönt (plattformsbundna, friska)"
 echo "                           $KVAR röda på BÅDA maskinerna (verkliga fel)"
 echo
@@ -113,17 +146,19 @@ echo "⭐ DOMEN OM KARTAN: vägen till KERNEL_COMPLETE förutsätter att h-004, 
 echo "   h-013 och h-016 är KLARA. Är någon av dem inte PASS ovan är kartan fel,"
 echo "   och det ska stå i docs/loop/drift.md innan Codex börjar."
 for h in 004 010 013 016; do
-  case " $RESULTAT " in *" h-$h:0 "*) echo "   h-$h: PASS — kartan håller" ;;
+  case " $RESULTAT " in *" h-$h:PASS(0) "*) echo "   h-$h: PASS·kval — kartan håller" ;;
+                        *" h-$h:PASS·diag(0) "*) echo "   h-$h: PASS·diag — grön direkt, men OREGISTRERAD: ingen kvalificerad dom" ;;
                         *) echo "   h-$h: ⚠️ INTE PASS — kartan håller INTE" ;; esac
 done
 echo
 
 # ── 3. Saknade grindar på vägen ──────────────────────────────────────────────
 echo "=== 3. Vad som saknas på vägen till KERNEL_COMPLETE ==="
-for f in verify/bin/h-014-exit verify/bin/h-015-exit verify/bin/autonomous-loop-exit \
-         docs/loop/autonomy-kernel-v1-acceptance.md; do
-  [ -e "$f" ] && echo "FINNS   $f" || echo "SAKNAS  $f"
+for id in h-014 h-015 @verify/bin/autonomous-loop-exit; do
+  grindlage "$id" 0 0 >/dev/null; printf "%-24s %s — %s\n" "$GL_ID" "$GL_TOKEN" "$GL_DETALJ"
 done
+f=docs/loop/autonomy-kernel-v1-acceptance.md
+if git ls-files --error-unmatch "$f" >/dev/null 2>&1 && [ -s "$f" ]; then echo "FINNS (spårad, icke-tom)  $f"; else echo "SAKNAS  $f"; fi
 echo
 
 # ── 4. Lokalt maskintillstånd — regel 12 ─────────────────────────────────────
@@ -145,19 +180,26 @@ echo
 # ── 6. Arbetsträdet efter: grindarna ska ha lämnat det orört ─────────────────
 EFTER="$(git status --porcelain | wc -l | tr -d ' ')"
 EFTER_IG="$(git status --porcelain --ignored=matching | grep -c "^!!")"
+git status --porcelain --ignored=matching -uall 2>/dev/null | sort > "$LOGGKAT/trad-efter.txt"
+HEAD_EFTER="$(git rev-parse HEAD)"
 echo "=== 6. Arbetsträdet ==="
 echo "okommitterade  FÖRE=$FORE EFTER=$EFTER"
 echo "ignorerade     FÖRE=$FORE_IG EFTER=$EFTER_IG   (delta: $((EFTER_IG - FORE_IG)))"
-if [ "$FORE" = "$EFTER" ] && [ "$FORE_IG" = "$EFTER_IG" ]; then
-  echo "OK — grindarna lämnade trädet orört, ignorerade filer inräknade"
-elif [ "$FORE" != "$EFTER" ]; then
-  echo "⚠️ GRINDARNA SMUTSADE NER TRÄDET (spårat/otrackat) — det är ett fynd i sig"
+TRAD_DIFF="$(diff "$LOGGKAT/trad-fore.txt" "$LOGGKAT/trad-efter.txt" 2>/dev/null)"
+if [ -z "$TRAD_DIFF" ] && [ "$HEAD_FORE" = "$HEAD_EFTER" ]; then
+  echo "OK — trädet orört: samma sökvägar och status (inkl. ignorerat), samma HEAD"
 else
-  echo "⚠️ GRINDARNA LÄMNADE $((EFTER_IG - FORE_IG)) IGNORERADE FILER EFTER SIG."
-  echo "   De syns inte i 'git status' och säkras inte av radda/smuts-*."
-  echo "   Se dem: git status --porcelain --ignored=matching | grep '\''^!!'\'' | head"
+  echo "⚠️ GRINDARNA SMUTSADE NER TRÄDET — sökvägar/status skiljer (lika antal räcker inte):"
+  printf '%s\n' "$TRAD_DIFF" | head -40
+  [ "$HEAD_FORE" = "$HEAD_EFTER" ] || echo "   HEAD ändrades: $HEAD_FORE → $HEAD_EFTER"
+  AGG_NEJ=$((AGG_NEJ+1))
 fi
 echo
 echo "=== KLART ==="
-echo "Full logg: $LOGG"
+echo "Full logg: $LOGG  ·  per grind: $LOGGKAT/<id>.txt"
 echo "Klistra tillbaka allt från '=== NORTROPIC' och ned."
+# Aggregerad exitkod (AUD-10): 1 = något rött eller trädet smutsat · 2 = något ODÖMBART/diag · 0 = allt kvalificerat PASS
+[ "$(uname -s)" = "Darwin" ] || AGG_OD=$((AGG_OD+1))
+[ "$AGG_NEJ" -gt 0 ] && exit 1
+[ "$AGG_OD" -gt 0 ] && exit 2
+exit 0

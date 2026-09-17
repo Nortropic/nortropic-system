@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# inventera-lokalt-arbete.sh — LÄSER BARA. Tar aldrig bort något, ändrar ingenting.
+# inventera-lokalt-arbete.sh — SKRIVER ALDRIG i något arbetsträd och tar aldrig bort något.
+# Enda skrivningen: refs/remotes/origin/* uppdateras av `git fetch --prune` (utan den vore
+# domen stale, FYND 37). Rapporten hamnar under ~/.nortropic/rapporter/, inte /tmp.
 #
 # Svarar på regel 12:s enda fråga, per worktree och per gren:
 #   finns detta arbete på git, eller bara på den här maskinen?
@@ -14,15 +16,16 @@
 # reflog, och reflog rensas. Det är regel 12:s farligaste kategori och den enda
 # som försvinner tyst.
 #
-# Bash 3.2-säkert (macOS systembash). Ingen sudo. Inget nät utom en `git fetch`
-# som du kör själv först — provet fetchar INTE, eftersom en stale origin/main ger
-# falska "föräldralösa" (det felet gjordes 2026-09-16 och fångades i tid).
+# Bash 3.2-säkert (macOS systembash). Ingen sudo. Enda nät- och skrivåtgärden är
+# `git fetch --prune origin` (L3): en stale origin/main gav falska "föräldralösa"
+# 2026-09-16, därför fetchar provet självt innan det dömer.
 
 set -u
 ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "inte ett git-repo"; exit 2; }
 cd "$ROT" || exit 2
 
-RAPPORT="/tmp/nortropic-lokalt-arbete-$(date +%Y%m%d-%H%M%S).txt"
+RAPPORTKAT="${NORTROPIC_RAPPORT_KAT:-$HOME/.nortropic/rapporter}"; mkdir -p "$RAPPORTKAT"
+RAPPORT="$RAPPORTKAT/lokalt-arbete-$(date +%Y%m%d-%H%M%S).txt"
 exec > >(tee "$RAPPORT") 2>&1
 
 echo "=== INVENTERING AV LOKALT ARBETE — regel 12 ==="
@@ -100,12 +103,16 @@ echo
 
 # ── Klassificera ett commit-SHA ─────────────────────────────────────────────
 # I_MAIN      = förfader till origin/main. Säkrad, helt.
-# PA_REMOTE   = finns på någon pushad gren. Säkrad så länge grenen inte raderas.
+# PA_REMOTE   = finns på någon pushad gren PÅ ORIGIN. Säkrad så länge grenen inte raderas.
 # FORALDRALOS = finns ingenstans på origin. FÖRSVINNER om worktreen tas bort.
+# ENDAST origin räknas (AUD-09, 2026-09-17): `git branch -r --contains` utan filter listar
+# ALLA remotes, men bara origin är hämtad — en referens under en annan remote (t.ex. ett
+# lokalt bare-repo) gav PA_REMOTE åt ett objekt som inte fanns på origin. Samma felklass
+# som FYND 37, en remote ut.
 klassa() {
   local h="$1"
   git merge-base --is-ancestor "$h" origin/main 2>/dev/null && { echo "I_MAIN"; return; }
-  if [ -n "$(git branch -r --contains "$h" 2>/dev/null | head -1)" ]; then
+  if [ -n "$(git branch -r --contains "$h" --list 'origin/*' 2>/dev/null | head -1)" ]; then
     echo "PA_REMOTE"; return
   fi
   echo "FORALDRALOS"
@@ -203,12 +210,14 @@ if [ -z "$MIN_ORIGIN" ]; then
   k_farlig=-1
 else
   while IFS= read -r kd; do
-    [ "$kd" = "$ROT" ] && continue
+    # Realpath: på macOS är $TMPDIR/$HOME ibland symlänkade (/var → /private/var); en textjämförelse
+    # lät huvudklonen räknas en gång till som "fristående klon" (mätt i provet 2026-09-17).
+    [ "$(cd "$kd" 2>/dev/null && pwd -P)" = "$(cd "$ROT" && pwd -P)" ] && continue
     [ "$(git -C "$kd" remote get-url origin 2>/dev/null)" = "$MIN_ORIGIN" ] || continue
     kh="$(git -C "$kd" rev-parse HEAD 2>/dev/null)" || continue
     k_tot=$((k_tot+1))
     if git cat-file -e "$kh^{commit}" 2>/dev/null \
-       && [ -n "$(git branch -r --contains "$kh" 2>/dev/null | head -1)" ]; then
+       && [ -n "$(git branch -r --contains "$kh" --list 'origin/*' 2>/dev/null | head -1)" ]; then
       klage="SÄKRAD"
     else
       klage="FÖRÄLDRALÖS"; k_farlig=$((k_farlig+1))
@@ -261,8 +270,15 @@ if [ "$FETCHA" = "0" ]; then
 fi
 FARA=$((n_foraldralos + g_farliga + n_smutsig + k_farlig + k_smutsfarlig))
 if [ "$FARA" = "0" ]; then
-  echo "✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns på git."
-  echo "   Städning kan ske utan att något går förlorat."
+  echo "✅ REGEL 12 UPPFYLLD för spårat och ospårat innehåll — det finns på origin."
+  # STÄDNINGSFULLMAKT BARA FÖR DET PROVET LÄST (AUD-09). Ignorerat innehåll ingår inte i
+  # FARA och säkras inte av radda/smuts-*; regel 13b villkor 4 kräver att det är MÄTT.
+  if [ "$IG_TOT" = "0" ]; then
+    echo "   Städning kan ske utan att något går förlorat (inget ignorerat innehåll mätt)."
+  else
+    echo "   STÄDNING EJ FRIKÄND — $IG_TOT ignorerade filer i $IG_TRAD träd är omätta (regel 13b villkor 4)."
+    echo "   Mät dem först: git -C <träd> status --porcelain --ignored=matching | grep '^!!'"
+  fi
   [ "$n_smuts_sakrad" -gt 0 ] && echo "   ($n_smuts_sakrad worktrees är smutsiga, men deras innehåll ligger i radda/smuts-*" && echo "    med IDENTISKT träd — mätt, inte antaget på grennamnet.)"
 else
   echo "⚠️  $FARA poster finns BARA på denna maskin:"

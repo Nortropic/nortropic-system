@@ -17,7 +17,20 @@
 
 set -u
 
-avvik=0; odombart=0; bekraftat=0
+# TVÅ SORTERS RADER (AUD-03, 2026-09-17). Underlagets tal beskriver DIAGNOSÖGONBLICKET —
+# revisionen VAGEN.md §3 mättes på. De ska stämma DÄR, för alltid; att en leverans senare
+# gör ett tal osant på HEAD är vägen som lyckas, inte underlaget som fallerar. Tidigare
+# mätte provet allt mot HEAD och krävde att h-014-exit, h-015-exit och autonomous-loop-exit
+# SAKNAS — så redo-for-codex.sh hade sagt INTE REDO exakt när FAS 4–7 blev klara.
+#   HISTORISKA rader: mäts vid REV med git show/ls-tree/log, verdikt BEKRÄFTAT@rev / AVVIKER@rev.
+#   OPERATIVA rader: mäts på det levande trädet, som förut.
+# `--operativt` kör bara de operativa raderna (redo-for-codex.sh:s ingång) och hoppar även
+# bundle/patch-raderna, som i repot är permanent ODÖMBART med avsikt.
+REV="${VALIDERA_REV:-28ca1af}"
+LAGE="allt"; [ "${1:-}" = "--operativt" ] && LAGE="operativt"
+if git rev-parse -q --verify "$REV^{commit}" >/dev/null 2>&1; then REV_OK=1; else REV_OK=0; fi
+
+avvik=0; odombart=0; bekraftat=0; hist_ok=0; hist_avvik=0; hist_od=0
 UNDERLAG="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 rad() { # rad <påstående> <förväntat> <uppmätt>
@@ -27,6 +40,17 @@ rad() { # rad <påstående> <förväntat> <uppmätt>
   else                            v="AVVIKER";  avvik=$((avvik+1)); fi
   printf "%-46s %-22s %-22s %s\n" "$p" "$f" "$u" "$v"
 }
+
+rad_hist() { # rad_hist <påstående> <förväntat vid REV> <uppmätt vid REV>
+  [ "$LAGE" = "operativt" ] && return
+  local p="$1" f="$2" u="$3" v
+  if   [ "$REV_OK" != 1 ] || [ "$u" = "ODÖMBART" ]; then v="ODÖMBART@$REV"; hist_od=$((hist_od+1)); odombart=$((odombart+1))
+  elif [ "$u" = "$f" ]; then v="BEKRÄFTAT@$REV"; hist_ok=$((hist_ok+1))
+  else v="AVVIKER@$REV"; hist_avvik=$((hist_avvik+1)); fi
+  printf "%-46s %-22s %-22s %s\n" "$p" "$f" "$u" "$v"
+}
+rev_finns() { git cat-file -e "$REV:$1" 2>/dev/null && echo FINNS || echo SAKNAS; }
+rev_commits() { [ "$REV_OK" = 1 ] || { echo ODÖMBART; return; }; git cat-file -e "$REV:verify/bin/$1-exit" 2>/dev/null || { echo ODÖMBART; return; }; git log --oneline "$REV" --follow -- "verify/bin/$1-exit" 2>/dev/null | wc -l | tr -d ' '; }
 
 matt() { # kör kommando; ODÖMBART om det inte går
   local out; out=$(eval "$1" 2>/dev/null) || { echo "ODÖMBART"; return; }
@@ -74,39 +98,42 @@ echo "  ⭐ OMFRYSNINGAR PER GRIND — diskriminanten klar/icke-klar (01 §1, 02
 # (2 omfrysningar) 8 PASS / 8 FAIL. Talen nedan är riktiga; etiketten var det inte.
 # h-017, h-036 och h-038 ligger utanför h-015:s beroendeslutning och är INTE mätta
 # — "ej mätt" är inte "klar", och att skriva det är regel 8.
-rad "h-016  [FAIL, mätt]"   "1"   "$(gatecommits h-016)"
-rad "h-013  [FAIL, mätt]"   "2"   "$(gatecommits h-013)"
-rad "h-017  [EJ MÄTT]"      "2"   "$(gatecommits h-017)"
-rad "h-038  [EJ MÄTT]"      "2"   "$(gatecommits h-038)"
-rad "h-001  [PASS, mätt]"   "3"   "$(gatecommits h-001)"
-rad "h-036  [EJ MÄTT]"      "3"   "$(gatecommits h-036)"
-rad "h-035  (pågår)"      "17"  "$(gatecommits h-035)"
-rad "h-039  (pågår)"      "30"  "$(gatecommits h-039)"
-rad "h-032  (pågår)"      "120" "$(gatecommits h-032)"
-rad "h-031  (pågår)"      "147" "$(gatecommits h-031)"
-rad "h-039-exit storlek (byte)" "2136969" \
-    "$(f=verify/bin/h-039-exit; [ -f $f ] && (stat -c%s $f 2>/dev/null || stat -f%z $f) || echo ODÖMBART)"
-# Strukturpåståendet, inte bara talet: växte grinden monotont?
-rad "h-039-grinden minskade aldrig" "0 minskningar" \
-    "$( [ -f verify/bin/h-039-exit ] && git log --reverse --format=%H --follow -- verify/bin/h-039-exit 2>/dev/null \
+# Historiska: omfrysningstalen vid diagnosrevisionen. (h-035/039/032/031 stod tidigare som
+# "(pågår)" — de avslutades OVERIFIERAT 2026-09-16; etiketten är borta, talet är historiskt.)
+rad_hist "h-016  [FAIL, mätt]"   "1"   "$(rev_commits h-016)"
+rad_hist "h-013  [FAIL, mätt]"   "2"   "$(rev_commits h-013)"
+rad_hist "h-017  [EJ MÄTT]"      "2"   "$(rev_commits h-017)"
+rad_hist "h-038  [EJ MÄTT]"      "2"   "$(rev_commits h-038)"
+rad_hist "h-001  [PASS, mätt]"   "3"   "$(rev_commits h-001)"
+rad_hist "h-036  [EJ MÄTT]"      "3"   "$(rev_commits h-036)"
+rad_hist "h-035  (avslutad OVERIFIERAT)" "17"  "$(rev_commits h-035)"
+rad_hist "h-039  (avslutad OVERIFIERAT)" "30"  "$(rev_commits h-039)"
+rad_hist "h-032  (avslutad OVERIFIERAT)" "120" "$(rev_commits h-032)"
+rad_hist "h-031  (avslutad OVERIFIERAT)" "147" "$(rev_commits h-031)"
+rad_hist "h-039-exit storlek (byte)" "2136969" \
+    "$([ "$REV_OK" = 1 ] && git cat-file -s "$REV:verify/bin/h-039-exit" 2>/dev/null || echo ODÖMBART)"
+# Strukturpåståendet, inte bara talet: växte grinden monotont (fram till REV)?
+rad_hist "h-039-grinden minskade aldrig" "0 minskningar" \
+    "$( [ "$REV_OK" = 1 ] && git log --reverse --format=%H "$REV" --follow -- verify/bin/h-039-exit 2>/dev/null \
         | while read -r c; do git cat-file -s "$(git rev-parse "$c:verify/bin/h-039-exit" 2>/dev/null)" 2>/dev/null; done \
         | awk 'NR>1&&$1<p{n++}{p=$1}END{print (n?n:0)" minskningar"}' || echo ODÖMBART)"
 echo
 
 # ── §2/§6 Luckorna i kedjan ──────────────────────────────────────────────────
-rad "autonomous-loop-exit saknas" "SAKNAS" \
-    "$([ -e verify/bin/autonomous-loop-exit ] && echo FINNS || echo SAKNAS)"
-rad "filer i verify/bin/" "29" "$(matt 'ls verify/bin | wc -l | tr -d " "')"
-rad "h-014-exit saknas" "SAKNAS" "$([ -e verify/bin/h-014-exit ] && echo FINNS || echo SAKNAS)"
-rad "h-015-exit saknas" "SAKNAS" "$([ -e verify/bin/h-015-exit ] && echo FINNS || echo SAKNAS)"
-rad "h-030 finns EJ i specen" "SAKNAS" \
-    "$(matt "python3 -c \"import json;d=json.load(open('specs/tasks.spec.json'));print('FINNS' if 'h-030' in [t['id'] for t in d['tasks']] else 'SAKNAS')\"")"
+# HISTORISKA vid REV: att dessa saknades var diagnosen. Att de senare FINNS är FAS 4–7
+# som lyckas — en operativ startkontroll får aldrig kräva att leveransen saknas (AUD-03).
+rad_hist "autonomous-loop-exit saknades vid REV" "SAKNAS" "$(rev_finns verify/bin/autonomous-loop-exit)"
+rad_hist "filer i verify/bin/ vid REV" "29" "$([ "$REV_OK" = 1 ] && git ls-tree "$REV" verify/bin/ 2>/dev/null | wc -l | tr -d ' ' || echo ODÖMBART)"
+rad_hist "h-014-exit saknades vid REV" "SAKNAS" "$(rev_finns verify/bin/h-014-exit)"
+rad_hist "h-015-exit saknades vid REV" "SAKNAS" "$(rev_finns verify/bin/h-015-exit)"
+rad_hist "h-030 fanns EJ i specen vid REV" "SAKNAS" \
+    "$([ "$REV_OK" = 1 ] && git show "$REV:specs/tasks.spec.json" 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print('FINNS' if 'h-030' in [t['id'] for t in d['tasks']] else 'SAKNAS')" 2>/dev/null || echo ODÖMBART)"
 rad "h-015 beror på h-030" "JA" \
     "$(matt "python3 -c \"import json;d=json.load(open('specs/tasks.spec.json'));print('JA' if any('h-030' in (t.get('depends_on') or []) for t in d['tasks'] if t['id']=='h-015') else 'NEJ')\"")"
 
 # ── §5 Den cirkulära pinningen ───────────────────────────────────────────────
-rad "registret registrerar 2 webbfiler" "2" \
-    "$(matt "grep -cE 'scripts/check-invariants\.mjs|workflows/nortropic-verify-suite\.js' controller/verify/register.json")"
+rad_hist "registret registrerade 2 webbfiler vid REV" "2" \
+    "$([ "$REV_OK" = 1 ] && git show "$REV:controller/verify/register.json" 2>/dev/null | grep -cE 'scripts/check-invariants\.mjs|workflows/nortropic-verify-suite\.js' || echo ODÖMBART)"
 # OBS: grep -c ger exit 1 vid NOLL träffar, och noll är det FÖRVÄNTADE svaret här.
 # Utan '|| true' rapporterar provet ODÖMBART på ett korrekt påstående — ett prov som
 # inte kan skilja "inga träffar" från "kunde inte mätas" mäter sin egen felhantering.
@@ -120,12 +147,13 @@ rad "03-regelverk kernelomnämnanden" "0" \
     "$(kmatt 'trust.?kernel|controller/|verify/bin|specs/tasks|exit_test' docs/03-regelverk.md)"
 
 # ── Vaktsvitens räckvidd: 16 webb / 2 kärna / 1 båda / 4 inget ───────────────
-rad "scripts/check-*.mjs, antal" "23" "$(matt 'ls scripts/check-*.mjs 2>/dev/null | wc -l | tr -d " "')"
-rad "vaktfördelning webb/kärna/båda/noll" "16/2/1/4" \
+rad_hist "scripts/check-*.mjs, antal vid REV" "23" "$([ "$REV_OK" = 1 ] && git ls-tree --name-only "$REV" scripts/ 2>/dev/null | grep -c 'scripts/check-.*\.mjs$' || echo ODÖMBART)"
+rad_hist "vaktfördelning webb/kärna/båda/noll vid REV" "16/2/1/4" \
     "$(w=0;k=0;b=0;n=0
-       for s in scripts/check-*.mjs; do [ -f "$s" ] || continue
-         a=$(grep -cE '(agents|skills|packs|workflows|backtests)/' "$s"); a=${a:-0}
-         c=$(grep -cE '(controller|verify|specs)/' "$s"); c=${c:-0}
+       [ "$REV_OK" = 1 ] || { echo ODÖMBART; exit 0; }
+       for s in $(git ls-tree --name-only "$REV" scripts/ 2>/dev/null | grep 'scripts/check-.*\.mjs$'); do
+         a=$(git show "$REV:$s" 2>/dev/null | grep -cE '(agents|skills|packs|workflows|backtests)/'); a=${a:-0}
+         c=$(git show "$REV:$s" 2>/dev/null | grep -cE '(controller|verify|specs)/'); c=${c:-0}
          if [ "$a" -gt 0 ] && [ "$c" -gt 0 ]; then b=$((b+1))
          elif [ "$a" -gt 0 ]; then w=$((w+1))
          elif [ "$c" -gt 0 ]; then k=$((k+1))
@@ -144,7 +172,7 @@ rad "vaktfördelning webb/kärna/båda/noll" "16/2/1/4" \
 echo
 for f in scripts/nortropic-codex-autopilot.py scripts/check-provanropare.mjs \
          scripts/check-verifierarregistret.mjs scripts/kor-styrprov.mjs scripts/kor-vakter.mjs; do
-  rad "finns i scripts/: $(basename "$f")" "FINNS" "$([ -f "$f" ] && echo FINNS || echo SAKNAS)"
+  rad_hist "fanns i scripts/ vid REV: $(basename "$f")" "FINNS" "$(rev_finns "$f")"
 done
 
 # ── Dokumentationsrättelsen: fyra commits ────────────────────────────────────
@@ -160,13 +188,14 @@ echo
 rad "alla 4 dok-commitsen finns (mängd)" "4/4" \
     "$(n=0; for m in 'repots identitet' 'lageretiketten' 'vaktklassificeringen' 'BLANDADE'; do
          git log --format='%s' 2>/dev/null | grep -qiE "$m" && n=$((n+1)); done; echo "$n/4")"
-rad "patchen bär 4 commits" "4" \
+[ "$LAGE" = "operativt" ] || rad "patchen bär 4 commits" "4" \
     "$(p=$UNDERLAG/artefakter/nortropic-dokumentation-4commits.patch
        [ -f "$p" ] && grep -c '^From [0-9a-f]\{40\}' "$p" || echo ODÖMBART)"
 
 # ── Webb-bundlen ─────────────────────────────────────────────────────────────
 B="$UNDERLAG/artefakter/nortropic-web-extraktion.bundle"
-if [ -f "$B" ] && command -v git >/dev/null; then
+if [ "$LAGE" = "operativt" ]; then :   # avsiktligt utelämnad i repot — permanent ODÖMBART, hoppas i operativt läge
+elif [ -f "$B" ] && command -v git >/dev/null; then
   T=$(mktemp -d); git clone -q "$B" "$T/w" 2>/dev/null
   if [ -d "$T/w/.git" ]; then
     rad "bundle: commits" "337" "$(git -C "$T/w" log --oneline | wc -l | tr -d ' ')"
@@ -179,7 +208,12 @@ else rad "bundle: finns" "JA" "ODÖMBART"; fi
 
 # ── Plattform: kernelgatarna kan bara dömas på Macen ─────────────────────────
 echo
-if [ "$(uname -s)" = "Darwin" ]; then
+if [ "$LAGE" = "operativt" ]; then
+  # Operativt läge (redo:s ingång) kör INGEN grind live: h-013 skapar workspaces via
+  # controller/workspace/cli i den klon den körs i och lämnar .nortropic-h036-proof-*-rester
+  # (80 per körning, mätt av oberoende granskning 2026-09-17), och raden bär ändå inget verdikt.
+  rad "värdmaskin" "$(uname -s)" "$(uname -s)"
+elif [ "$(uname -s)" = "Darwin" ]; then
   rad "värdmaskin" "Darwin" "Darwin"
   if [ -f verify/bin/h-013-exit ]; then
     # INGET GNU `timeout` — det finns inte på macOS. Raden gav exit 127
@@ -197,7 +231,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
     # Macen i ren klon, mätt två gånger 2026-09-16 (main och plattformsgrenen).
     # Provets kontrakt är att upptäcka FÖRÄNDRING, inte att önska ett utfall —
     # blir h-013 grön ska denna rad FÄLLA, så att någon uppdaterar den.
-    rad "h-013-exit (h-014:s beroende) [FAIL, mätt]" "exit 1" "exit $e"
+    # INFORAD utan förväntan: en lagad h-013 får inte fälla startkontrollen (AUD-03).
+    printf "%-46s %-22s %-22s %s\n" "h-013-exit (h-014:s beroende), live" "-" "exit $e" "INFO"
   else rad "h-013-exit finns" "JA" "ODÖMBART"; fi
 else
   rad "värdmaskin" "Darwin" "ODÖMBART"
@@ -295,7 +330,8 @@ rad "inga döda FAS-pekare i underlaget" "0" "$(doda_faser)"
 
 # ── Summering ────────────────────────────────────────────────────────────────
 printf '%.0s-' {1..108}; echo
-echo "BEKRÄFTAT $bekraftat · AVVIKER $avvik · ODÖMBART $odombart"
+echo "OPERATIVT: BEKRÄFTAT $bekraftat · AVVIKER $avvik · ODÖMBART $odombart"
+[ "$LAGE" = "operativt" ] || echo "HISTORISKT@$REV: BEKRÄFTAT $hist_ok · AVVIKER $hist_avvik · ODÖMBART $hist_od   (ett AVVIKER här = underlaget bär ett fel om diagnosen, inte om läget)"
 echo
 # Förväntad baslinje per plats. Ett ODÖMBART som är FÖRVÄNTAT skrivs ändå ut som
 # ODÖMBART — det tystas aldrig. Skälet: en vakt som hoppar över kontroller vars artefakt
@@ -317,5 +353,6 @@ if [ "$odombart" -gt 0 ]; then
 fi
 echo "Detta prov ersätter INTE den oberoende omhärledningen i 06-inventering.md §0."
 [ "$avvik" -gt 0 ] && exit 1
+[ "$LAGE" != "operativt" ] && [ "$hist_avvik" -gt 0 ] && exit 1
 [ "$odombart" -gt 0 ] && exit 2
 exit 0
