@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
-# helhetsbilden.sh — LÄSER BARA. Skriver ut hela lägesbilden, MÄTT.
+# helhetsbilden.sh — SKRIVER ALDRIG i arbetsträdet. Enda nätåtkomst: `git fetch origin main`
+# (uppdaterar origin/main). Skriver ut hela lägesbilden, MÄTT.
 #
 #     bash docs/loop/raddning/artefakter/helhetsbilden.sh              # snabb, ~2 sek
-#     bash docs/loop/raddning/artefakter/helhetsbilden.sh --kor-grindar # kör de 14, Darwin
+#     bash docs/loop/raddning/artefakter/helhetsbilden.sh --kor-grindar # kör registrerade grindar, Darwin
 #
 # VARFÖR DEN FINNS. Ägaren 2026-09-16: "det första måste ju vara skapa en bild av
 # helheten, hjälper inte dokumentationen till med det? DETTA är varför vi snurrar
-# runt i galenskap varje gång."
+# runt i galenskap varje gång." Svaret var nej: docs/loop/raddning/ beskriver helheten
+# på fem överlappande sätt och ingen av dem visar LÄGET. Helheten räknas fram varje gång.
 #
-# Svaret var nej. docs/loop/raddning/ är 20 filer och ~4000 rader som beskriver
-# helheten på fem överlappande sätt, och ingen av dem visar LÄGET. Ett dokument om
-# ett tillstånd är inaktuellt dagen efter — det är projektets egen lag, och skälet
-# till att status bor i drift.md. Helheten måste alltså RÄKNAS FRAM varje gång,
-# aldrig skrivas ner.
+# VAD DEN MÄTER, OCH VAD DEN INTE PÅSTÅR (AUD-01, 2026-09-17). Provet läser slutkriteriets
+# sex rader ur VAGEN.md §1 och skiljer för varje grind på finns / specad / fryst /
+# registrerad / körd PASS via _grindlage.sh (som bara wrappar controller/verify/cli).
+# Grönt kräver ett kört PASS genom registret. En grindFIL är aldrig ett PASS — den
+# gamla versionen räknade `-f` som uppfyllt och kunde skriva KERNEL_COMPLETE med tre
+# grindar som aldrig körts. Utan --kor-grindar står det "kräver körning"; på fel
+# plattform ODÖMBART; oregistrerad grind är gul, aldrig grön (diagnostik bor i
+# matning-pa-macen.sh). Slutningen läses ur specens depends_on från h-015 — ingen
+# hårdkodad lista, så h-017 och h-027–h-030 kommer med den dag h-030 finns.
 #
-# Provet läser slutkriteriets sex rader ur VAGEN.md §1 och mäter var och en.
-# Det påstår ALDRIG ett grindutfall det inte kört: utan --kor-grindar står det
-# "kräver körning", och på fel plattform står det ODÖMBART. Aldrig PASS.
+# Exitkod: 0 = alla sex rader UPPFYLLDA · 1 = minst en rad SAKNAS/FEL · 2 = inget saknas
+# men något är ODÖMBART/ej kört. Ett ODÖMBART blir aldrig grönt.
 
 set -u
 KOR_GRINDAR=0
@@ -24,6 +29,7 @@ KOR_GRINDAR=0
 
 ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "inte ett git-repo"; exit 2; }
 cd "$ROT" || exit 2
+GL_ROT="$ROT"; . "$ROT/docs/loop/raddning/artefakter/_grindlage.sh"
 
 gron()  { printf '\033[32m%s\033[0m' "$1"; }
 rod()   { printf '\033[31m%s\033[0m' "$1"; }
@@ -49,23 +55,26 @@ printf '   arbetsträd  %s okommitterade  ' "$SMUTS"
 [ "$SMUTS" = "0" ] && gron "rent" || gul "grindkörning på smutsigt träd ger tal som ser ut som evidens"; echo
 
 printf '   autopush    '
+# JA bara om hooken är installerad OCH byteidentisk med repots — en stale kopia utan
+# vakterna mot länkade worktrees pushar grindfixturer (L1c). `-x` räckte inte (AUD-02).
 HP="$(git config --get core.hooksPath 2>/dev/null || true)"
-if [ -n "$HP" ] && [ -x "$HP/post-commit" ]; then gron "på — varje commit pushas (regel 12)"
+HOOKVAKT=0
+if [ -n "$HP" ] && [ -x "$HP/post-commit" ] && cmp -s .githooks/post-commit "$HP/post-commit"; then
+  gron "på — varje commit pushas (regel 12), hooken identisk med repots"; HOOKVAKT=1
+elif [ -n "$HP" ] && [ -x "$HP/post-commit" ]; then
+  rod "hooken i $HP SKILJER från repots .githooks/post-commit — bash scripts/installera-hooks.sh --kor"
 elif [ -n "$HP" ]; then rod "core.hooksPath=$HP men post-commit saknas eller är inte körbar"
-else gul "AV — arbete kan bli kvar lokalt. bash scripts/installera-hooks.sh"; fi; echo
+else gul "AV — arbete kan bli kvar lokalt. bash scripts/installera-hooks.sh --kor"; fi; echo
 
 printf '   granskning  '
-# Provet påstår ALDRIG att granskningen fungerar. Härifrån går bara att mäta att
-# workflowen (vaktsvit + skalprov) finns SPÅRAD på grenen — en fil som inte är
-# committad existerar inte för GitHub Actions. Diffgranskningen sker av en separat
-# process (AGENTS.md steg 3), och om main kräver checkarna är en serverinställning
-# som ingen lokal körning kan se: ODÖMBART, aldrig grön, blir aldrig grön av filen.
+# Härifrån går bara att mäta att workflowen finns SPÅRAD på grenen. Diffgranskningen sker
+# av en separat process (AGENTS.md); om main kräver checkarna är en serverinställning.
 if git ls-files --error-unmatch .github/workflows/granska-pr.yml >/dev/null 2>&1; then
   gul "workflow spårad (vaktsvit + skalprov) · diffgranskning = separat process · required checks på main: ODÖMBART härifrån"
 elif [ -f .github/workflows/granska-pr.yml ]; then
   rod "filen finns men är OSPÅRAD — vitlistan har svalt den, Actions ser den aldrig"
 else
-  rod "ingen granska-pr.yml — PR:er mergas ogranskade (AGENTS.md steg 2)"
+  rod "ingen granska-pr.yml — PR:er mergas ogranskade (AGENTS.md)"
 fi; echo
 
 printf '   färskhet    '
@@ -80,62 +89,67 @@ echo
 echo "2. SLUTKRITERIET — KERNEL_COMPLETE, sex rader (VAGEN.md §1)"
 echo
 
-UPPFYLLDA=0
-rad() { # nr, text, tillstånd, detalj
+JA=0; NEJ=0; OD=0
+rad() { # nr, text, tillstånd(JA|NEJ|OD), detalj
   printf '   %s  %-46s ' "$1" "$2"
   case "$3" in
-    JA)   gron "UPPFYLLT"; UPPFYLLDA=$((UPPFYLLDA+1)) ;;
-    NEJ)  rod  "SAKNAS" ;;
-    *)    gul  "$3" ;;
+    JA)  gron "UPPFYLLT"; JA=$((JA+1)) ;;
+    NEJ) rod  "SAKNAS";   NEJ=$((NEJ+1)) ;;
+    *)   gul  "ODÖMBART"; OD=$((OD+1)) ;;
   esac
   [ -n "${4:-}" ] && printf '  %s' "$4"
   echo
 }
+# En grindrad ur stegens token: JA endast vid exakt PASS; tokenen skrivs alltid ut.
+grindrad() { # nr, text, id
+  grindlage "$3" "$KOR_GRINDAR" 0 >/dev/null
+  local k; k="$(gl_klass "$GL_TOKEN")"
+  case "$k" in ja) rad "$1" "$2" JA "$GL_TOKEN($GL_KOD)" ;;
+               od) rad "$1" "$2" OD "$GL_TOKEN — $GL_DETALJ" ;;
+               *)  rad "$1" "$2" NEJ "$GL_TOKEN($GL_KOD) — $GL_DETALJ" ;; esac
+}
 
-# Krav 1 — de fjorton grindarna
-GRINDAR="001 002 003 004 005 006 007 008 009 010 011 012 013 016"
-FINNS=0; for h in $GRINDAR; do [ -f "verify/bin/h-$h-exit" ] && FINNS=$((FINNS+1)); done
-if [ "$KOR_GRINDAR" = "1" ] && [ "$OS" = "Darwin" ]; then
-  P=0; F=0; A=0; RAD=""
-  for h in $GRINDAR; do
-    G="verify/bin/h-$h-exit"
-    [ -f "$G" ] || { A=$((A+1)); RAD="$RAD h-$h:-"; continue; }
-    bash "$G" >/dev/null 2>&1; K=$?
-    case $K in 0) P=$((P+1));; 1) F=$((F+1));; *) A=$((A+1));; esac
-    RAD="$RAD h-$h:$K"
-  done
-  [ "$F" = "0" ] && [ "$A" = "0" ] && rad 1 "h-015:s beroendeslutning grön (14 grindar)" JA "$P/14" \
-                                  || rad 1 "h-015:s beroendeslutning grön (14 grindar)" "$P/14 PASS · $F FAIL · $A annat"
-  echo "       RAD:$RAD"
-elif [ "$KOR_GRINDAR" = "1" ]; then
-  rad 1 "h-015:s beroendeslutning grön (14 grindar)" "ODÖMBART" "fel plattform ($OS)"
+# Krav 1 — h-015:s beroendeslutning, läst ur specen. Aldrig en hårdkodad lista.
+if [ "$KOR_GRINDAR" = 1 ] && [ "$OS" = "Darwin" ] && [ "$HOOKVAKT" != 1 ] && [ -n "$HP" ]; then
+  rad 1 "h-015:s beroendeslutning grön" OD "grindkörning stoppad: hooken i $HP saknar vakterna (L1c) — fixturcommits skulle pushas"
 else
-  rad 1 "h-015:s beroendeslutning grön (14 grindar)" "kräver körning" "$FINNS/14 grindfiler finns · --kor-grindar"
+  N=0; P=0; NEJ_N=0; OD_N=0; REG=0; FRYS=0; SAKN=""; RAD=""
+  for id in $(gl_slutning h-015); do
+    case "$id" in SAKNAS:*) SAKN="$SAKN ${id#SAKNAS:}"; NEJ_N=$((NEJ_N+1)); RAD="$RAD ${id#SAKNAS:}:EJ_SPECAD"; continue;; esac
+    N=$((N+1)); grindlage "$id" "$KOR_GRINDAR" 0 >/dev/null
+    [ -n "$GL_VID" ] && REG=$((REG+1)); [ "$GL_FRYS" != "-" ] && FRYS=$((FRYS+1))
+    case "$(gl_klass "$GL_TOKEN")" in ja) P=$((P+1));; od) OD_N=$((OD_N+1));; *) NEJ_N=$((NEJ_N+1));; esac
+    RAD="$RAD $id:$GL_TOKEN($GL_KOD)"
+  done
+  N_TOT=$((N + $(printf '%s' "$SAKN" | wc -w | tr -d ' ')))
+  if [ -n "$SAKN" ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "$N_TOT noder ·$SAKN SAKNAS I SPEC · $P PASS"
+  elif [ "$NEJ_N" -gt 0 ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "$P/$N PASS · $NEJ_N röda · $OD_N odömbara"
+  elif [ "$KOR_GRINDAR" != 1 ]; then rad 1 "h-015:s beroendeslutning grön" OD "kräver körning · $REG/$N registrerade · $FRYS/$N frysta · --kor-grindar"
+  elif [ "$OD_N" -gt 0 ]; then rad 1 "h-015:s beroendeslutning grön" OD "$P/$N PASS · $OD_N odömbara ($REG/$N registrerade)"
+  else rad 1 "h-015:s beroendeslutning grön" JA "$P/$N PASS via controller/verify/cli"; fi
+  echo "       RAD:$RAD"
 fi
 
-# Krav 2-6 — mekaniskt mätbara utan att köra något
-[ -f verify/bin/h-014-exit ] && rad 2 "h-014 har en fryst grind" JA || rad 2 "h-014 har en fryst grind" NEJ
-# h-027..h-030 måste vara EGNA TASK, inte omnämnanden. Ett grep på "h-030"
-# träffar h-015:s depends_on och gav 1/4 där sanningen är 0/4 — mätt 2026-09-16,
-# rättat innan provet anfördes. Räkna id:n ur specen, aldrig textförekomster.
-SUB="$(python3 - <<'PY' 2>/dev/null || echo FEL
-import json
-d = json.load(open('specs/tasks.spec.json'))
-ts = d['tasks'] if isinstance(d, dict) and 'tasks' in d else d
-ids = {t.get('id') for t in (ts if isinstance(ts, list) else ts.values())}
-print(len(ids & {'h-027', 'h-028', 'h-029', 'h-030'}))
-PY
-)"
-if [ "$SUB" = "FEL" ]; then rad 3 "h-027..h-030 finns som task" "ODÖMBART" "kunde inte läsa specen"
-elif [ "$SUB" = "4" ]; then rad 3 "h-027..h-030 finns som task" JA
-else rad 3 "h-027..h-030 finns som task" NEJ "$SUB/4 (id i specen, inte omnämnanden)"; fi
-[ -f verify/bin/h-015-exit ] && rad 4 "h-015 har en fryst grind" JA || rad 4 "h-015 har en fryst grind" NEJ
-[ -f verify/bin/autonomous-loop-exit ] && rad 5 "programdomen finns" JA || rad 5 "programdomen finns" NEJ
-[ -f docs/loop/autonomy-kernel-v1-acceptance.md ] && rad 6 "acceptansfilen finns" JA || rad 6 "acceptansfilen finns" NEJ
+# Krav 2–6
+grindrad 2 "h-014 har en fryst grind som passerar" h-014
+SUB_SPEC=0; SUB_FRYST=0
+for id in h-027 h-028 h-029 h-030; do
+  grindlage "$id" 0 0 >/dev/null
+  case "$GL_TOKEN" in EJ_SPECAD|MISSBUNDEN|KRASCH) ;; *) SUB_SPEC=$((SUB_SPEC+1)) ;; esac
+  case "$GL_TOKEN" in GRIND_SAKNAS|TOM_GRIND|OFRYST|EJ_SPECAD|MISSBUNDEN|KRASCH) ;; *) SUB_FRYST=$((SUB_FRYST+1)) ;; esac
+done
+if [ "$SUB_SPEC" = 4 ] && [ "$SUB_FRYST" = 4 ]; then rad 3 "h-027..h-030 finns som task med fryst grind" JA "4/4 specade · 4/4 frysta"
+else rad 3 "h-027..h-030 finns som task med fryst grind" NEJ "$SUB_SPEC/4 specade (id i specen, inte omnämnanden) · $SUB_FRYST/4 frysta"; fi
+grindrad 4 "h-015 har en fryst grind som passerar" h-015
+grindrad 5 "programdomen finns och är grön" @verify/bin/autonomous-loop-exit
+ACC=docs/loop/autonomy-kernel-v1-acceptance.md
+if git ls-files --error-unmatch "$ACC" >/dev/null 2>&1 && [ -s "$ACC" ]; then rad 6 "acceptansfilen finns (spårad, icke-tom)" JA
+elif [ -e "$ACC" ]; then rad 6 "acceptansfilen finns (spårad, icke-tom)" NEJ "finns men är ospårad eller tom"
+else rad 6 "acceptansfilen finns (spårad, icke-tom)" NEJ; fi
 
 echo
-printf '   ⇒ %s av 6 uppfyllda.  ' "$UPPFYLLDA"
-[ "$UPPFYLLDA" = "6" ] && gron "KERNEL_COMPLETE" || echo -n "Vägen dit står i VAGEN.md §4."
+printf '   ⇒ %s uppfyllda · %s saknas · %s odömbara av 6.  ' "$JA" "$NEJ" "$OD"
+if [ "$JA" = 6 ]; then gron "KERNEL_COMPLETE"; else echo -n "Vägen dit står i VAGEN.md §4."; fi
 echo
 
 # ── 3. PLATTFORMSGRENEN ─────────────────────────────────────────────────────
@@ -160,7 +174,6 @@ echo "   Regel 12: bash docs/loop/raddning/artefakter/inventera-lokalt-arbete.sh
 echo
 echo "══════════════════════════════════════════════════════════════════════"
 
-# Exitkod: 0 = allt uppfyllt · 1 = arbete kvar · 2 = kunde inte mätas
-[ "$OS" = "Darwin" ] || exit 2
-[ "$UPPFYLLDA" = "6" ] && exit 0
-exit 1
+[ "$NEJ" -gt 0 ] && exit 1
+[ "$OD" -gt 0 ] && exit 2
+exit 0

@@ -81,7 +81,7 @@ const PINNAR = {
   'check-paketlinser.mjs': 'a7f967b2e1df3fb3',
   'check-planner-routing.mjs': '8524b3da1901c5eb',
   'check-profile-contract.mjs': '5da81cc32582b46c',
-  'check-provanropare.mjs': '2c4c00c953d1b0c3',
+  'check-provanropare.mjs': 'c3cf8f4ccdb75da4',
   'check-research-contract.mjs': '4aa0aa5b5f281092',
   'check-v4-utkast.mjs': '3c107f8e300336f9',
   'check-verifierarregistret.mjs': '3e0ee0482b3d5565',

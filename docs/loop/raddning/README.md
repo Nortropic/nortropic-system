@@ -27,10 +27,12 @@ annanstans är den upphävd — `03`, `10` och `12` bär numera en banner som s�
 bash docs/loop/raddning/artefakter/redo-for-codex.sh    # på MACEN
 ```
 
-Tolv mekaniska rader — körbanan, regel 12, autopush, underlagets avvikelser, att
-`VAGEN.md` är hel, att ingen annan fil bär en egen ordning, att kartan är mätt.
-`exit 0` = redo · `exit 1` = raderna med ✗ säger vad som saknas · `exit 2` = kunde
-inte mätas här.
+Mekaniska rader — körbanan, regel 12, autopush (hooken måste vara identisk med repots),
+underlagets operativa avvikelser (validatorns exitkod är domen), att `VAGEN.md` är hel,
+att ingången inte bär en egen ordning, att kartan är mätt och bunden till en revision som
+är förfader till HEAD med oförändrad kärna. `exit 0` = redo · `exit 1` = raderna med ✗
+säger vad som saknas · `exit 2` = kunde inte mätas här. Prövat i
+`tests/scripts/redo-for-codex/fall.sh` (AUD-02, 2026-09-17).
 
 **Varför den finns:** frågan *"är vi redo?"* ställdes tjugo gånger utan definition,
 och ett svar som är en bedömning kan alltid visa sig vara för generöst när någon
@@ -59,9 +61,16 @@ status bor i `drift.md` — och samma skäl gäller helhetsbilden.
 bash docs/loop/raddning/artefakter/validera-underlaget.sh    # från reporoten, på MACEN
 ```
 
-37 av underlagets bärande påståenden prövas mot repot, med verdikt per rad.
-`exit 0` = talen stämmer · `exit 1` = underlaget bär ett fel (`AVVIKER`) · `exit 2` =
-något kunde inte mätas (`ODÖMBART`, blir aldrig grönt).
+Underlagets bärande påståenden prövas mot repot, med verdikt per rad — i **två sorter**
+(AUD-03, 2026-09-17): **historiska** rader mäts vid diagnosrevisionen `REV` (`28ca1af`,
+`VALIDERA_REV` för att ändra) med `git show`/`ls-tree`/`log` och får verdikt
+`BEKRÄFTAT@REV`/`AVVIKER@REV` — de flippar aldrig när vägen lyckas (att `h-014-exit`
+senare FINNS är FAS 4 som är klar, inte underlaget som är fel); **operativa** rader mäts på
+det levande trädet. `--operativt` kör bara de operativa raderna (så anropar
+`redo-for-codex.sh`) och hoppar även bundle-/patch-raderna. `exit 0` = stämmer · `exit 1` =
+minst ett `AVVIKER` (historiskt AVVIKER räknas bara i standardläget) · `exit 2` = något
+kunde inte mätas (`ODÖMBART`, blir aldrig grönt). Prövat i
+`tests/scripts/validera-underlaget/fall.sh`.
 
 Provet är mutationsprövat: fel förväntat tal ger `AVVIKER` + exit 1, saknad grindfil ger
 `ODÖMBART` + exit 2, och ingendera blir tyst grön.

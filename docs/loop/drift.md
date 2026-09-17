@@ -1,5 +1,70 @@
 # Att köra loopen
 
+## 2026-09-17 — L3: sanningsenliga start-/slutbesked — AUD-01/02/03/09/10 stängda (grindstege, helhetsbilden, redo, validera, inventera, matning + fem harnessar)
+
+### Vad som ändrats (uppdraget §4.3, auditens motexempel T01/T02/T05/T06/T07)
+- **`artefakter/_grindlage.sh`** (ny, sourcas): en gemensam stege som wrappar `controller/verify/cli` och dömer inget själv.
+  Token per grind: `EJ_SPECAD` · `MISSBUNDEN` (cli exit 4) · `GRIND_SAKNAS` · `TOM_GRIND` · `OFRYST` (otrackad eller diffar mot
+  HEAD) · `FRYST_EJ_REGISTRERAD` (gul, aldrig grön) · `REGISTRERAD_EJ_KORD` · `PLATTFORM_ODOMBART` · `PYTHON_SAKNAS` · körd:
+  `PASS(0)` grön **endast** med icke-tom utdata, `PASS_UTAN_UTDATA` gul, `FAIL(1)`, `ODOMBART(2)`, `VAGRAN(3)`, `INTEGRITET(4)`,
+  `AVBRUTEN(>128)`, `KRASCH(126/127)`; råexit alltid i parentes, `·diag` för direkt `bash` (aldrig kvalificerad). `gl_slutning`
+  = BFS över `depends_on` från `h-015` i `specs/tasks.spec.json`. Aggregat överallt: `nej>0 → 1; od>0 → 2; annars 0`.
+- **`helhetsbilden.sh`** omskriven: rad 1 = slutningen ur specen (ersätter hårdkodad `GRINDAR=`; saknat id = NEJ), rad 2/4/5 via
+  stegen (aldrig `-f`), rad 3 kräver 4/4 specade **och** frysta, rad 6 spårad + icke-tom, autopush-raden `cmp -s` mot
+  `~/.nortropic/githooks/post-commit`, hook-vaktstopp före grindkörning, header sann ("läser bara" — fetchar `origin/main`),
+  exit nej→1 / od→2. **Konsekvens:** rad 1 kan bara nå ODÖMBART tills slutningsgrindarna är registrerade i
+  `controller/verify/register.json` — det är ett kontraktsflöde (arkitekt/test-author; `register.json` är SHA-pinnad i
+  `controller/verify/cli`) och står i VÄGEN som steg före Milstolpe A (L5), inte tyst här. AUD-01/AUD-02 stängda.
+- **`redo-for-codex.sh`**: `v=$?` **är** domen (0 JA / 1 NEJ / 2 ODÖMBART / annat NEJ "krasch exit N"); anropar
+  `validera-underlaget.sh --operativt`; "kartan är mätt" binds mekaniskt: `RAD: h-001`-block i drift.md med backtickad sha som är
+  förfader till HEAD **och** `git diff --quiet <sha> HEAD -- verify/bin controller specs`; autopush = `cmp -s`; `mktemp` i stället
+  för fasta `/tmp/redo-*.txt`. AUD-03 stängd: landning av en leverans fäller inte längre redo.
+- **`validera-underlaget.sh`**: `REV=${VALIDERA_REV:-28ca1af}` (diagnosrevisionen); historiska rader mäts vid `$REV` via
+  `git cat-file/ls-tree/show` → `BEKRÄFTAT@28ca1af` / `AVVIKER@28ca1af` och flippar aldrig när vägen lyckas; `--operativt` hoppar
+  historiska + bundle/patch-raderna (permanent ODÖMBART i repot — skälet till att `v` ignorerades). README: `ÖVERFLÖDIGA` vs
+  `AVSIKTLIGT UTELÄMNADE` rättade, hårda tal borta. AUD-09/AUD-10 stängda.
+- **`inventera-lokalt-arbete.sh`**: `git branch -r --contains "$h" --list 'origin/*'` på båda ställen (lokala grenar räknades
+  som "på origin"); "Städning kan ske…" skrivs **endast** om `IG_TOT=0`, annars `STÄDNING EJ FRIKÄND — N ignorerade filer i M träd
+  omätta (regel 13b:4)`; header sann; rapport till `${NORTROPIC_RAPPORT_KAT:-~/.nortropic/rapporter}/`, inte `/tmp`.
+- **`matning-pa-macen.sh`**: slutning ur specen; registrerad → `cli run` (`PASS·kval`), ofryst/oregistrerad → `bash` (`PASS·diag`,
+  aggregat ≥ 2); full utdata per grind till `$LOGGKAT/h-XXX.txt`; restkontroll = sorterad `git status --porcelain
+  --ignored=matching -uall` före/efter + HEAD oförändrad; aggregat 0/1/2.
+
+### Prov (harness som `installera-hooks/fall.sh`: `mktemp -d`, bare origin + klon, eget `$HOME`, PATH-shim för `uname -s`, kopia av
+`controller/verify/cli`, syntetiskt register/spec/grindar)
+`tests/scripts/helhetsbilden/fall.sh` **17** (H1=T01: hårdkodad lista vs spec; H2b: ingen KERNEL_COMPLETE utan körning; H3 positivt;
+H4 stegens tokens; H5 hook-vakt; H6 exit-algebra; H7 fel plattform ODÖMBART; H8 `cmp` hook; H9 header) ·
+`tests/scripts/redo-for-codex/fall.sh` **11** (R1=T02: `v` är domen; R2 `--operativt`; R3 positivt; R4 kartbindning: sha ej förfader /
+verify ändrad / saknat block; R5 `cmp`; R6 mktemp) · `tests/scripts/validera-underlaget/fall.sh` **11** (V1 historiska vid REV
+flippar inte när trädet ändras; V2 `--operativt`; V3 `AVVIKER@REV` när REV-innehållet avviker; V4 README-tal) ·
+`tests/scripts/inventera-lokalt-arbete/fall.sh` **6** (I1=T05 `--list origin/*`; I2 positivt; I3=T06 städning ej frikänd; I4
+header; I5 rapportkatalog; I6 IG_TOT=0) · `tests/scripts/matning-pa-macen/fall.sh` **5** (M1=T07 diag ≠ kval; M2 LOGGKAT; M3
+positivt; M4 restkontroll; M5 aggregat). Mutanter (återinförd `-f`, ignorerat `v`, borttaget `--list origin/*`, `wc -l`-jämförelse,
+diag räknad som kval, städning frikänd trots ignorerade) fälls — `l3/mut/`. Registerrader ×5 (`check-provanropare.mjs`,
+källhash ompinnad), workflowens `provsviter`-lista +5, `check-vaktankare.mjs --pinna-om`.
+
+### Körda på Darwin i `~/kernel-arbete` efter patchen (sanna rader)
+Före commit (arbetsträdet bär L3-filerna okommitterade — det syns, och det är rätt):
+- `helhetsbilden.sh` → **exit 1**: *"0 uppfyllda · 6 saknas · 0 odömbara av 6"*. Rad 1: `SAKNAS — 15 noder · h-030 SAKNAS I SPEC
+  · 0 PASS`, per grind `FRYST_EJ_REGISTRERAD(-)` (h-001…h-016: frysta i `verify/bin/`, ingen i `register.json`); rad 2/4/5
+  `GRIND_SAKNAS(-)` (h-014-exit, h-015-exit, autonomous-loop-exit finns inte); rad 3 `0/4 specade · 0/4 frysta`; rad 6 saknas.
+  Ingen KERNEL_COMPLETE, inget `-f`, inget grindutfall som inte körts. Plattformsgrenen: 55 före / 145 efter main, fem kärnfiler
+  skiljer (controller/launch, policy, verify/cli, register.json, specs). Att rad 1 är NEJ (inte ODÖMBART) beror på att h-030
+  saknas i specen — slutningen är ofullständig, vilket är sant.
+- `redo-for-codex.sh` → **exit 1, "INTE REDO"** med exakt två ✗: *arbetsträdet rent (15 okommitterade)* och *regel 12* — båda
+  ÄR den okommitterade L3-leveransen; övriga tio ✓ inkl. *underlaget (operativt): inga AVVIKER* (AUD-03-flippen borta) och
+  *kartan är mätt (RAD i drift.md, revision bunden) mätt på 28ca1af*.
+- `validera-underlaget.sh --operativt` → **exit 0** (19 rader BEKRÄFTAT/ODÖMBART-fria operativa rader); utan flaggan exit 2
+  (bundle/patch-raderna, permanent ODÖMBART i repot — det står nu i README).
+- `inventera-lokalt-arbete.sh` → **exit 1**: 1 worktree OSÄKRAT okommitterat (= detta träd), 8 fristående kloner, 0 föräldralösa,
+  0 grenar utanför origin; städning EJ frikänd förrän ignorerade filer mätts; rapport `~/.nortropic/rapporter/lokalt-arbete-20260917-184405.txt`.
+EFTER_COMMIT_PLATSHALLARE
+
+### Auditdisposition
+AUD-01 ✔ (slutningen ur specen, h-017/h-027–030 med) · AUD-02 ✔ (stegen, aldrig `-f`) · AUD-03 ✔ (`v` är domen,
+`--operativt`) · AUD-09 ✔ (`--list origin/*`) · AUD-10 ✔ (städning frikänns bara vid IG_TOT=0). Kvar: AUD-04–07/12 (L5),
+AUD-08 (L4), AUD-11 (L6/L7).
+
 ## 2026-09-17 — L2: en ingång — AGENTS.md och CLAUDE.md bär samma kontrakt, byteidentiska med vakt (import- och länkformen mättes och föll); PROMPT-TILL-CODEX.txt avförd
 
 ### Vad som ändrats (uppdraget §4.1/§4.2)
