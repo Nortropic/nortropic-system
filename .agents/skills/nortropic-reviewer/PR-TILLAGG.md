@@ -68,8 +68,9 @@ Hemvisten för kernelarbete är `docs/loop/drift.md` och `docs/05-beslutslogg.md
 **6. En §A-yta ändrad — eller granskarens egen konfiguration.**
 `docs/07-konstitution.md`, `docs/03-regelverk.md` och `CLAUDE.md` ändras bara av en
 människa. Rör diffen dem är det ett fynd, oavsett hur rimlig ändringen ser ut.
-`.github/workflows/**`, `.agents/skills/nortropic-reviewer/**` och
-`scripts/check-granskningsmekanismen.mjs` är inte §A men är **granskarens konfiguration**:
+`.github/workflows/**`, `.agents/skills/nortropic-reviewer/**`, `scripts/check-granskningsmekanismen.mjs`,
+`scripts/publicera.sh` och `.claude/settings.json` är inte §A men är **granskarens konfiguration**
+(rör kandidaten `publicera.sh` kör kedjedrivaren mekanismen ur `origin/main`:s version):
 en kandidat som ändrar dem granskas av en text den själv skrivit. Rör diffen dem är det ett
 eget fynd att pröva särskilt noga (uppdraget §6, 2026-09-17).
 

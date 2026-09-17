@@ -32,9 +32,10 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # VAKT 1 — länkad worktree. De fjorton grindarna (t.ex. verify/bin/h-007-exit) och kernelns
 # kandidatytor (controller/workspace/cli) gör `git worktree add` i den RIKTIGA klonen och
-# committar där. Deras commits är fixturer och kandidater, inte bevarandeobjekt: en generisk
-# push hade publicerat h007-prov-<pid> och radda/auto-* på origin (mätt 2026-09-17). En
-# länkad worktree känns igen på att dess git-dir ligger under huvudrepots .git/worktrees/.
+# committar där. Deras commits är fixturer och kandidater, inte bevarandeobjekt: utan vakten
+# skulle en generisk push publicera h007-prov-<pid> och radda/auto-* på origin (hooksPath-
+# arvet mätt 2026-09-17; ingen fixtur nådde origin). En länkad worktree känns igen på att
+# dess git-dir ligger under huvudrepots .git/worktrees/.
 if [ "$(git rev-parse --git-dir 2>/dev/null)" != "$(git rev-parse --git-common-dir 2>/dev/null)" ]; then
   echo "post-commit: länkad worktree (grind-/kandidatyta) — ingen autopush härifrån." >&2
   exit 0
