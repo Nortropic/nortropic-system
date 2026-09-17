@@ -2,12 +2,95 @@
 
 ## 2026-09-17 — L1b: publicera.sh — bevara → PR → separat granskning → merge som mekanism; L0 landad; evidensundantag i installeraren
 
+### Fjärde självgranskningen (13:20–13:46 CEST): granskaren hade ägarens gh-inloggning — spärrar mätta mot riktig `claude`
+Mekanismen granskade sig själv en fjärde gång (`claude -p`, separat process, PR #264 @ `11993795`) och gav
+`DOM: FYND` med **ett blockerande fynd**: granskarprocessen svarade `Logged in to github.com account
+Jonkebronk` på `gh auth status`. Orsak, mätt av granskaren: `--setting-sources user` laddar ägarens
+`~/.claude/settings.json`, vars `env` sätter `GH_CONFIG_DIR=~/nortropic/.gh-sandbox-config` och därmed
+skriver över mekanismens tomma katalog; verktygslistan nekade inte `gh`. Tre underlag (skriptets
+kommentar, drift, beslutsloggsraden) påstod "utan drivarens gh-/ssh-credentials" — det påståendet var
+osant och är struket. Rättelsen är tre **mekaniska** lager i steg 4, inte prompttext:
+(a) `--disallowedTools` bär `Bash(gh:*)`, `Bash(<absolut sökväg till gh>:*)`, `Bash(git push:*)`,
+`Bash(git -C:*)` (prefixmönstret `git push` matchar inte `git -C … push`), `git worktree/branch/switch/
+remote/config` och alla skrivverktyg; (b) granskarens `PATH` börjar med en katalog där `gh` är ett skal som
+vägrar (exit 77) — oavsett kommandoform (`X=1 gh …`); (c) git-transporten är död:
+`GIT_SSH_COMMAND=false`, `GIT_TERMINAL_PROMPT=0`, `credential.helper` nollad och
+`remote.origin.pushurl` → ogiltig sökväg via `GIT_CONFIG_COUNT`, så en push kan inte lyckas ens om (a)
+kringgås. `GH_CONFIG_DIR` sätts fortfarande men bär inget skydd (användarinställningen vinner) — det står
+nu så i skriptet. Granskarens prompt säger att GitHub-läget kontrolleras av mekanismen efter den.
+
+**Mätt mot riktig `claude` (inte stubben), samma startform som steg 4, mätprompt med tolv kommandon,
+bevis under `~/nortropic-bevis/publicera-sparrar-<stamp>/` (identitet, svar, rc):**
+| Mätprov (claude 2.1.257, macOS, `~/kernel-arbete` @ `11993795`) | Resultat |
+|---|---|
+| **1** (`publicera-sparrar-20260917T115917Z`, spärr via lösa miljövariabler + nekanden): `gh auth status`, `/opt/homebrew/bin/gh auth status`, `X=1 gh auth status`, `X=1 git push --dry-run …` (origin / ssh-URL / https-URL), `git -C . rev-parse HEAD`, `git config --get …` | alla **NEKAD** av behörighetssystemet |
+| 1: `printenv GH_CONFIG_DIR GIT_SSH_COMMAND GIT_TERMINAL_PROMPT` | **bara** `GH_CONFIG_DIR` skrevs ut, med värdet ur ägarens `settings.json` (`~/nortropic/.gh-sandbox-config`), inte mekanismens tomma katalog; `GIT_*` saknades helt — lösa miljövariabler når inte granskarens Bash |
+| 1: `which gh` | `…/publicera-sparr.*/gh` — PATH ärvs |
+| **2** (`…T120535Z`, PATH-skal gh/git/ssh + `--settings '{"env":{"GH_CONFIG_DIR":…}}'`): `printenv GH_CONFIG_DIR` | mekanismens `…/publicera-sparr.*/gh-tom` — kommandoradens `--settings` slår användarinställningen |
+| 2: `which gh git ssh` | alla tre = skalen |
+| 2: `gh auth status`, `X=1 git push --dry-run …` | NEKAD |
+| 2: `bash tests/../../../../<scratch>/pushprov.sh` (traversering som matchar allow-prefixet `bash tests/`; skriptet provar absolut `/usr/bin/git push` över ssh och https samt `/opt/homebrew/bin/gh auth status`) | **NEKAD av auto-mode-klassificeraren** ("Blocked by classifier") — luckan nåddes inte via Claude; se lokal mätning nedan |
+| **3** (`…T121131Z`, `GIT_*` dessutom via `--settings`): `printenv GH_CONFIG_DIR GIT_SSH_COMMAND … GIT_CONFIG_KEY_1` | **bara** `GH_CONFIG_DIR` — `GIT_*` når inte granskarens Bash ens via `--settings`. Därför bär skriptet **inga** `GIT_*`-variabler (ett skydd som inte når fram vore felklass 2) |
+| 3: `git ls-remote --heads origin main` (git = skalet) | `fatal: Could not read from remote repository` — skalets `GIT_SSH_COMMAND=false` verkar |
+| **Lokalt, utan Claude** (`l1b-r5/luckor-lokalt.sh`, `g4.log`, samma PATH-skal, stdin stängd, utan askpass): G1 `/opt/homebrew/bin/gh auth status` med tom `GH_CONFIG_DIR` | rc 1 `You are not logged into any GitHub hosts` |
+| G2/G3 `/usr/bin/git push --dry-run` ssh-URL resp. `origin` (git via **absolut** sökväg, `ssh` slås upp i PATH) | rc 128 `ssh är avstängt för granskaren … Could not read from remote repository` |
+| G4 `/usr/bin/git push --dry-run https://github.com/…` (absolut git, https) | **KVARSTÅENDE LUCKA:** `git-credential-osxkeychain get` blockerar >46 s (nyckelringen; en GUI-fråga på ägarens skärm är möjlig — OVERIFIERAT om den visades); efter att hjälparen dödats: `could not read Username … Device not configured`. Ingen ref skapades. Vägen dit kräver att både nekandet `Bash(/usr/bin/git:*)` och klassificeraren kringgås via ett tillåtet skript; det är prompt + klassificerare som bär den, inte mekanism |
+| Efter alla prov: `git ls-remote --heads origin 'matprov-*'` | 0 refs |
+
+**Advisories ur samma granskning, alla tagna:** (2) `--granskare ci` räknar nu bara DOM-rader för exakt
+HEAD från botens konto och varje FYND-rad vinner (N11d, N11e; gh-stubben speglar `select(.user.login…)`
+i stället för att alltid svara som boten); (3) tom check-rollup är inte grön: väntande checks (tom
+conclusion/PENDING/QUEUED/IN_PROGRESS) och tom rollup pollas upp till `NORTROPIC_CHECK_VANTAN` s
+(standard 900, intervall 30) och blir stopp när tiden är slut (N6g, N6h, P4) — CI tar minuter,
+granskningen tog redan längre; (4) tre överlevande mutanter fälls nu: kvittokontrollen `origin/main^2 ==
+HEAD` (N13: stub-servern mergar fel commit), tom `--disallowedTools` (stubben kräver `Edit`, `Write`,
+`Bash(gh:*)`, `Bash(git push:*)`, `Bash(git -C:*)` i listan) och väggklockan (N14: sovande granskare +
+`NORTROPIC_GRANSKARE_TID=1` → ODÖMBART); (5) "fjorton mutanter" räknade upp tretton — rättat till en
+exakt räkning nedan; (6) `--odombart-ok`-skälet bokförs nu som PR-kommentar och i `KVITTO`-raden
+(`ODOMBART_OK=`), kan kommentaren inte postas sker ingen merge (N6b, N6f tomt skäl). `KVITTO` bär
+också `BAS=` (origin/main vid granskningen; steg 4 fetchar main först så intervallet gäller dagens bas).
+
+**Prov nu: 38 fall gröna** (29 + N6f, N6g, N6h, P4, N11d, N11e, N13, N14, P1c). **Mutanter, exakt
+räkning (24 byggda ur den rättade kandidaten, en rad ändrad per mutant, harnessen körd mot var och en):**
+| # | Mutant (en rad ändrad i `scripts/publicera.sh`) | Fälls av |
+|---|---|---|
+| 1 | kvittokontrollen `origin/main^2 == HEAD` bort | N13 |
+| 2 | `--disallowedTools ""` | P1 m.fl. (stubben kräver spärrarna i listan) |
+| 3 | väggklockan (`perl alarm`) bort | N14 |
+| 4 | `Bash(gh:*)`/`Bash(<gh>:*)` bort ur nekandet | P1 m.fl. (stubben) |
+| 5 | PATH-skalet bort | P1c |
+| 6 | git-skalet släpper igenom `push` | P1c |
+| 7 | tom check-rollup räknas grön | N6g |
+| 8 | ci: sista DOM-raden vinner | N11d |
+| 9 | ci: utan HEAD-filter | N11e |
+| 10 | `--odombart-ok` utan PR-kommentar | N6b |
+| 11 | ingen pollning av väntande checks | P4 |
+| 12 | claude: sista DOM-raden vinner | N4b |
+| 13 | SHA-prefix räcker | N3b |
+| 14 | merge trots opostat kvitto | N10 |
+| 15 | smutskontrollen efter granskning bort | N8 |
+| 16 | granskarens rc ignoreras | N2c |
+| 17 | `--match-head-commit` bort | P1 |
+| 18 | gh-fel vid checks = "ingen CI" | N6e |
+| 19 | PR-head-flytt efter granskning ignoreras | N5 |
+| 20 | ci: DOM från vem som helst (utan `select(.user.login…)`) | N11b (författarens egen TILLSTYRKS mergar) |
+| 21 | `--granskare ingen` tillåts | N1 |
+| 22 | `--odombart-ok`: delsträng av checknamnet räcker | N6d |
+| 23 | granskaren körs utan cwd = repot | N4 m.fl. (20 fall) |
+| 24 | sessionsvariablerna läcker till granskaren | P1b |
+| 25 | `--settings` utan `GH_CONFIG_DIR` | P1c |
+| 26 | ssh-skalet bort | P1c |
+
+**26 byggda, 26 fällda** (svep `l1b-r5/mutanter5.log` + `mutanter6.log`; nr 20 omkörd efter att gh-stubben
+gjorts trogen även utan `select`, `mutanter7.log`). Kända luckor som harnessen INTE mäter: att riktig
+`claude` ärver PATH och `--settings`-miljön (det mäts av mätproven ovan, inte av stubben), och G4.
+
 ### Mekanismen (ägarkrav 11:40: "auto PR review och push, så vi inte hamnar med 100 commits")
 `scripts/publicera.sh --repo <klon> [--gren] [--granskare claude|ci|ingen] [--utan-merge] [--odombart-ok "<check>: <skäl>"] [--torr]`
 körs av kedjedrivaren vid varje avslutad leverans. Sex steg, varje stopp synligt: (1) ren arbetskopia,
 gren ≠ main, HEAD på origin (pushar själv om det bara är lokalt; origin som inte är förfader → stopp, aldrig
 force); (2) PR mot main (öppnas om ingen finns; PR-nummer måste vara ett tal); (3) granskning av **hela**
-`origin/main..HEAD` i en **separat process**: `claude -p` i ren miljö (utan `CLAUDECODE`-variabler), rollen ur
+`origin/main..HEAD` i en **separat process**: `claude -p` i ren miljö (utan `CLAUDECODE`-variabler; gh, push och git-transport spärrade — se ovan), rollen ur
 `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`, inga skrivverktyg, endast läs-/git-läs-/
 prov-kommandon; arbetskopian måste vara ren efteråt; domen `DOM: TILLSTYRKS @<sha>` / `DOM: FYND @<sha>`
 postas som PR-review-kommentar; (4) FYND → stopp (samma gren, samma budget); (5) merge `--merge
@@ -25,7 +108,7 @@ trädet → stopp · N9 på main → stopp · P1 legitim grön kandidat → gran
 `--match-head-commit`, kvitto · P2 ingen PR → öppnas, granskad, mergad · P3 opushad commit → pushas,
 `--utan-merge` stannar efter granskningen · P0a–c owner/repo ur ssh-/https-URL · P1b granskaren körs med cwd = repot, utan sessions-/credentialvariabler och utan projekthookar · N2c DOM men rc≠0 → ODÖMBART · N3b 7-teckensprefix → ingen merge · N4b FYND följd av TILLSTYRKS → stopp · N6c/N6d `--odombart-ok` kräver exakt checknamn · N6e gh-fel vid checks → stopp · N10 kvittot kan inte postas → ingen merge · N11a–c `--granskare ci` bara från utpekat bot-konto · N12 fel spets före granskning → ingen granskare startad. **29 gröna.** Fjorton mutanter (utan SHA-kontroll,
 utan omkontroll av head, utan `--match-head-commit`, FYND mergar, röda checks ignoreras, smuts efter
-granskning, saknad DOM blir OK, gammal repo-regex, FYND-raden ignoreras, kvittofel ignoreras, ci utan bot-konto, gh-fel = ingen CI, projekthookar laddas) fälls alla; prefix-i-stället-för-likhet är en likvärdig mutant eftersom TILLSTYRKS-regexen redan kräver fullt 40-teckens SHA. **Mekanismens första körning mot sin egen PR fann en
+granskning, saknad DOM blir OK, gammal repo-regex, FYND-raden ignoreras, kvittofel ignoreras, ci utan bot-konto, gh-fel = ingen CI, projekthookar laddas) fälls (tretton uppräknade + rc≠0-mutanten som N2c fäller — "fjorton" var rätt tal men listan bar tretton; den exakta räkningen efter fjärde självgranskningen står ovan); prefix-i-stället-för-likhet är en likvärdig mutant eftersom TILLSTYRKS-regexen redan kräver fullt 40-teckens SHA. **Mekanismens första körning mot sin egen PR fann en
 bugg stubbarna dolde:** macOS `sed -E` saknar icke-giriga kvantifierare, `REPO` blev tomt och skriptet stannade
 fail-closed vid steg 2 — rättat med portabel regex, `--visa-repo` och en gh-stub som kräver giltigt `--repo`
 (P0a–c). **Andra körningen mot sig själv fann nästa:** `--allowedTools`/`--disallowedTools` är variadiska och svalde

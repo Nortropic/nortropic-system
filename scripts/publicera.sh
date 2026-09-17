@@ -16,12 +16,15 @@
 #   3  PR:ens head == lokal HEAD (annars har någon annan skrivit på grenen — STOPP)
 #   4  granskning av HELA intervallet main..HEAD i en SEPARAT process utan sessionshistorik
 #      (`claude -p`, rollen ur .agents/skills/nortropic-reviewer/SKILL.md + PR-TILLAGG.md,
-#      inga skrivverktyg). Domen måste bära exakt det SHA den läste. Rapporten läggs som
-#      PR-review-kommentar på GitHub — kvittot ska överleva denna maskin.
+#      inga skrivverktyg, inget gh, ingen push — se GRANSKARENS SPÄRRAR nedan). Domen måste
+#      bära exakt det SHA den läste. Rapporten läggs som PR-review-kommentar på GitHub —
+#      kvittot ska överleva denna maskin.
 #   5  merge (normal merge-commit, aldrig squash/rebase) ENDAST om: dom = TILLSTYRKS @HEAD,
-#      PR-head fortfarande == HEAD, alla checks gröna (röd check = vänta, även om den kan
-#      vara ODÖMBART — det säger du i så fall uttryckligen med --odombart-ok och skälet
-#      bokförs), och --match-head-commit skyddar mot en spets som flyttat under tiden.
+#      PR-head fortfarande == HEAD, checks finns och är gröna (väntande checks pollas upp
+#      till NORTROPIC_CHECK_VANTAN s; INGA checks alls = stopp, inte 'ingen CI'; röd check =
+#      stopp, även om den kan vara ODÖMBART — det säger du i så fall uttryckligen med
+#      --odombart-ok och skälet bokförs i KVITTO-raden OCH som PR-kommentar), och
+#      --match-head-commit skyddar mot en spets som flyttat under tiden.
 #   6  kvitto: PR, granskat SHA, merge-SHA, verifierat mot origin/main^2.
 #
 # VAD DEN INTE GÖR: committar inte, ändrar inte grinden, döljer inte fynd, mergar aldrig
@@ -29,6 +32,27 @@
 # avslutad leverans; `nortropic-autocommit.sh --publicera` anropar den när
 # NORTROPIC_PUBLICERA=1. Exitkoder: 0 mergad · 1 stopp (villkor saknas) · 2 ODÖMBART
 # (granskaren gav inget dömbart svar) · 3 fel i anropet.
+#
+# GRANSKARENS SPÄRRAR (mätta mot riktig `claude`, 2026-09-17 — se drift.md): domaren får
+# inte kunna merga, posta eller pusha. Verktygsspärrar räcker inte ensamma: prefixmönster
+# som `Bash(git push:*)` matchar varken `git -C … push` eller `X=1 git push`, och
+# `--setting-sources user` laddar ägarens ~/.claude/settings.json vars `env` skriver över
+# mekanismens GH_CONFIG_DIR (mekanismens fjärde granskning av sig själv, fynd 1: granskaren
+# svarade `Logged in … Jonkebronk`). Därför tre lager, alla mekaniska:
+#   (a) verktygsnekande: gh (kort och absolut sökväg), git push/-C/worktree/branch/switch/
+#       remote/config, git via absolut sökväg, alla skrivverktyg;
+#   (b) PATH-skal först i granskarens PATH: `gh` vägrar (exit 77), `git` vägrar `push` och
+#       kör annars den riktiga binären med död ssh-transport, `ssh` vägrar (255). Skalen
+#       verkar oavsett kommandoform (`X=1 gh …`, inifrån ett skript) så länge PATH ärvs —
+#       och PATH ärvs (mätt);
+#   (c) GH_CONFIG_DIR → tom katalog via `--settings` (kommandoraden slår användarinställningen;
+#       en lös miljövariabel gjorde det inte — det var fynd 1), så att inte ens en absolut
+#       sökväg till gh inifrån ett tillåtet skript hittar en inloggning.
+#   Mätt tre gånger mot riktig claude: GIT_*-variabler (GIT_SSH_COMMAND, GIT_CONFIG_COUNT …) når
+#   INTE granskarens Bash, varken lösa eller via --settings — därför bär miljön ingen git-spärr;
+#   ssh-döden ligger i git-skalet (sätter GIT_SSH_COMMAND=false för den riktiga binären) och i
+#   ssh-skalet (git via absolut sökväg slår upp `ssh` i PATH). Kvarstående lucka: https-push via
+#   absolut sökväg till git inifrån ett tillåtet skript — se drift.md för mätningen.
 set -u
 
 ROT=""; GREN=""; GRANSKARE="claude"; UTAN_MERGE=0; TORR=0; ODOK=""; VISA_REPO=0
@@ -110,32 +134,46 @@ case "$GRANSKARE" in
     # Utan utpekat konto vägrar läget: en DOM-rad från vem som helst (t.ex. författaren) vore
     # exakt den självcertifiering mekanismen finns för att hindra (mekanismens egen granskning
     # av sig själv, fynd 2, 2026-09-17).
+    g fetch -q origin main 2>/dev/null || true; BAS_SHA="$(g rev-parse origin/main)"
     BOT="${NORTROPIC_CI_GRANSKARE:-}"
     [ -n "$BOT" ] || stopp "--granskare ci: granskningsjobbet är inte påslaget — sätt NORTROPIC_CI_GRANSKARE=<jobbets konto> när det finns"
-    DOM="$($GH api "repos/$REPO/pulls/$PRNR/reviews" --jq ".[] | select(.user.login == \"$BOT\") | .body" 2>/dev/null | grep -E '^DOM: (TILLSTYRKS|FYND) @[0-9a-f]{7,40}' | tail -1)"
-    [ -n "$DOM" ] || odombart "ingen DOM-rad från $BOT i PR #$PRNR:s reviews"
+    # Bara DOM-rader för exakt denna HEAD räknas (en äldre review binder inte kandidaten), och
+    # varje FYND-rad vinner över en senare TILLSTYRKS (samma felklass som N4b, fynd 2 i
+    # mekanismens fjärde granskning av sig själv).
+    RADER="$($GH api "repos/$REPO/pulls/$PRNR/reviews" --jq ".[] | select(.user.login == \"$BOT\") | .body" 2>/dev/null | grep -E "^DOM: (TILLSTYRKS|FYND) @$HEAD_SHA( |\$)" || true)"
+    if printf '%s\n' "$RADER" | grep -q '^DOM: FYND'; then DOM="$(printf '%s\n' "$RADER" | grep '^DOM: FYND' | head -1)"
+    else DOM="$(printf '%s\n' "$RADER" | grep '^DOM: TILLSTYRKS' | tail -1)"; fi
+    [ -n "$DOM" ] || odombart "ingen DOM-rad för $HEAD_SHA från $BOT i PR #$PRNR:s reviews"
     ;;
   claude)
     [ -f "$ROT/.agents/skills/nortropic-reviewer/SKILL.md" ] || stopp "granskarrollen saknas i repot"
-    PROMPT="Du är nortropic-reviewer: OBEROENDE och READ-ONLY. Du har inte skrivit denna kod. Läs och följ ordagrant .agents/skills/nortropic-reviewer/SKILL.md och .agents/skills/nortropic-reviewer/PR-TILLAGG.md. Granska HELA intervallet origin/main..HEAD (kommando: git diff origin/main...HEAD; git log --oneline origin/main..HEAD) i detta repo. Ändra ingenting i arbetsträdet, committa inget. Mutationer och experiment gör du i KOPIOR under mktemp (t.ex. PUBLICERA=<kopia> bash tests/…). Verifiera varje misstanke mekaniskt innan du rapporterar. Skriv fynden numrerade, allvarligast först, med fil:rad, kommando, observerat, verdikt (BLOCKERANDE/ADVISORY/OK) och minsta åtgärd. AVSLUTA med exakt en rad på formen 'DOM: TILLSTYRKS @$HEAD_SHA' eller 'DOM: FYND @$HEAD_SHA — blockerande: #n, #m'. SHA:t måste vara exakt $HEAD_SHA."
+    PROMPT="Du är nortropic-reviewer: OBEROENDE och READ-ONLY. Du har inte skrivit denna kod. Läs och följ ordagrant .agents/skills/nortropic-reviewer/SKILL.md och .agents/skills/nortropic-reviewer/PR-TILLAGG.md. Granska HELA intervallet origin/main..HEAD (kommando: git diff origin/main...HEAD; git log --oneline origin/main..HEAD) i detta repo. Ändra ingenting i arbetsträdet, committa inget. Mutationer och experiment gör du i KOPIOR under mktemp (t.ex. PUBLICERA=<kopia> bash tests/…). GitHub-läget (PR, checks, reviews) kontrolleras av mekanismen efter dig — gh och push är avstängda för dig. Verifiera varje misstanke mekaniskt innan du rapporterar. Skriv fynden numrerade, allvarligast först, med fil:rad, kommando, observerat, verdikt (BLOCKERANDE/ADVISORY/OK) och minsta åtgärd. AVSLUTA med exakt en rad på formen 'DOM: TILLSTYRKS @$HEAD_SHA' eller 'DOM: FYND @$HEAD_SHA — blockerande: #n, #m'. SHA:t måste vara exakt $HEAD_SHA."
     [ "$TORR" = 1 ] && { echo "torr: skulle starta granskare för ${HEAD_SHA:0:12}"; exit 0; }
     # Ren process: inga ärvda sessionsvariabler, inga skrivverktyg, cwd = repot. Prompten går
     # på STDIN: --allowedTools/--disallowedTools är variadiska och svalde annars prompten som
     # ett verktygsnamn (mekanismens andra körning mot sig själv, 2026-09-17 12:59).
     # Granskaren får inte kandidatens hookar (.claude/settings.json → autocommit av kandidatkod:
-    # --setting-sources user), inte drivarens gh-/ssh-credentials (tom GH_CONFIG_DIR, utan
-    # SSH_AUTH_SOCK/GH_TOKEN), och en väggklocka (macOS saknar timeout; perl alarm finns).
-    GHTOM="$(mktemp -d "${TMPDIR:-/tmp}/publicera-ghtom.XXXXXX")"
+    # --setting-sources user) och har en väggklocka (macOS saknar timeout; perl alarm finns).
+    # Spärrarna (a)(b)(c) ur huvudet: verktygsnekande, PATH-skal för gh, död git-transport.
+    g fetch -q origin main 2>/dev/null || true   # granskningen gäller intervallet mot DAGENS main
+    BAS_SHA="$(g rev-parse origin/main)"
+    SPARR="$(mktemp -d "${TMPDIR:-/tmp}/publicera-sparr.XXXXXX")"; mkdir -p "$SPARR/gh-tom"
+    GHBIN="$(command -v gh 2>/dev/null || echo /opt/homebrew/bin/gh)"; GITBIN="$(command -v git)"
+    printf '#!/bin/sh\necho "gh är avstängt för granskaren (publicera.sh spärr b) — GitHub-läget kontrolleras av mekanismen" >&2\nexit 77\n' > "$SPARR/gh"
+    printf '#!/bin/sh\necho "ssh är avstängt för granskaren (publicera.sh spärr b)" >&2\nexit 255\n' > "$SPARR/ssh"
+    printf '#!/bin/sh\nfor a in "$@"; do case "$a" in push) echo "git push är avstängt för granskaren (publicera.sh spärr b)" >&2; exit 77 ;; esac; done\nGIT_SSH_COMMAND=false GIT_TERMINAL_PROMPT=0 exec %s "$@"\n' "$GITBIN" > "$SPARR/git"
+    chmod +x "$SPARR/gh" "$SPARR/ssh" "$SPARR/git"
     # ALLA sessionsvariabler (CLAUDECODE, CLAUDE_CODE_*) — listan varierar mellan versioner.
-    AVSKALA="-u CLAUDECODE -u SSH_AUTH_SOCK -u GH_TOKEN -u GITHUB_TOKEN"
+    AVSKALA="-u CLAUDECODE -u SSH_AUTH_SOCK -u GH_TOKEN -u GITHUB_TOKEN -u GIT_SSH -u GIT_ASKPASS"
     for v in $(env | sed -nE 's/^(CLAUDE_CODE_[A-Za-z0-9_]*)=.*/\1/p'); do AVSKALA="$AVSKALA -u $v"; done
-    printf '%s' "$PROMPT" | ( cd "$ROT" && env $AVSKALA GH_CONFIG_DIR="$GHTOM" \
+    printf '%s' "$PROMPT" | ( cd "$ROT" && env $AVSKALA PATH="$SPARR:$PATH" GH_CONFIG_DIR="$SPARR/gh-tom" \
         perl -e 'alarm shift; exec @ARGV' "${NORTROPIC_GRANSKARE_TID:-3600}" \
         "$CLAUDE" -p --max-turns 60 --output-format text --setting-sources user \
-        --disallowedTools "Edit,Write,NotebookEdit,Bash(git commit:*),Bash(git push:*),Bash(git checkout:*),Bash(git reset:*),Bash(git stash:*),Bash(git merge:*),Bash(git rebase:*)" \
+        --settings "{\"env\":{\"GH_CONFIG_DIR\":\"$SPARR/gh-tom\"}}" \
+        --disallowedTools "Edit,Write,NotebookEdit,Bash(gh:*),Bash($GHBIN:*),Bash(git push:*),Bash(git -C:*),Bash($GITBIN:*),Bash(/usr/bin/git:*),Bash(git commit:*),Bash(git checkout:*),Bash(git switch:*),Bash(git branch:*),Bash(git worktree:*),Bash(git remote:*),Bash(git config:*),Bash(git reset:*),Bash(git stash:*),Bash(git merge:*),Bash(git rebase:*)" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git ls-files:*),Bash(git ls-tree:*),Bash(git rev-parse:*),Bash(git status:*),Bash(git check-ignore:*),Bash(git cat-file:*),Bash(node scripts/:*),Bash(bash tests/:*),Bash(PUBLICERA=:*),Bash(HOOK=:*),Bash(REDO=:*),Bash(shasum:*),Bash(wc:*),Bash(sed -n:*),Bash(cat:*),Bash(ls:*),Bash(diff:*),Bash(mktemp:*),Bash(cp:*)" \
         ) > "$RAPPORT" 2> "$RAPPORT.stderr"
-    RC=$?; rm -rf "$GHTOM"
+    RC=$?; rm -rf "$SPARR"
     [ "$RC" = 142 ] && odombart "granskaren avbröts av väggklockan (${NORTROPIC_GRANSKARE_TID:-3600} s)"
     [ -z "$(g status --porcelain)" ] || stopp "granskaren lämnade arbetskopian smutsig — kandidaten är inte längre den granskade (git status)"
     [ "$RC" = 0 ] && [ -s "$RAPPORT" ] || odombart "granskaren avslutade med rc=$RC eller tom rapport ($RAPPORT)"
@@ -159,25 +197,36 @@ case "$DOM" in "DOM: FYND"*) stopp "granskningen gav FYND — åtgärda på samm
 [ "$UTAN_MERGE" = 1 ] && { echo "5 merge:     hoppas över (--utan-merge)"; exit 0; }
 PRHEAD2="$($GH pr view "$PRNR" --repo "$REPO" --json headRefOid --jq .headRefOid)"
 [ "$PRHEAD2" = "$HEAD_SHA" ] || stopp "PR-head flyttade under granskningen ($PRHEAD2) — granskningen gäller inte längre"
-CHECKS="$($GH pr view "$PRNR" --repo "$REPO" --json statusCheckRollup --jq '.statusCheckRollup[] | "\(.name // .context // "?")\t\(.conclusion // .state // "?")"' 2>/dev/null)" \
-  || stopp "kunde inte läsa PR:ens checks (gh-fel) — ett fel är inte 'ingen CI'"
-if [ -n "$CHECKS" ]; then
-  RODA="$(printf '%s\n' "$CHECKS" | awk -F'\t' 'tolower($2)!="success" && tolower($2)!="skipped" && tolower($2)!="neutral" {print $1" = "$2}')"
-  if [ -n "$RODA" ]; then
-    if [ -n "$ODOK" ]; then
-      NAMN="${ODOK%%:*}"; SKAL="${ODOK#*:}"
-      [ -n "$NAMN" ] && [ "$NAMN" != "$ODOK" ] && [ -n "$(printf '%s' "$SKAL" | tr -d ' ')" ] || stopp "--odombart-ok kräver formen '<exakt checknamn>: <skäl>'"
-      KVAR="$(printf '%s\n' "$RODA" | awk -F' = ' -v n="$NAMN" '$1 != n' || true)"
-      [ -z "$KVAR" ] || stopp "checks som inte är gröna:"$'\n'"$KVAR"
-      echo "  ODÖMBART accepterat uttryckligen: $ODOK"
-    else
-      stopp "checks som inte är gröna (röd kan vara ODÖMBART — säg det i så fall med --odombart-ok '<namn>: <skäl>'):"$'\n'"$RODA"
-    fi
+# Checks: väntande (tom conclusion / PENDING / QUEUED / IN_PROGRESS) pollas — CI tar minuter,
+# granskningen tog redan längre. INGA checks alls är också ett väntläge (fönstret mellan push
+# och check-run) och blir stopp när tiden är ute: tomt är aldrig grönt (mekanismens fjärde
+# granskning av sig själv, fynd 3).
+las_checks() { $GH pr view "$PRNR" --repo "$REPO" --json statusCheckRollup --jq '.statusCheckRollup[] | "\(.name // .context // "?")\t\(.conclusion // .state // "?")"' 2>/dev/null; }
+VANTAN="${NORTROPIC_CHECK_VANTAN:-900}"; INTERVALL="${NORTROPIC_CHECK_INTERVALL:-30}"; VANTAT=0
+while :; do
+  CHECKS="$(las_checks)" || stopp "kunde inte läsa PR:ens checks (gh-fel) — ett fel är inte 'ingen CI'"
+  VANTANDE="$(printf '%s\n' "$CHECKS" | awk -F'\t' 'NF && ($2=="" || $2=="?" || tolower($2)=="pending" || tolower($2)=="queued" || tolower($2)=="in_progress" || tolower($2)=="expected") {print $1}')"
+  [ -n "$CHECKS" ] && [ -z "$VANTANDE" ] && break
+  [ "$VANTAT" -lt "$VANTAN" ] || break
+  echo "  väntar på checks ($VANTAT/$VANTAN s): ${VANTANDE:-inga rapporterade ännu}" | tr '\n' ' '; echo
+  sleep "$INTERVALL"; VANTAT=$((VANTAT + (INTERVALL>0 ? INTERVALL : 1)))   # räknaren stiger alltid (proven kör med intervall 0)
+done
+[ -n "$CHECKS" ] || stopp "inga checks rapporterade för PR #$PRNR efter $VANTAT s — tomt är inte grönt (CI ej startad, eller ett repo utan CI: då gäller serverns skydd, inte denna spak)"
+RODA="$(printf '%s\n' "$CHECKS" | awk -F'\t' 'tolower($2)!="success" && tolower($2)!="skipped" && tolower($2)!="neutral" {print $1" = "$2}')"
+if [ -n "$RODA" ]; then
+  if [ -n "$ODOK" ]; then
+    NAMN="${ODOK%%:*}"; SKAL="${ODOK#*:}"
+    [ -n "$NAMN" ] && [ "$NAMN" != "$ODOK" ] && [ -n "$(printf '%s' "$SKAL" | tr -d ' ')" ] || stopp "--odombart-ok kräver formen '<exakt checknamn>: <skäl>'"
+    KVAR="$(printf '%s\n' "$RODA" | awk -F' = ' -v n="$NAMN" '$1 != n' || true)"
+    [ -z "$KVAR" ] || stopp "checks som inte är gröna:"$'\n'"$KVAR"
+    # Skälet ska överleva drivarens stdout: PR-kommentar + KVITTO-raden (fynd 6).
+    $GH pr comment "$PRNR" --repo "$REPO" --body "ODÖMBART accepterat uttryckligen av kedjedrivaren för kandidat $HEAD_SHA: $ODOK" >/dev/null 2>&1 || stopp "kunde inte bokföra --odombart-ok-skälet som PR-kommentar — ingen merge utan bokfört skäl"
+    echo "  ODÖMBART accepterat uttryckligen (bokfört på PR:en): $ODOK"
+  else
+    stopp "checks som inte är gröna (röd kan vara ODÖMBART — säg det i så fall med --odombart-ok '<namn>: <skäl>'):"$'\n'"$RODA"
   fi
-  echo "5 checks:    $(printf '%s\n' "$CHECKS" | wc -l | tr -d ' ') st, inga röda utan skäl"
-else
-  echo "5 checks:    inga (ingen CI på denna PR)"
 fi
+echo "5 checks:    $(printf '%s\n' "$CHECKS" | wc -l | tr -d ' ') st, inga röda utan skäl"
 $GH pr merge "$PRNR" --repo "$REPO" --merge --match-head-commit "$HEAD_SHA" >/dev/null 2>"$RAPPORT.merge.stderr" \
   || stopp "merge nekades: $(head -3 "$RAPPORT.merge.stderr" | tr '\n' ' ')"
 
@@ -187,5 +236,5 @@ MERGE_SHA="$(g rev-parse origin/main)"
 P2="$(g rev-parse -q --verify "origin/main^2" 2>/dev/null || echo '')"
 [ "$P2" = "$HEAD_SHA" ] || stopp "origin/main ($MERGE_SHA) har inte HEAD som andra förälder — kontrollera för hand innan något upprepas"
 echo "6 mergad:    PR #$PRNR · granskat ${HEAD_SHA:0:12} · merge ${MERGE_SHA:0:12} · rapport $RAPPORT"
-printf 'KVITTO\tPR=%s\tGRANSKAT=%s\tMERGE=%s\tDOM=%s\n' "$PRNR" "$HEAD_SHA" "$MERGE_SHA" "$DOM"
+printf 'KVITTO\tPR=%s\tGRANSKAT=%s\tBAS=%s\tMERGE=%s\tODOMBART_OK=%s\tDOM=%s\n' "$PRNR" "$HEAD_SHA" "${BAS_SHA:-}" "$MERGE_SHA" "${ODOK:--}" "$DOM"
 exit 0
