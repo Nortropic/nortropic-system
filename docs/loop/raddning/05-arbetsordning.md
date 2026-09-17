@@ -99,7 +99,7 @@ alltså rätt sak. Den mekaniska domen skulle ligga i
 `verify/bin/autonomous-loop-exit`, fryst RED före S2–S13 och grön **oförändrad** vid
 empiriskt closeout (`docs/05-beslutslogg.md`, LOOP-ÄGARHAND-50, 2026-08-10).
 
-Grinden refereras i `AGENTS.md` rad 148, i roadmapens steg L, i
+Grinden refereras i `AGENTS.md` (§7 Publicering), i roadmapens steg L, i
 `docs/loop/codex-evidence-contract.md` och i beslutsloggen.
 
 **Den finns inte.** `verify/bin/` har 29 filer; `autonomous-loop-exit` är ingen av dem.

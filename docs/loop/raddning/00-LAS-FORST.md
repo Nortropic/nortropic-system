@@ -39,8 +39,7 @@ men **kan inte flyttas som det ser ut nu**; skälet står i `01-lagesbild.md` §
 | `07-v1-acceptans.md` | **Vad `Autonomy Kernel v1` betyder** — namndisciplin, scope, h-030-beslutet, hur varje krav bevisas |
 | `08-mekanismer.md` | Hur de tre arbetsreglerna kopplas till befintligt flöde så de FÄLLER |
 | `09-task-rundtrampsvakten.md` | **Taskspec att frysa** — den enda MEKANISMEN i paketet. Bärs av Codex, inte Claude |
-| `10-forsta-arbetspaketet-h014.md` | **Första bygget.** Redan specad i repot; bara grinden saknas. Bär rättelsen om plattformen |
-| `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
+| `10-forsta-arbetspaketet-h014.md` | **Arbetspaket `h-014` (`VAGEN.md` FAS 4).** Redan specad i repot; bara grinden saknas. Bär rättelsen om plattformen |
 | `artefakter/nortropic-dokumentation-4commits.patch` | Fyra färdiga commits som rättar ingångsdokumentationen |
 | `artefakter/nortropic-web-extraktion.bundle` | ⚠️ **ÖVERFLÖDIG** — webbfabriken finns på riktigt i `Nortropic/nortropic-webbforvaltning` sedan 2026-09-16, med proveniens per fil. Bundlen var mitt eget utkast och ska inte användas |
 | `artefakter/validera-underlaget.sh` | **MEKANISMEN som prövar detta underlag mot repot.** 37 påståenden, verdikt per rad, exit 0/1/2. Kör den först |

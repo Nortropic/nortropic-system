@@ -1,10 +1,10 @@
 # Arbetsordern — verifierad mot grenens HEAD 2026-09-16
 
-> ⚠️ **ORDNINGEN I DENNA FIL ÄR DELMÄNGD.** Vägen står i `VAGEN.md`. Steg 1–4 här är
-> `VAGEN.md`:s PARALLELLSPÅR (separationens landning) och blockerar inte FAS 1–3.
-> **Beroendeanalysen och tvårotshypotesen i filen är källan `VAGEN.md` §3 bygger på.**
+> Delplan för `VAGEN.md` **FAS 1 — landa plattformsgrenen.** Ordningen står i `VAGEN.md`;
+> tabellen här är daterad 2026-09-16 — kontrollera den mot HEAD. Beroendeanalysen och
+> tvårotshypotesen i filen är källan `VAGEN.md` §3 bygger på.
 
-**Detta är den enda arbetsorder som gäller.** `SEPARATION-20260910/EFTERARBETE.md` är
+**Delplan, inte ordning.** `SEPARATION-20260910/EFTERARBETE.md` är
 sann men **föråldrad**: den skrevs 2026-09-10 vid commit `dae90c8f`, och grenen
 `nortropic/platform-integration-20260910` har gått 48 commits sedan dess.
 

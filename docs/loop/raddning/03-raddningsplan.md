@@ -29,7 +29,7 @@ Inget ägarbeslut krävs — se `05-arbetsordning.md` §1.**
 > **oförändrad** vid empiriskt closeout. `FULL_ROADMAP_SOFTWARE_COMPLETE` betyder
 > task-gates + program-gate + empirical falsification gröna.
 
-Grinden refereras i `AGENTS.md` rad 148, i roadmapens steg L, i
+Grinden refereras i `AGENTS.md` (§7 Publicering), i roadmapens steg L, i
 `docs/loop/codex-evidence-contract.md` och i beslutsloggen. **Den finns inte.**
 `verify/bin/` har 29 filer; den är ingen av dem.
 

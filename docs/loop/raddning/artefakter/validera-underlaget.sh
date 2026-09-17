@@ -273,7 +273,7 @@ rad "h-014 påstås inte ha gröna beroenden" "0" \
 #
 # Detta är den mekaniska halvan av regeln "en enda väg". Den andra halvan går inte
 # att automatisera: att en text SÄGER något annat om vad som görs först. Den delen
-# måste läsas. Se PROMPT-TILL-CODEX.txt, som en timme efter att VAGEN.md skrivits
+# måste läsas. Se PROMPT-TILL-CODEX.txt (avförd 2026-09-17, blob acd132be), som en timme efter att VAGEN.md skrivits
 # fortfarande sa "BÖRJA HÄR: h-009" medan VAGEN.md sagt "FAS 1 — landa grenen".
 echo
 echo "  ⭐ DÖDA FAS-PEKARE — varje refererad FAS måste finnas i VAGEN.md"
