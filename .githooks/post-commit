@@ -19,6 +19,8 @@
 # VAD DEN ALDRIG GÖR
 #   --force, rebase, amend, reset, cherry-pick  (NO_FORCE_SEMANTICS=YES)
 #   blockerar aldrig en commit — en post-commit-hook kan inte, och ska inte
+#   pushar aldrig från en LÄNKAD worktree (grindarnas fixturer, kernelns kandidatytor)
+#   pushar aldrig en commit av nortropic-utforare (kandidater ägs av kerneln)
 #
 # Misslyckad push är INTE tyst: den skriver regel 12:s felläge till stderr.
 
@@ -27,6 +29,23 @@ command -v git >/dev/null 2>&1 || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 [ "${NORTROPIC_AUTOPUSH:-1}" = "0" ] && exit 0   # nödutgång, aldrig standard
+
+# VAKT 1 — länkad worktree. De fjorton grindarna (t.ex. verify/bin/h-007-exit) och kernelns
+# kandidatytor (controller/workspace/cli) gör `git worktree add` i den RIKTIGA klonen och
+# committar där. Deras commits är fixturer och kandidater, inte bevarandeobjekt: en generisk
+# push hade publicerat h007-prov-<pid> och radda/auto-* på origin (mätt 2026-09-17). En
+# länkad worktree känns igen på att dess git-dir ligger under huvudrepots .git/worktrees/.
+if [ "$(git rev-parse --git-dir 2>/dev/null)" != "$(git rev-parse --git-common-dir 2>/dev/null)" ]; then
+  echo "post-commit: länkad worktree (grind-/kandidatyta) — ingen autopush härifrån." >&2
+  exit 0
+fi
+
+# VAKT 2 — utförarens kandidatcommit. controller/utforare/cli committar som nortropic-utforare;
+# kandidaten bevaras och publiceras av kerneln (attestation, guarded merge), aldrig av en hook.
+if git log -1 --format='%an%n%cn' 2>/dev/null | grep -qx 'nortropic-utforare'; then
+  echo "post-commit: kandidatcommit av utföraren — kerneln äger bevarandet, ingen autopush." >&2
+  exit 0
+fi
 
 GREN="$(git branch --show-current 2>/dev/null || true)"
 SHA="$(git rev-parse --short HEAD 2>/dev/null)" || exit 0
