@@ -23,9 +23,9 @@ rapport postad · N5 ny commit efter granskning → stopp · N6 röd check utan 
 med uttryckligt skäl → merge · N7 smutsig arbetskopia → stopp före granskning · N8 granskaren smutsar
 trädet → stopp · N9 på main → stopp · P1 legitim grön kandidat → granskad, mergad med
 `--match-head-commit`, kvitto · P2 ingen PR → öppnas, granskad, mergad · P3 opushad commit → pushas,
-`--utan-merge` stannar efter granskningen · P0a–c owner/repo ur ssh-/https-URL · P1b granskaren körs med cwd = repot och utan `CLAUDECODE` i miljön. **18 gröna.** Åtta mutanter (utan SHA-kontroll,
+`--utan-merge` stannar efter granskningen · P0a–c owner/repo ur ssh-/https-URL · P1b granskaren körs med cwd = repot, utan sessions-/credentialvariabler och utan projekthookar · N2c DOM men rc≠0 → ODÖMBART · N3b 7-teckensprefix → ingen merge · N4b FYND följd av TILLSTYRKS → stopp · N6c/N6d `--odombart-ok` kräver exakt checknamn · N6e gh-fel vid checks → stopp · N10 kvittot kan inte postas → ingen merge · N11a–c `--granskare ci` bara från utpekat bot-konto · N12 fel spets före granskning → ingen granskare startad. **29 gröna.** Fjorton mutanter (utan SHA-kontroll,
 utan omkontroll av head, utan `--match-head-commit`, FYND mergar, röda checks ignoreras, smuts efter
-granskning, saknad DOM blir OK, gammal repo-regex) fälls alla. **Mekanismens första körning mot sin egen PR fann en
+granskning, saknad DOM blir OK, gammal repo-regex, FYND-raden ignoreras, kvittofel ignoreras, ci utan bot-konto, gh-fel = ingen CI, projekthookar laddas) fälls alla; prefix-i-stället-för-likhet är en likvärdig mutant eftersom TILLSTYRKS-regexen redan kräver fullt 40-teckens SHA. **Mekanismens första körning mot sin egen PR fann en
 bugg stubbarna dolde:** macOS `sed -E` saknar icke-giriga kvantifierare, `REPO` blev tomt och skriptet stannade
 fail-closed vid steg 2 — rättat med portabel regex, `--visa-repo` och en gh-stub som kräver giltigt `--repo`
 (P0a–c). **Andra körningen mot sig själv fann nästa:** `--allowedTools`/`--disallowedTools` är variadiska och svalde
@@ -49,7 +49,7 @@ pass (tre + två + ett blockerande fynd åtgärdade; sista två passen VERIFIED)
 `$HOME` till djup 6 och satte `core.hooksPath` i **fem** repon med samma origin under
 `~/nortropic/evidence/v316-h039-continuity-review-20260912/` (`h039-local-two-edge-method-53ms1swj/
 repository`, `h039-observer-causal-method-7z704bbk/{positive,untracked_attribute,bad_config,
-committed_attribute}`) — frysta h-039-beroenden (regel 13b:5). Återställt 12:50 med `git config --unset
+committed_attribute}`) — frysta h-039-beroenden (regel 13b:5). Återställt 12:49 med `git config --unset
 core.hooksPath` i exakt de fem (config-innehållet är som före; `.git/config` har ny inod/mtime, vilket inte
 går att återställa). Inga commits, inga pushar, inga andra filer rörda. h-039 är avslutad `OVERIFIERAT`;
 om dess R33-bindning läser inod/mtime på `.git/config` är den bruten för de fem — OVERIFIERAT.
@@ -57,20 +57,40 @@ om dess R33-bindning läser inod/mtime på `.git/config` är den bruten för de 
 prov K3c (klon med samma origin under evidensroten rörs inte), mutant utan undantaget fälls. Hooksveper
 i dag: bara de fyra klonerna (`~/kernel-arbete`, `~/nortropic-kontrollklon`,
 `~/nortropic-repos/nortropic-system`, `~/nortropic/nortropic-system`) bär `core.hooksPath`; hooken i
-`~/.nortropic/githooks` är identisk med repots (med vakterna).
+`~/.nortropic/githooks` är identisk i mekanism med repots (vakterna finns; kommentarsraderna ändrades i
+denna PR, så `installera-hooks.sh --kor` körs efter merge).
 
 ### Rådgivande fynd från #262-granskningen, tagna här
 A1 N2b: commit där bara **committern** är `nortropic-utforare` → ingen push (mutant som bara läser `%an`
 fälls) · A2 workflow-kommentaren om jobbnivå-permissions säger nu att vakten utökas i samma commit ·
 A3 hookens kommentar: "utan vakten skulle … (hooksPath-arvet mätt; ingen fixtur nådde origin)".
 Från #261:s andra granskning: A1 (reläet) är nu mekanism — `publicera.sh` steg 3 postar domen; A6:
-`publicera.sh` väljer **merge-commit** (`--merge`), aldrig squash/rebase (AGENTS.md:288); autopilotens
-"rebase-merga" (AGENTS.md:336) är ett äldre block som arkiveras i L2.
+`publicera.sh` väljer **merge-commit** (`--merge`), aldrig squash/rebase (AGENTS.md "Oförändrat, och det är
+detta som bär trusten"); autopilotens "rebase-merga" (operating model v2-blocket) är ett äldre block som
+arkiveras i L2.
 
-Mätt vid spetsen: publicera 18 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
+Mätt vid spetsen: publicera 29 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
 check-granskningsmekanismen 22/22 · provanropare 20/20 (56 kandidater) · vaktankare 34/34 · kor-vakter 24/24.
-Denna PR granskas av **båda** vägarna: `publicera.sh --utan-merge` (den nya mekanismen dömer sin egen
-kandidat i separat `claude -p`) och en separat read-only-subagent; mergen sker med `publicera.sh`.
+### Mekanismen granskade sig själv — och fällde sig (13:02–13:20)
+`publicera.sh --utan-merge` på PR #264 (spets `7831b4d`): steg 1–3 gröna, steg 4 startade en separat
+`claude -p` som läste hela intervallet, körde proven, 15 mutanter och sex scenarier, och gav
+`DOM: FYND @7831b4d — blockerande: #1, #2` med nio fynd; skriptet stannade (rc 1) utan merge. Samtidigt
+gav den separata read-only-subagenten `DOM: TILLSTYRKS @7831b4d` med nio rådgivande, sex av dem samma
+som mekanismens. Alla åtgärdade i nästa commit: (1) kan kvittot inte postas sker ingen merge; (2)
+`--granskare ci` vägrar utan utpekat bot-konto (`NORTROPIC_CI_GRANSKARE`) och läser bara dess reviews;
+(3) `--odombart-ok` kräver exakt checknamn och skäl; (4) rc≠0 med DOM → ODÖMBART, provat; (5) fel spets
+före granskning → stopp före granskaren; (6) hook-texten "identisk i mekanism"; (7) radnummer →
+sektionsnamn; (8) granskaren får läsverktygen `diff`/`mktemp`/`cp`/`git check-ignore`, muterar bara i
+kopior; (9) AGENTS.md:s "tills mekanismen finns"-mening rättad. Subagentens tillägg: exakt fullt SHA
+(inget prefix), varje `DOM: FYND`-rad räknas, väggklocka via `perl alarm` (3600 s, `NORTROPIC_GRANSKARE_TID`),
+gh-fel vid checks → stopp (inte "ingen CI"), granskaren utan projekthookar (`--setting-sources user`,
+annars hade kandidatens `.claude/settings.json` kört autocommit av kandidatkod), utan drivarens gh-/ssh-
+credentials (tom `GH_CONFIG_DIR`, utan `SSH_AUTH_SOCK`/`GH_TOKEN`), `scripts/publicera.sh` och
+`.claude/settings.json` i felklass 6, och regeln att kedjedrivaren kör mekanismen ur `origin/main`:s
+version när kandidaten rör den (denna PR är undantaget: skriptet finns inte på main ännu — därför
+dubbel granskning). Kvarstår som känd gräns: granskaren är samma modell som byggaren (workflow-separation,
+inte säkerhetsgräns); `--allowedTools`-mönstren för env-prefixade kommandon (`PUBLICERA=…`) är UNVERIFIERADE.
+Denna PR mergas med `publicera.sh` när mekanismen och subagenten båda dömt spetsen TILLSTYRKS.
 
 ## 2026-09-17 — L1c: post-commit-hooken pushar inte längre från länkade worktrees eller utförarcommits; L1 landad; required status checks satta
 

@@ -214,7 +214,7 @@ publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
 | 2 | **Den mekaniska domen startar av sig själv** — `.github/workflows/granska-pr.yml` kör vaktsviten och skalproven på `pull_request` |
 | 3 | **Granskningen av diffen körs av den drivande sessionen**, i en egen agent, enligt `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`. Granskaren får aldrig vara den som skrev koden i samma tråd. Domen bär exakt det head-SHA granskaren läste (`DOM: TILLSTYRKS @<sha>`) och postas av granskaren som PR-review-kommentar |
 | 4 | Åtgärda varje fynd, eller svara varför det inte åtgärdas — på samma gren, och granska om hela intervallet |
-| 5 | Merga **endast** om domen är `TILLSTYRKS @` exakt PR-spetsen och checks är gröna: en commit efter domen ogiltigförklarar den. Författaren skriver aldrig protokollet — kvittot är granskarens kommentar. Tills mekanismen finns i repot (`scripts/publicera.sh`, nästa leverans) gör kedjedrivaren stegen för hand: `gh pr review --comment`, sedan `gh pr merge --merge --match-head-commit <sha>` |
+| 5 | Merga **endast** om domen är `TILLSTYRKS @` exakt PR-spetsen och checks är gröna: en commit efter domen ogiltigförklarar den. Författaren skriver aldrig protokollet — kvittot är granskarens kommentar. Mekanismen är `bash scripts/publicera.sh --repo <klon>` (bevara → PR → separat granskare → merge); för hand: `gh pr review --comment`, sedan `gh pr merge --merge --match-head-commit <sha>` |
 
 **Den mekaniska domen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha,
 det ska ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör två

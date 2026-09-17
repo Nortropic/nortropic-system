@@ -26,24 +26,29 @@ cat > "$T/bin/gh" <<'GH'
 echo "$*" >> "$T/gh.log"
 # Riktiga gh faller utan giltigt --repo utanför ett git-repo — stubben ska inte vara snällare.
 # (Mekanismens första körning mot sig själv stannade på just detta: REPO blev tomt.)
-case " $* " in *" --repo "[A-Za-z0-9._-]*/[A-Za-z0-9._-]*" "*) ;; *) echo "gh-stub: --repo saknas eller ogiltigt: $*" >&2; exit 9 ;; esac
+case "$1" in pr) case " $* " in *" --repo "[A-Za-z0-9._-]*/[A-Za-z0-9._-]*" "*) ;; *) echo "gh-stub: --repo saknas eller ogiltigt: $*" >&2; exit 9 ;; esac ;; esac
 C="$(cat "$T/gh.case")"; N="$(grep -c . "$T/gh.log")"
 case "$1 $2" in
   "pr list")   if [ "$C" = "ingen-pr" ] && [ ! -f "$T/pr-skapad" ]; then echo ''; else echo 42; fi ;;
   "pr create") touch "$T/pr-skapad"; echo "https://github.com/x/y/pull/42" ;;
   "pr view")
      case "$*" in
-       *headRefOid*) if [ "$C" = "spets-flyttar" ] && [ -f "$T/granskad" ]; then echo "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"; else git -C "$T/arb" rev-parse HEAD; fi ;;
-       *statusCheckRollup*) case "$C" in
+       *headRefOid*) if [ "$C" = "spets-flyttar" ] && [ -f "$T/granskad" ]; then echo "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"; elif [ "$C" = "spets-fel-fran-start" ]; then echo "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"; else git -C "$T/arb" rev-parse HEAD; fi ;;
+       *statusCheckRollup*) [ "$C" = "checks-fel" ] && { echo "gh: fel" >&2; exit 1; }; case "$C" in
            rod-check|rod-check-ok) printf 'vaktsviten (webbfabriken)\tSUCCESS\nskalprov under tests/scripts\tFAILURE\n' ;;
            *) printf 'vaktsviten (webbfabriken)\tSUCCESS\nskalprov under tests/scripts\tSUCCESS\n' ;;
          esac ;;
      esac ;;
-  "pr review") touch "$T/review-postad"; echo ok ;;
+  "pr review") if [ "$C" = "review-faller" ]; then echo "HTTP 422" >&2; exit 1; fi; touch "$T/review-postad"; echo ok ;;
   "pr merge")  touch "$T/merge-anropad"; echo "$*" > "$T/merge.args"
      # utför mergen på riktigt i bare-origin, så origin/main^2 kan prövas
      H="$(git -C "$T/arb" rev-parse HEAD)"; git -C "$T/mrg" fetch -q origin && git -C "$T/mrg" checkout -q main && git -C "$T/mrg" merge -q --no-ff -m "Merge PR #42" "$H" && git -C "$T/mrg" push -q origin main ;;
-  "api "*) echo '' ;;
+  "api "*) H="$(git -C "$T/arb" rev-parse HEAD)"
+     case "$C" in
+       ci-bot)   printf '%s\n' "DOM: TILLSTYRKS @$H" ;;   # (stubben speglar --jq-filtret: bara botens body)
+       ci-annan) echo '' ;;
+       *) echo '' ;;
+     esac ;;
   *) echo "gh-stub: okänt $*" >&2; exit 9 ;;
 esac
 GH
@@ -55,7 +60,8 @@ cat > "$T/bin/claude" <<'CL'
 # cwd ska vara repot och sessionsvariablerna ska vara borta — allt bokförs för P1.
 PROMPT="$(cat)"
 case "$PROMPT" in *"DOM: TILLSTYRKS @"*) ;; *) echo "claude-stub: ingen prompt med domform på stdin" >&2; exit 9 ;; esac
-pwd -P > "$T/claude.pwd"; env | grep -c '^CLAUDECODE' > "$T/claude.env" || true
+pwd -P > "$T/claude.pwd"; env | grep -cE '^(CLAUDECODE|CLAUDE_CODE_|SSH_AUTH_SOCK=|GH_TOKEN=)' > "$T/claude.env" || true
+case " $* " in *" --setting-sources user "*) ;; *) echo "claude-stub: projekthookar inte avstängda (--setting-sources user saknas)" >&2; exit 9 ;; esac
 case " $* " in *" --disallowedTools "*) ;; *) echo "claude-stub: inga --disallowedTools" >&2; exit 9 ;; esac
 touch "$T/granskad"
 H="$(git rev-parse HEAD)"
@@ -63,14 +69,17 @@ case "$(cat "$T/claude.case")" in
   tillstyrks) echo "1. OK — inget fynd."; echo "DOM: TILLSTYRKS @$H" ;;
   fynd)       echo "1. BLOCKERANDE fil:1 …"; echo "DOM: FYND @$H — blockerande: #1" ;;
   fel-sha)    echo "DOM: TILLSTYRKS @0000000000000000000000000000000000000000" ;;
+  prefix7)    echo "DOM: TILLSTYRKS @${H:0:7}" ;;
+  fynd-sedan-tillstyrks) echo "DOM: FYND @$H — blockerande: #1"; echo "DOM: TILLSTYRKS @$H" ;;
   ingen-dom)  echo "Jag kunde inte avgöra." ;;
   tom)        : ;;
+  tillstyrks-rc1) echo "DOM: TILLSTYRKS @$H"; exit 1 ;;
   smutsar)    echo "smuts" > SMUTS.txt; echo "DOM: TILLSTYRKS @$H" ;;
 esac
 CL
 chmod +x "$T/bin/claude"
 export PATH="$T/bin:$PATH" NORTROPIC_GH="$T/bin/gh" NORTROPIC_CLAUDE="$T/bin/claude"
-export CLAUDECODE=1   # som inuti en Claude Code-session: mekanismen ska ta bort den för granskaren
+export CLAUDECODE=1 CLAUDE_CODE_CHILD_SESSION=1 SSH_AUTH_SOCK=/tmp/x GH_TOKEN=hemlig   # som i drivarens session: mekanismen ska ta bort dem för granskaren
 
 # ── fixtur: bare origin + arbetsklon med gren + hjälpklon för stub-merge ─────
 bygg() {
@@ -98,26 +107,48 @@ bygg; echo ingen-dom > "$T/claude.case"
 rc="$(kor)"; [ "$rc" = 2 ] && ingen_merge && ok "N2 granskare utan DOM-rad → ODÖMBART, ingen merge" || fel "N2" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; echo tom > "$T/claude.case"
 rc="$(kor)"; [ "$rc" = 2 ] && ingen_merge && ok "N2b tom rapport → ODÖMBART" || fel "N2b" "rc=$rc"
+bygg; echo tillstyrks-rc1 > "$T/claude.case"
+rc="$(kor)"; [ "$rc" = 2 ] && ingen_merge && ok "N2c granskaren gav DOM men avslutade med rc=1 → ODÖMBART (rc-kontrollen bär)" || fel "N2c" "rc=$rc"
 bygg; echo fel-sha > "$T/claude.case"
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && grep -q 'gäller' "$T/ut.txt" && ok "N3 DOM med fel SHA → stopp" || fel "N3" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; echo fynd > "$T/claude.case"
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && [ -f "$T/review-postad" ] && ok "N4 FYND → stopp, rapport postad, ingen merge" || fel "N4" "rc=$rc"
+bygg; echo prefix7 > "$T/claude.case"
+rc="$(kor)"; [ "$rc" != 0 ] && ingen_merge && ok "N3b DOM med 7-teckensprefix → ingen merge (exakt fullt SHA krävs)" || fel "N3b" "rc=$rc"
+bygg; echo fynd-sedan-tillstyrks > "$T/claude.case"
+rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && ok "N4b FYND-rad följd av TILLSTYRKS-rad → stopp (varje FYND räknas)" || fel "N4b" "rc=$rc"
+bygg; echo checks-fel > "$T/gh.case"
+rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && grep -q 'gh-fel' "$T/ut.txt" && ok "N6e gh-fel vid läsning av checks → stopp, inte 'ingen CI'" || fel "N6e" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; echo spets-flyttar > "$T/gh.case"
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && grep -q 'flyttade' "$T/ut.txt" && ok "N5 ny commit efter granskning → stopp" || fel "N5" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; echo rod-check > "$T/gh.case"
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && grep -q 'skalprov' "$T/ut.txt" && ok "N6 röd check utan skäl → stopp" || fel "N6" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; echo rod-check > "$T/gh.case"
 rc="$(kor --odombart-ok "skalprov under tests/scripts: Linux-ODÖMBART, se logg")"; [ "$rc" = 0 ] && [ -f "$T/merge-anropad" ] && ok "N6b röd check med uttryckligt skäl → merge" || fel "N6b" "rc=$rc $(tail -1 "$T/ut.txt")"
+bygg; echo rod-check > "$T/gh.case"
+rc="$(kor --odombart-ok ": Linux-ODÖMBART")"; [ "$rc" = 1 ] && ingen_merge && ok "N6c --odombart-ok med tomt namn → stopp" || fel "N6c" "rc=$rc $(tail -1 "$T/ut.txt")"
+bygg; echo rod-check > "$T/gh.case"
+rc="$(kor --odombart-ok "skalprov: delsträng räcker inte")"; [ "$rc" = 1 ] && ingen_merge && ok "N6d --odombart-ok med delsträng av namnet → stopp (exakt namn krävs)" || fel "N6d" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; echo smuts > "$T/arb/c.txt"
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && [ ! -f "$T/granskad" ] && ok "N7 smutsig arbetskopia → stopp före granskning" || fel "N7" "rc=$rc"
 bygg; echo smutsar > "$T/claude.case"
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && grep -q 'smutsig' "$T/ut.txt" && ok "N8 granskaren smutsar trädet → stopp" || fel "N8" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; git -C "$T/arb" switch -q main
 rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && ok "N9 på main → stopp" || fel "N9" "rc=$rc"
+bygg; echo review-faller > "$T/gh.case"
+rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && grep -q 'kvitto' "$T/ut.txt" && ok "N10 kvittot kan inte postas → ingen merge" || fel "N10" "rc=$rc $(tail -1 "$T/ut.txt")"
+bygg
+rc="$(kor --granskare ci)"; [ "$rc" = 1 ] && ingen_merge && [ ! -f "$T/granskad" ] && ok "N11a --granskare ci utan utpekat bot-konto → stopp" || fel "N11a" "rc=$rc $(tail -1 "$T/ut.txt")"
+bygg; echo ci-annan > "$T/gh.case"
+rc="$(NORTROPIC_CI_GRANSKARE=granskbot kor --granskare ci)"; [ "$rc" = 2 ] && ingen_merge && ok "N11b ci: ingen DOM från bot-kontot → ODÖMBART" || fel "N11b" "rc=$rc $(tail -1 "$T/ut.txt")"
+bygg; echo ci-bot > "$T/gh.case"
+rc="$(NORTROPIC_CI_GRANSKARE=granskbot kor --granskare ci)"; [ "$rc" = 0 ] && [ -f "$T/merge-anropad" ] && [ ! -f "$T/granskad" ] && ok "N11c ci: DOM från bot-kontot → merge utan lokal granskare" || fel "N11c" "rc=$rc $(tail -1 "$T/ut.txt")"
+bygg; echo spets-fel-fran-start > "$T/gh.case"
+rc="$(kor)"; [ "$rc" = 1 ] && ingen_merge && [ ! -f "$T/granskad" ] && ok "N12 PR-head ≠ HEAD redan före granskning → stopp, ingen granskare startad" || fel "N12" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg
 rc="$(kor)"; H="$(git -C "$T/arb" rev-parse HEAD)"
 if [ "$rc" = 0 ] && grep -q -- "--match-head-commit $H" "$T/merge.args" && [ "$(git -C "$T/mrg" rev-parse origin/main^2)" = "$H" ] && grep -q '^KVITTO' "$T/ut.txt" && [ -f "$T/review-postad" ]; then ok "P1 legitim grön kandidat → granskad, mergad med --match-head-commit, kvitto"; else fel "P1" "rc=$rc $(tail -2 "$T/ut.txt" | tr '\n' ' ')"; fi
-[ "$(cat "$T/claude.pwd")" = "$(cd "$T/arb" && pwd -P)" ] && [ "$(cat "$T/claude.env")" = 0 ] && ok "P1b granskaren körs med cwd = repot och utan CLAUDECODE i miljön" || fel "P1b" "pwd=$(cat "$T/claude.pwd") CLAUDECODE-var=$(cat "$T/claude.env")"
+[ "$(cat "$T/claude.pwd")" = "$(cd "$T/arb" && pwd -P)" ] && [ "$(cat "$T/claude.env")" = 0 ] && ok "P1b granskaren körs med cwd = repot, utan CLAUDECODE/CLAUDE_CODE_*/SSH_AUTH_SOCK/GH_TOKEN, utan projekthookar" || fel "P1b" "pwd=$(cat "$T/claude.pwd") läckta variabler=$(cat "$T/claude.env")"
 bygg; echo ingen-pr > "$T/gh.case"
 rc="$(kor)"; [ "$rc" = 0 ] && [ -f "$T/pr-skapad" ] && [ -f "$T/merge-anropad" ] && ok "P2 ingen PR → öppnas, sedan granskad och mergad" || fel "P2" "rc=$rc $(tail -1 "$T/ut.txt")"
 bygg; git -C "$T/arb" commit -q --allow-empty -m "opushad"
