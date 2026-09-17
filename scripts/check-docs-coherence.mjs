@@ -408,6 +408,12 @@ kravOmArtefakt({
     else nej('H-överlämning-pekar-på-statusens-hemvist', 'utan pekaren vet nästa session inte var läget faktiskt står')
     if (/CLAUDE\.md/.test(las('CLAUDE.md')) || /agentoverlamning/.test(las('CLAUDE.md'))) ja('H-CLAUDE-pekar-på-överlämningen')
     else nej('H-CLAUDE-pekar-på-överlämningen', 'en överlämning ingen pekar på läses inte')
+    // En ingång (LOOP-ÄGARBESLUT-INGANG-V1, 2026-09-17): Codex läser AGENTS.md, Claude Code CLAUDE.md, och de
+    // ska bära SAMMA kontrakt. Importformen (@AGENTS.md) expanderas inte från underkataloger och en symbolisk
+    // länk tömmer §A-sökvägen (fäller h-007-exit K1.8) — därför två riktiga filer som måste vara byteidentiska.
+    // Jämförs som bytes, inte som text: en avvikelse på ett tecken är en avvikelse.
+    if (finns('AGENTS.md') && readFileSync(join(ROT, 'CLAUDE.md')).equals(readFileSync(join(ROT, 'AGENTS.md')))) ja('H-CLAUDE-och-AGENTS-byteidentiska')
+    else nej('H-CLAUDE-och-AGENTS-byteidentiska', 'CLAUDE.md och AGENTS.md skiljer sig — en ingång kräver samma bytes; ändra båda i samma commit (CLAUDE.md är §A: HÖGRISK + beslutsrad)')
   }
 }
 
@@ -805,7 +811,7 @@ forbudOmArtefaktSaknas({
 // över en. FORVANTAT är därför skriven för hand och jämförs mot faktiskt antal.
 // Faller de isär är körningen ODÖMBAR: en vakt som tappat kontroller vet inte längre
 // vad dess grönt betyder, och får då inte påstå någonting alls.
-const FASTA = 76   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9 · J 4
+const FASTA = 77   // +1 2026-09-17: H-CLAUDE-och-AGENTS-byteidentiska (en ingång, LOOP-ÄGARBESLUT-INGANG-V1)   // A 12 · B 4 · C 15 · D 3 · E 4 · F 6 · G-ärlighet 1 · H 12 · I 9 · J 4
 
 for (const p of pass) console.log(`PASS: ${p}`)
 for (const f of fails) console.error(`FAIL: ${f}`)

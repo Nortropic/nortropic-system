@@ -54,7 +54,7 @@ lät auktoritativa.
 | Fil | Sa | Gäller nu |
 |---|---|---|
 | `03-raddningsplan.md` steg 1 | *"Bygg slutgrinden först"* | **Analys.** Ordningen upphävd → FAS 7 här |
-| `10-forsta-arbetspaketet-h014.md` | *"Första arbetspaketet: h-014"* | **Arbetspaket.** Inte första → FAS 5 här |
+| `10-forsta-arbetspaketet-h014.md` | *"Första arbetspaketet: h-014"* | **Arbetspaket.** Inte första → FAS 4 här |
 | `12-arbetsorder.md` steg 1–4 | separationens landning | **Delplanen för FAS 1**, som mätningen gjorde till huvudspår |
 | `06-inventering.md` §1 | bootstrap-kedjan `h-039→h-038→h-032→h-031` | **Upphävd** — de tre är avslutade `OVERIFIERAT` |
 | `AGENTS.md` (laddas automatiskt: Codex direkt, Claude via `CLAUDE.md`) | pekar hit | Ingången. `PROMPT-TILL-CODEX.txt` avförd 2026-09-17 (blob `acd132be` @ `eb9483e9`; bar status och återkallade order) |

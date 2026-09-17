@@ -84,6 +84,7 @@ Integrationstakt: en leverans = en PR; högst en öppen PR utöver den som grans
 mergade leveranser, inte commits.
 
 ## 9. Evidens
+Regel 22 (teknisk ändring och dess dokumentation i samma commit): kernelarbete bokförs i `docs/loop/drift.md` + `docs/05-beslutslogg.md`; rör ändringen webbfabrikslagret gäller `docs/00-borja-har.md`.
 Slutrapport enligt `docs/loop/codex-evidence-contract.md`: varje påstående med kommando + exitkod ur samma
 session; overifierat märks `OVERIFIERAT`; ett prov bevisar bara det provet läser (regel 8a). Teknisk
 ändring och dess drift-/beslutsrad i samma commit (regel 22).
@@ -92,15 +93,16 @@ session; overifierat märks `OVERIFIERAT`; ett prov bevisar bara det provet läs
 `docs/loop/harness-substitution-contract-v1.md` (provider-neutral kernel; blob-pinnad av autopiloten; bär
 `PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY` fryst — namnger nedströmskonsumenten, aldrig detta repos
 leverans) · `docs/loop/codex-autopilot-v2.md` · `docs/loop/codex-autopilot-v3-full-roadmap.md` ·
-`docs/loop/remaining-bootstrap-delegation-v1.md` (grindpinnad; dess scope h-031/h-032/h-035 är avslutat
-`OVERIFIERAT`). Backupen: `Nortropic/nortropic-backups` — backuparbete ger en rad i drift samma dag.
+`docs/loop/remaining-bootstrap-delegation-v1.md` (grindpinnad; dess scope h-031/h-032/h-035 — läget står i
+drift, inte här). Backupen: `Nortropic/nortropic-backups` — backuparbete ger en rad i drift samma dag.
 
 ## 11. Verktygsspecifikt — Codex
 Starta `codex` i `~/kernel-arbete`; `AGENTS.md` laddas automatiskt, ingen prompt klistras in. Roller:
 `$nortropic-<roll>`. Icke-interaktivt: `codex exec -C ~/kernel-arbete -s read-only …` (motorn i
 `CODEX_CLI_PATH`). Ingen Stop-hook finns för Codex: kör `scripts/nortropic-autocommit.sh` själv före avslut.
 
-## 12. Claude Code — anropsdetaljer (`CLAUDE.md` är en symbolisk länk till denna fil)
+## 12. Claude Code — anropsdetaljer (`CLAUDE.md` är byteidentisk med denna fil; `check-docs-coherence.mjs` kräver det)
+- Projektets Stop/SessionEnd-hookar (autocommit) laddas **bara när sessionen startar i reporoten** (mätt 2026-09-17): startar du i en underkatalog sker ingen autocommit — bevara för hand (regel 12).
 
 - Starta i reporoten `~/kernel-arbete`. `.claude/settings.json` (spårad) kör
   `scripts/nortropic-autocommit.sh` på `Stop` och `SessionEnd` via `$CLAUDE_PROJECT_DIR`. Kontrollera

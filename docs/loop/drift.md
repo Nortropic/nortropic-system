@@ -1,9 +1,9 @@
 # Att köra loopen
 
-## 2026-09-17 — L2: en ingång — AGENTS.md är kontraktet, CLAUDE.md är en symbolisk länk till det (importformen mättes och föll); PROMPT-TILL-CODEX.txt avförd
+## 2026-09-17 — L2: en ingång — AGENTS.md och CLAUDE.md bär samma kontrakt, byteidentiska med vakt (import- och länkformen mättes och föll); PROMPT-TILL-CODEX.txt avförd
 
 ### Vad som ändrats (uppdraget §4.1/§4.2)
-- **`AGENTS.md`** omskriven till en router på ≈100 rader med markören `NORTROPIC_INGANG=AGENTS.md-2026-09-17`:
+- **`AGENTS.md`** omskriven till en router på ≈120 rader (117 + §12) med markören `NORTROPIC_INGANG=AGENTS.md-2026-09-17`:
   vad repot är; en hemvist per uppgift (VÄGEN / drift + helhetsbilden / beslutslogg / regler / metod);
   auktoritetsordning; repoidentitet + `NO_FORCE_SEMANTICS` + grindkörningsvarningen; roller = workflow-separation
   med det mekaniska skyddet utskrivet (identitet, `allowed_write`, frysta prov, hash-pinnat register,
@@ -16,22 +16,25 @@
   (blob-pinnad av autopiloten) — AGENTS-kopian var inte asserterad av något (mätt: noll träffar i
   verify/controller/scripts på båda grenarna).
 - **`CLAUDE.md`** (§A, regel 6 — ändrad HÖGRISK-märkt med `LOOP-ÄGARUPPDRAG-20260917` §4.2 som auktoritet):
-  **symbolisk länk till `AGENTS.md`** (git-typ `120000`). Uppdragets första form — tunn `CLAUDE.md` med `@AGENTS.md` +
-  Claude-detaljer — **prövades först och föll i mätningen**: från reporoten laddades `CLAUDE.md` (`session_start`) och
-  `AGENTS.md` (`include`) och markören svarades rätt, men från `docs/loop/raddning` laddades bara `CLAUDE.md` och
-  svaret blev *"Ingen rad som börjar med NORTROPIC_INGANG= finns i mina laddade instruktioner … `@AGENTS.md`, vars
-  innehåll inte expanderats"* (`~/nortropic-bevis/ingang-20260917T155250Z/`); varianten `@./AGENTS.md` gav samma
-  (`…T155410Z-variant-punktslash/`). Claude Code 2.1.257 expanderar alltså inte relativa importer i en förälderkatalogs
-  `CLAUDE.md`. Nästa enklaste stödda form är länken: samma bytes för båda verktygen, ingen dubblett att hålla lika;
-  Claude-specifika anropsdetaljer står i `AGENTS.md` §12 (16 rader). Innehåller literal `agentoverlamning`
-  (`check-docs-coherence.mjs:409`, som läser genom länken — 24/24 gröna). Ingen `@` utanför backticks.
+  **riktig fil, byteidentisk med `AGENTS.md`**, och likheten är en vakt (`check-docs-coherence.mjs`:
+  `H-CLAUDE-och-AGENTS-byteidentiska`, jämför bytes). Två former prövades och föll före denna: (1) uppdragets första
+  form — tunn `CLAUDE.md` med `@AGENTS.md` — laddades från reporoten (`session_start` + `include`) men **inte** från
+  `docs/loop/raddning` (bara `CLAUDE.md`, importen oexpanderad; `@./AGENTS.md` likadant; `~/nortropic-bevis/ingang-20260917T155250Z/`,
+  `…T155410Z-variant-punktslash/`): Claude Code 2.1.257 expanderar inte relativa importer i en förälderkatalogs `CLAUDE.md`;
+  (2) symbolisk länk `CLAUDE.md → AGENTS.md` laddades från båda katalogerna (`…T155520Z-variant-symlank/`, `…T155544Z-slutlig/`)
+  men **fäller den frysta grinden `h-007-exit` K1.8** (`verify/bin/h-007-exit:32` skriver till `$WS/CLAUDE.md`, `git status`
+  visar då ` M AGENTS.md` och §A-orsaken namnger fel fil: `18 PASS, 1 FAIL` mot `19 PASS` på main) och tömmer §A-sökvägen på
+  innehåll — funnet av mekanismens granskning av `138f107`. **Med två riktiga filer committade i en engångsklon: `h-007-exit` 19 PASS, 0 FAIL, `PASS K1.8 §A-yta avvisas: CLAUDE.md`** (diagnostik, Darwin). Två riktiga filer med byteidentitet som mekanism är nästa enklaste
+  stödda form: var sitt verktyg läser sin egen fil, `h-007` passerar, §A-filen bär kontraktet (varje kontraktsändring är
+  därmed HÖGRISK + beslutsrad, regel 6 oförändrad), och "håll dem lika" är inte längre en rutin utan en vakt. Claude-specifika
+  anropsdetaljer i §12 (16 rader). Innehåller literal `agentoverlamning` (`check-docs-coherence.mjs`). Ingen `@` utanför backticks.
 - **Avfört:** `docs/loop/raddning/PROMPT-TILL-CODEX.txt` (424 rader; bar status, återkallade order,
   dubbletter av VÄGEN; blob `acd132be` @ `eb9483e9` i git-historiken). Konsumenter ompekade i samma commit:
   `AGENTS.md`, `VAGEN.md` §0-tabellen, `raddning/README.md`, `00-LAS-FORST.md`, `redo-for-codex.sh` (kontroll 6
   prövar nu `AGENTS.md`), `validera-underlaget.sh` (kommentar). `raddning/README.md` bär **en** pekare
   (`VAGEN.md`), `12-arbetsorder.md` är "delplan för FAS 1", `10-…-h014.md` är "arbetspaket, FAS 4",
   `03`/`05` citerar `AGENTS.md` §7 i stället för "rad 148"; rot-`README.md` beskriver den nya formen.
-- `.claude/settings.json`: hook-kommandona via `${CLAUDE_PROJECT_DIR:-.}` (relativ sökväg bröt utanför roten).
+- `.claude/settings.json`: hook-kommandona via `${CLAUDE_PROJECT_DIR:-.}`. **Ändringen är verkningslös** (oberoende granskning av `138f107`, mätt kallt i engångsklon med eko-hookar): projektets Stop/SessionEnd-hookar laddas **bara när sessionen startar i reporoten** — från en underkatalog avfyras ingen projekthook alls, och från roten var `bash scripts/…` redan rätt. Formen behålls som harmlös; det som gäller står i §12: start i underkatalog = ingen autocommit, bevara för hand (regel 12).
 
 ### Konsumentkarta (mätt före ändringen)
 Ingen grind eller `controller/**` på `main` hashar/radpinnar AGENTS.md/CLAUDE.md (bara sökvägslistor:
@@ -51,16 +54,18 @@ Prov: `laddningsprov.sh` (i `~/nortropic-bevis/ingang-*/launcher`-form: `launch-
 | samma | `docs/loop/raddning` | **bara** `CLAUDE.md` session_start | *"Ingen rad som börjar med NORTROPIC_INGANG= … `@AGENTS.md`, vars innehåll inte expanderats"* | **FALL** |
 | `@./AGENTS.md` | `docs/loop/raddning` | bara `CLAUDE.md` | samma | **FALL** (`…T155410Z-variant-punktslash`) |
 | **`CLAUDE.md` → symbolisk länk till `AGENTS.md`** (blob `88f0c733` för båda) | reporoten | `CLAUDE.md` session_start (innehåll = `AGENTS.md`) | markör + `VAGEN.md`, 1 tur | **PASS** (`…T155544Z-slutlig`) |
+| samma | `docs/loop/raddning` | `CLAUDE.md` session_start | markör + `VAGEN.md`, 1 tur | **PASS** (samma körning) — men formen fäller `h-007-exit` K1.8 (se ovan) |
+| **`CLAUDE.md` riktig fil, byteidentisk med `AGENTS.md`** (blob `a719c0be` för båda; isolerad engångsklon under `$TMPDIR` utan projekthookar och utan `CLAUDE.md` i någon förälderkatalog) | reporoten | `CLAUDE.md` session_start (enda laddade instruktionsfilen) | markör + `VAGEN.md`, 1 tur | **PASS** (`…T162653Z-slutlig-tvafiler`; en tidigare körning `…T162543Z` under scratchpad plockade upp ett utkast-`CLAUDE.md` i en förälderkatalog och ersattes) |
 | samma | `docs/loop/raddning` | `CLAUDE.md` session_start | markör + `VAGEN.md`, 1 tur | **PASS** (samma körning) |
 | Codex (`codex exec -C <rot|raddning> -s read-only`) | båda | — | — | **EJ KÖRT** (kvota slut till 2026-09-19 20:22; app-motorn 0.154.0-alpha; CLI 0.147.0 kan inte tala med `gpt-6-astra`) |
 
-Slutsats: importformen är stödd men expanderas inte från en underkatalog i 2.1.257 — därför länken. Codex-ledet
+Slutsats: importformen är stödd men expanderas inte från en underkatalog i 2.1.257; länken laddas men fäller frysta `h-007` — därför två byteidentiska filer med vakt. Codex-ledet
 måste mätas när kvotan är tillbaka; tills dess är "båda verktygen laddar samma kontrakt" **bevisat för Claude Code,
-OVERIFIERAT för Codex** (Codex autoladdar `AGENTS.md` enligt sin dokumentation, samma bytes som länken pekar på).
+OVERIFIERAT för Codex** (Codex autoladdar `AGENTS.md` enligt sin dokumentation, samma bytes som `CLAUDE.md`).
 
 **Sidoeffekt som blev ett fynd (AUD-08 i praktiken):** laddningsprovet måste köras MED projektets inställningar
 (annars laddas inte `CLAUDE.md`), och projektets `.claude/settings.json` bär Stop/SessionEnd-hookarna →
-`scripts/nortropic-autocommit.sh` committade och pushade de okommitterade L2-filerna i slutet av varje provsession:
+`scripts/nortropic-autocommit.sh` committade och pushade de okommitterade L2-filerna i slutet av de **två rotstartade** provsessionerna (de fyra `raddning`-startade sessionerna gav inga commits — projekthookar laddas inte därifrån, se ovan):
 `66d4690`+`a2f0f6a` (17:52) och `ae305e7`+`ac55b9a` (17:55), varav två `[HÖGRISK-OGRANSKAD] §A-ytor rörda`
 för `CLAUDE.md`. Ingen force (regel 12): commiten nedan är människohandens auktorisation enligt formen i
 autocommitens eget meddelande, med `LOOP-ÄGARBESLUT-INGANG-V1` som rad. L4 inför `NORTROPIC_AUTOCOMMIT=0`
@@ -69,7 +74,7 @@ autocommitens eget meddelande, med `LOOP-ÄGARBESLUT-INGANG-V1` som rad. L4 inf�
 ### Omtest av konsumenter
 Mätt på grenen efter patchen (arbetsträdet med L2-filerna): `node scripts/kor-vakter.mjs` **24/24** (inkl.
 `check-docs-coherence.mjs`, som läser `CLAUDE.md` genom länken); `node scripts/check-granskningsmekanismen.mjs` 22/22;
-`bash tests/scripts/nortropic-autocommit/fall.sh` 7/7 (hook-kommandot med `${CLAUDE_PROJECT_DIR:-.}`);
+`bash tests/scripts/nortropic-autocommit/fall.sh` 7/7 (provet läser inte hook-kommandot i `settings.json`; att `${CLAUDE_PROJECT_DIR:-.}`-formen avfyras bevisas av autocommitarna `66d4690`/`ac55b9a`);
 `redo-for-codex.sh`: kontroll 6 (ingången bär ingen egen ordning · ingången pekar på `VAGEN.md`) ✓ mot `AGENTS.md`;
 de röda raderna är arbetsträdets okommitterade filer, autopush-raden (kloner mäts före `--kor`) och den kända
 AUD-03-flippen "underlaget: inga AVVIKER — 2 rader" (validera mäter vid spetsen; L3 rättar). `validera-underlaget.sh`
@@ -127,7 +132,7 @@ kringgångar, inte en fullständig parser; det står nu så även i skriptet. Ad
 till `~/nortropic-bevis/publicera-l1b-r5-20260917/` (loggar, mutantsvep, mätskript); väggklockan mätt mot **riktig**
 `claude`-binär (Mach-O arm64): `perl alarm 5` → rc 142 efter 5 s (`~/nortropic-bevis/publicera-vaggklocka-*/`).
 Prov då (716a992): **77 fall gröna** (38 + N6i/N6j + S1–S20 + H1–H17); mutanter: **34 byggda, 34 fällda** (nio nya, rader 27–35 i
-tabellen; svep mot en klon av kandidaten: `~/nortropic-bevis/publicera-l1b-r5-20260917/mutA.log`, `mutB.log`, `mutC.log`).
+tabellen; svep mot en klon av kandidaten: `~/nortropic-bevis/publicera-l1b-r5-20260917/mutA.log`, `mutB.log`; m31 fälld i `mutG.log`).
 **Mätprov 4 mot riktig `claude`** (första försöket 15:16 CEST stoppades av `You've hit your session limit · resets
 4:50pm` — bokfört som EJ KÖRT i `716a992`; kört 16:55 mot exakt `716a992`, `publicera.sh` blob `297b629d`, arbetsträd
 rent; launcher, identitet, svar i `~/nortropic-bevis/publicera-sparrar-20260917T145540Z/`):
@@ -246,7 +251,7 @@ räkning (byggda ur den rättade kandidaten, en rad ändrad per mutant, harnesse
 **Räkningen, förenad:** tabellen har 36 rader men 35 namngivna mutanter i svepet — rad 6 ("git-skalet släpper igenom
 push") och rad 31 är samma mutant efter att skalet byggdes om (m34), och en trettiosjätte (m39, "skalet vägrar sina egna
 `-c`-nycklar") var likvärdig efter kedjeupplösningen och togs bort tillsammans med regeln. Historik: `mutA.log`/`mutB.log`
-kördes mot 75-fallsharnessen (m31 överlevde där), `mutC.log` fällde m31 med H16, `mutD.log` körde om skalmutanterna efter
+kördes mot 75-fallsharnessen (m31 överlevde där), H16 fällde sedan m31 (`mutG.log`; `mutC.log` bevarades inte), `mutD.log` körde om skalmutanterna efter
 kedjefixen, `mutE.log` m39/m40. **Slutgiltigt svep mot HEAD:s 79-fallsharness i en klon av `1164bdd`: mutF.log (17/17) + mutG.log (18/18) — 35 byggda,
 35 fällda** (`~/nortropic-bevis/publicera-l1b-r5-20260917/`). Kända luckor som harnessen INTE mäter: att riktig
 `claude` ärver PATH och `--settings`-miljön (det mäts av mätproven ovan, inte av stubben), och G4.
