@@ -3,7 +3,7 @@
 # utdata sparad, restkontroll på innehåll, aggregerad exitkod. Syntetisk klon med kopia av controller/verify/cli.
 #   MATNING=<fil> GRINDLAGE=<fil> bash tests/scripts/matning-pa-macen/fall.sh
 set -u
-HAR="${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}"
+HAR="${1:-${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}}"   # första argumentet = kandidatrot (granskaren får inte miljöprefix)
 MA="${MATNING:-$HAR/docs/loop/raddning/artefakter/matning-pa-macen.sh}"; GL="${GRINDLAGE:-$HAR/docs/loop/raddning/artefakter/_grindlage.sh}"
 [ -f "$MA" ] && [ -f "$GL" ] || { echo "ODÖMBART: kandidat saknas"; exit 2; }
 command -v python3.12 >/dev/null 2>&1 || { echo "ODÖMBART: python3.12 saknas"; exit 2; }
@@ -48,5 +48,16 @@ bygg smutsar; echo a > "$A/rest-a.txt"; rc="$(kor)"; grep -q 'SMUTSADE' "$T/ut.t
 bygg langt; rc="$(kor)"; L="$(ls -t "$T/matningar"/*/h-001.txt 2>/dev/null | head -1)"; n="$(grep -c '^rad ' "$L" 2>/dev/null)"
 [ "${n:-0}" = 100 ] && grep -q 'sista 40 rader' "$T/ut.txt" && [ "$rc" = 1 ] && ok "M4 full utdata (100 rader) i loggfilen, skärmen visar 'sista 40 rader', FAIL → exit 1" || fel "M4" "rader=$n rc=$rc"
 # M5 worktree-spärr oförändrad: kör i en länkad worktree → exit 2
+# M8/M9 tom eller oläsbar slutning → NEJ (exit 1), aldrig "0 av 0 = grönt"
+bygg pass; printf '{"tasks":[{"id":"h-015","depends_on":[],"exit_test":"verify/bin/h-015-exit"}]}\n' > "$A/specs/tasks.spec.json"; git -C "$A" commit -qam tom; rc="$(kor)"; grep -q 'NEJ: tom slutning' "$T/ut.txt" && [ "$rc" = 1 ] && ok "M8 tom slutning → NEJ, exit 1" || fel "M8" "rc=$rc $(grep -m1 'SUMMA' "$T/ut.txt")"
+bygg pass; printf '{"tasks": [' > "$A/specs/tasks.spec.json"; git -C "$A" commit -qam trasig; rc="$(kor)"; grep -q 'kan inte läsas' "$T/ut.txt" && [ "$rc" = 1 ] && ok "M9 ogiltig JSON → NEJ, exit 1" || fel "M9" "rc=$rc"
+bygg pass; kor >/dev/null; grep -qE '^mätrevision: `[0-9a-f]{40}`$' "$T/ut.txt" && grep -qE '^RAD: h-001:' "$T/ut.txt" && ok "M10 utdata bär mätrevision + RAD i redo:s bindbara form" || fel "M10" "$(grep -E 'RAD|mätrevision' "$T/ut.txt" | head -2 | tr '\n' ' ')"
+# M6 slutningen ur specen: lägg h-099 som beroende till h-015 i fixturen → raden dyker upp (hårdkodad lista kan inte)
+bygg pass; /usr/bin/python3 - "$A/specs/tasks.spec.json" <<'PY'
+import json,sys; p=sys.argv[1]; d=json.load(open(p)); t=next(x for x in d['tasks'] if x['id']=='h-015'); t.setdefault('depends_on',[]).append('h-099'); json.dump(d,open(p,'w'))
+PY
+git -C "$A" commit -qam spec; rc="$(kor)"; grep -q 'h-099' "$T/ut.txt" && ok "M6 slutningen läses ur specen (nytt beroende h-099 dyker upp som SAKNAS)" || fel "M6" "h-099 saknas i utdata"
+# M7 hook-vakt: hooksPath satt till en katalog vars post-commit skiljer sig från repots → stopp före första grinden
+bygg pass; mkdir -p "$T/hk"; printf '#!/bin/sh\nexit 0\n' > "$T/hk/post-commit"; chmod +x "$T/hk/post-commit"; printf '#!/bin/sh\n# repots hook\nexit 0\n' > "$A/.githooks/post-commit" 2>/dev/null || { mkdir -p "$A/.githooks"; printf '#!/bin/sh\n# repots hook\nexit 0\n' > "$A/.githooks/post-commit"; }; git -C "$A" add -A; git -C "$A" commit -qm hook; git -C "$A" config core.hooksPath "$T/hk"; rc="$(kor)"; grep -q 'STOPP: hooken' "$T/ut.txt" && [ "$rc" = 2 ] && ok "M7 hook utan vakterna → stopp (exit 2) före första grinden" || fel "M7" "rc=$rc $(head -2 "$T/ut.txt" | tr '\n' ' ')"; git -C "$A" config --unset core.hooksPath
 bygg pass; git -C "$A" worktree add -q --detach "$T/wt" HEAD; ( cd "$T/wt" && bash docs/loop/raddning/artefakter/matning-pa-macen.sh ) > "$T/ut2.txt" 2>&1; rc=$?; [ "$rc" = 2 ] && ok "M5 länkad worktree → AVBRYTER, exit 2" || fel "M5" "rc=$rc"
 echo; echo "$PASS gröna · $FAIL röda"; [ "$FAIL" = 0 ] && exit 0 || exit 1

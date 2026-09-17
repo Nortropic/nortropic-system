@@ -1,5 +1,25 @@
 # Att köra loopen
 
+## 2026-09-17 kväll — AVSTÄMNING (ägarens förbrukningsbroms, ~40 % av veckokvoten uppgivet) och återupptagningspunkt
+
+**Integrerat på `main` (`4b58acf6`) i dag:** #261 granskningsmekanismen SHA-bunden · #262 hook-vakt (inga fixturpushar från
+länkade worktrees/utförarcommits) · #263 lägesförståelsen + underlaget · #264 `scripts/publicera.sh` (bevara → PR → separat
+granskning → merge; mekanismen mergade sig själv efter sju varv) · #265 en ingång (`AGENTS.md` = `CLAUDE.md`, byteidentitet
+som vakt; laddning bevisad för Claude Code från rot och underkatalog, Codex OVERIFIERAT). Required checks på servern:
+`vaktsviten (webbfabriken)` + `skalprov under tests/scripts` (mätt `gh api`).
+**Kernelförmåga:** ingen verifierad förflyttning — `helhetsbilden.sh` 0/6, de fjorton slutningsgrindarna `FRYST_EJ_REGISTRERAD`,
+h-030 saknas i specen, plattformsgrenen (55 commits, fem kärnfiler) inte landad. Det som flyttats är byggblockeringar och
+instrument, inte kärnan.
+**Ofärdigt, bevarat på remote:** L3 (PR #266, gren `nortropic/loop-l3-sanna-besked`) — två granskningar gav FYND
+(tom/oläsbar slutning blev grön; prosabunden RAD; `--operativt` körde h-013 live); rättelsen r2 är byggd, validerad i klon
+(harnessar 20/14/13/6/10, alla mutanter fällda) och committad här som ofärdig — ingen merge, ingen ny granskning i denna
+avstämning. **Förberett i sessionens scratchpad (flyktigt):** L4 autocommit (14 fall), L5 VÄGEN + rapportschema + Codex-rader
+(ägarinstruktion 18:45), L4b verifiering på rätt plats (ägarens avgränsade rättelse 19:05, design i `l4b/DESIGN.md`), L6-skript.
+**Återupptagningspunkt:** (1) L3 r2 → en granskningsrunda via `publicera.sh` (runda 2 av högst 3; tredje FYND ⇒ parkera
+grenen ofärdig och rapportera); (2) L4b enligt ägarens rättelse — förutsättning för kärnyte-PR:er i FAS 1; (3) FAS 1 enligt
+VÄGEN. L4/L5/L6/L7/L8 står kvar i ordningen; inga fler varv på publicera-spärrarna, inga dubbla subagentgranskningar utöver
+mekanismens föreskrivna, inga nya mutantsvep utan ny grund.
+
 ## 2026-09-17 — L3: sanningsenliga start-/slutbesked — AUD-01/02/03/09/10 stängda (grindstege, helhetsbilden, redo, validera, inventera, matning + fem harnessar)
 
 ### Vad som ändrats (uppdraget §4.3, auditens motexempel T01/T02/T05/T06/T07)
@@ -16,13 +36,15 @@
   `controller/verify/register.json` — det är ett kontraktsflöde (arkitekt/test-author; `register.json` är SHA-pinnad i
   `controller/verify/cli`) och står i VÄGEN som steg före Milstolpe A (L5), inte tyst här. AUD-01/AUD-02 stängda.
 - **`redo-for-codex.sh`**: `v=$?` **är** domen (0 JA / 1 NEJ / 2 ODÖMBART / annat NEJ "krasch exit N"); anropar
-  `validera-underlaget.sh --operativt`; "kartan är mätt" binds mekaniskt: `RAD: h-001`-block i drift.md med backtickad sha som är
-  förfader till HEAD **och** `git diff --quiet <sha> HEAD -- verify/bin controller specs`; autopush = `cmp -s`; `mktemp` i stället
+  `validera-underlaget.sh --operativt`; "kartan är mätt" binds mekaniskt: bara **mätrader** (radstart, ev. main/gren-prefix,
+  sedan RAD-blocket för h-001 med exitkod) med backtickad sha inom 30 rader ovanför som är förfader till HEAD **och**
+  `git diff --quiet <sha> HEAD -- verify/bin controller specs` — en prosarad som nämner blocket binder inget (r2: den
+  oberoende granskningen visade att L3:s egen drift-text planterade en sådan literal och band till ett sha; R4e/R4f); autopush = `cmp -s`; `mktemp` i stället
   för fasta `/tmp/redo-*.txt`. AUD-03 stängd: landning av en leverans fäller inte längre redo.
 - **`validera-underlaget.sh`**: `REV=${VALIDERA_REV:-28ca1af}` (diagnosrevisionen); historiska rader mäts vid `$REV` via
   `git cat-file/ls-tree/show` → `BEKRÄFTAT@28ca1af` / `AVVIKER@28ca1af` och flippar aldrig när vägen lyckas; `--operativt` hoppar
   historiska + bundle/patch-raderna (permanent ODÖMBART i repot — skälet till att `v` ignorerades). README: `ÖVERFLÖDIGA` vs
-  `AVSIKTLIGT UTELÄMNADE` rättade, hårda tal borta. AUD-09/AUD-10 stängda.
+  `AVSIKTLIGT UTELÄMNADE`: bundlen är både avsiktligt utelämnad ur repot och överflödig som artefakt — inte motstridigt, r2b; hårda tal borta. AUD-03 (validera-delen) stängd.
 - **`inventera-lokalt-arbete.sh`**: `git branch -r --contains "$h" --list 'origin/*'` på båda ställen (lokala grenar räknades
   som "på origin"); "Städning kan ske…" skrivs **endast** om `IG_TOT=0`, annars `STÄDNING EJ FRIKÄND — N ignorerade filer i M träd
   omätta (regel 13b:4)`; header sann; rapport till `${NORTROPIC_RAPPORT_KAT:-~/.nortropic/rapporter}/`, inte `/tmp`.
@@ -40,7 +62,13 @@ flippar inte när trädet ändras; V2 `--operativt`; V3 `AVVIKER@REV` när REV-i
 `tests/scripts/inventera-lokalt-arbete/fall.sh` **6** (I1=T05 `--list origin/*`; I2 positivt; I3=T06 städning ej frikänd; I4
 header; I5 rapportkatalog; I6 IG_TOT=0) · `tests/scripts/matning-pa-macen/fall.sh` **5** (M1=T07 diag ≠ kval; M2 LOGGKAT; M3
 positivt; M4 restkontroll; M5 aggregat). Mutanter (återinförd `-f`, ignorerat `v`, borttaget `--list origin/*`, `wc -l`-jämförelse,
-diag räknad som kval, städning frikänd trots ignorerade) fälls — `l3/mut/`. Registerrader ×5 (`check-provanropare.mjs`,
+diag räknad som kval, städning frikänd trots ignorerade) fälls — `~/nortropic-bevis/l3-20260917/mut/`. **r2 (oberoende
+granskning av `19396de`):** `--operativt` körde `h-013-exit` live i klonen (80 `.nortropic-h036-proof-*`-rester per körning;
+inforaden bar inget verdikt) — nu körs ingen grind i operativt läge (V5 kanarie, V5b fullt läge som förut); RAD-bindningen
+ankrad till mätrader (R4e prosarad, R4f icke-förfader); matning fick samma hook-vaktspärr som helhetsbilden (M7) och ett
+fall för slutningen ur specen (M6); `_grindlage` ger `PYTHON_SAKNAS` före registeruppslaget; inventera-headern säger att
+provet fetchar `--prune`. Resterna i `~/kernel-arbete` (720 proof-filer i roten, ignorerade) står kvar orörda — inget raderas —
+och räknas i inventeras "STÄDNING EJ FRIKÄND"-tal. Registerrader ×5 (`check-provanropare.mjs`,
 källhash ompinnad), workflowens `provsviter`-lista +5, `check-vaktankare.mjs --pinna-om`.
 
 ### Körda på Darwin i `~/kernel-arbete` efter patchen (sanna rader)
@@ -54,7 +82,7 @@ Före commit (arbetsträdet bär L3-filerna okommitterade — det syns, och det 
 - `redo-for-codex.sh` → **exit 1, "INTE REDO"** med exakt två ✗: *arbetsträdet rent (15 okommitterade)* och *regel 12* — båda
   ÄR den okommitterade L3-leveransen; övriga tio ✓ inkl. *underlaget (operativt): inga AVVIKER* (AUD-03-flippen borta) och
   *kartan är mätt (RAD i drift.md, revision bunden) mätt på 28ca1af*.
-- `validera-underlaget.sh --operativt` → **exit 0** (19 rader BEKRÄFTAT/ODÖMBART-fria operativa rader); utan flaggan exit 2
+- `validera-underlaget.sh --operativt` → **exit 0** (16 BEKRÄFTAT + 1 INFO); utan flaggan exit 2
   (bundle/patch-raderna, permanent ODÖMBART i repot — det står nu i README).
 - `inventera-lokalt-arbete.sh` → **exit 1**: 1 worktree OSÄKRAT okommitterat (= detta träd), 8 fristående kloner, 0 föräldralösa,
   0 grenar utanför origin; städning EJ frikänd förrän ignorerade filer mätts; rapport `~/.nortropic/rapporter/lokalt-arbete-20260917-184405.txt`.
@@ -62,11 +90,11 @@ Efter commit `e58abfb` + autopush (18:46 CEST): `redo-for-codex.sh` → **exit 0
 reporoten; AGENTS.md laddas automatiskt, VAGEN.md bär ordningen"** — tolv ✓, och domen är nu exitkoden, inte en rad som
 skrivs ändå. `inventera-lokalt-arbete.sh` → **exit 0**: 0 OSÄKRAT, 1 worktree på pushad gren, 8 kloner, 0 föräldralösa; och
 raden *"STÄDNING EJ FRIKÄND — 2029 ignorerade filer i 4 träd är omätta (regel 13b villkor 4)"* står kvar som sann varning i
-stället för det gamla "Städning kan ske" (AUD-10). `helhetsbilden.sh` oförändrad (0/6, exit 1) — leveransen ändrar inte kärnan.
+stället för det gamla "Städning kan ske" (AUD-09). `helhetsbilden.sh` oförändrad (0/6, exit 1) — leveransen ändrar inte kärnan.
 
 ### Auditdisposition
 AUD-01 ✔ (slutningen ur specen, h-017/h-027–030 med) · AUD-02 ✔ (stegen, aldrig `-f`) · AUD-03 ✔ (`v` är domen,
-`--operativt`) · AUD-09 ✔ (`--list origin/*`) · AUD-10 ✔ (städning frikänns bara vid IG_TOT=0). Kvar: AUD-04–07/12 (L5),
+`--operativt`) · AUD-09 ✔ (`--list origin/*`, städning frikänns bara vid IG_TOT=0) · AUD-10 ✔ (kval ≠ diag, full logg per grind, restkontroll). Kvar: AUD-04–07/12 (L5),
 AUD-08 (L4), AUD-11 (L6/L7).
 
 ## 2026-09-17 — L2: en ingång — AGENTS.md och CLAUDE.md bär samma kontrakt, byteidentiska med vakt (import- och länkformen mättes och föll); PROMPT-TILL-CODEX.txt avförd

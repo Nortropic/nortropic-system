@@ -208,7 +208,12 @@ else rad "bundle: finns" "JA" "ODÖMBART"; fi
 
 # ── Plattform: kernelgatarna kan bara dömas på Macen ─────────────────────────
 echo
-if [ "$(uname -s)" = "Darwin" ]; then
+if [ "$LAGE" = "operativt" ]; then
+  # Operativt läge (redo:s ingång) kör INGEN grind live: h-013 skapar workspaces via
+  # controller/workspace/cli i den klon den körs i och lämnar .nortropic-h036-proof-*-rester
+  # (80 per körning, mätt av oberoende granskning 2026-09-17), och raden bär ändå inget verdikt.
+  rad "värdmaskin" "$(uname -s)" "$(uname -s)"
+elif [ "$(uname -s)" = "Darwin" ]; then
   rad "värdmaskin" "Darwin" "Darwin"
   if [ -f verify/bin/h-013-exit ]; then
     # INGET GNU `timeout` — det finns inte på macOS. Raden gav exit 127

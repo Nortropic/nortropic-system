@@ -3,7 +3,7 @@
 # över omätt ignorerat innehåll. Eget $HOME (klonsökningen går från $HOME), egna bare-remotes.
 #   INVENTERA=<fil> bash tests/scripts/inventera-lokalt-arbete/fall.sh
 set -u
-HAR="${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}"
+HAR="${1:-${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}}"   # första argumentet = kandidatrot (granskaren får inte miljöprefix)
 INV="${INVENTERA:-$HAR/docs/loop/raddning/artefakter/inventera-lokalt-arbete.sh}"
 [ -f "$INV" ] || { echo "ODÖMBART: $INV saknas"; exit 2; }
 T="$(mktemp -d "${TMPDIR:-/tmp}/inventera-fall.XXXXXX")"; export T; trap 'rm -rf "$T"' EXIT

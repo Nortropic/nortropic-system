@@ -29,6 +29,7 @@ ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "inte ett git-repo"
 LOGGKAT="${NORTROPIC_LOGG_KAT:-$HOME/.nortropic/matningar}/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$LOGGKAT"
 LOGG="$LOGGKAT/matning.txt"
 exec > >(tee "$LOGG") 2>&1
+GL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/grindlage-run.XXXXXX")"; trap 'rm -rf "$GL_TMP"' EXIT; export GL_TMP
 GL_ROT="$ROT"; . "$ROT/docs/loop/raddning/artefakter/_grindlage.sh"
 AGG_NEJ=0; AGG_OD=0
 
@@ -92,12 +93,19 @@ echo
 BAS="001:0 002:0 003:1 004:1 005:0 006:0 007:0 008:0 009:2 010:1 011:1 012:2 013:1 016:1"
 basvarde() { for p in $BAS; do case "$p" in "$1:"*) echo "${p#*:}"; return;; esac; done; echo "-"; }
 
-PASS=0; FAIL=0; ANNAT=0; DIAG=0; RESULTAT=""; VANDA=0; KVAR=0; N=0
+PASS=0; FAIL=0; ANNAT=0; DIAG=0; RESULTAT=""; VANDA=0; KVAR=0; N=0; SPECFEL=0
 # Slutningen läses ur specen (depends_on från h-015), aldrig en hårdkodad lista: h-017 och
 # h-027–h-030 kommer med den dag h-030 finns. Ett saknat id är ett fynd, inte en tystnad.
 SLUTNING="$(gl_slutning h-015)"
+# Hook-vakt (L1c): grindarna skapar worktrees och committar i denna klon; utan vakterna i
+# hooken pushas fixturgrenar. Samma spärr som helhetsbilden.sh — stoppa före första grinden.
+HP="$(git config --get core.hooksPath 2>/dev/null || true)"
+if [ -n "$HP" ] && [ -f "${HP/#\~/$HOME}/post-commit" ] && ! cmp -s .githooks/post-commit "${HP/#\~/$HOME}/post-commit"; then
+  echo "STOPP: hooken i $HP är inte repots (.githooks/post-commit) — grindkörning skulle pusha fixturcommits. Kör: bash scripts/installera-hooks.sh --kor" >&2; exit 2
+fi
 printf "%-6s %-8s %-22s %-7s %s\n" TASK MACEN VERDIKT LINUX KOMMENTAR
 for id in $SLUTNING; do
+  case "$id" in FEL:spec) SPECFEL=1; continue;; esac
   case "$id" in SAKNAS:*) printf "%-6s %-8s %-22s %-7s %s\n" "${id#SAKNAS:}" "-" "EJ_SPECAD" "-" "⚠️ saknas i specen — slutningen är inte hel"; ANNAT=$((ANNAT+1)); AGG_NEJ=$((AGG_NEJ+1)); RESULTAT="$RESULTAT ${id#SAKNAS:}:EJ_SPECAD"; continue;; esac
   N=$((N+1)); h="${id#h-}"
   grindlage "$id" 1 1 "$LOGGKAT/$id.txt" >/dev/null
@@ -108,7 +116,8 @@ for id in $SLUTNING; do
     *) VF="$V"; ANNAT=$((ANNAT+1)); case "$(gl_klass "$V")" in nej) AGG_NEJ=$((AGG_NEJ+1));; *) AGG_OD=$((AGG_OD+1));; esac ;;
   esac
   B="$(basvarde "$h")"
-  if [ "$B" != "0" ] && [ "$K" = "0" ]; then KOM="plattformsbunden — frisk"; VANDA=$((VANDA+1))
+  if [ "$B" = "-" ]; then KOM="ingen Linux-baslinje (ny i slutningen)"
+  elif [ "$B" != "0" ] && [ "$K" = "0" ]; then KOM="plattformsbunden — frisk"; VANDA=$((VANDA+1))
   elif [ "$B" != "0" ] && [ "$K" != "0" ] && [ "$K" != "-" ]; then KOM="⚠️ RÖD ÄVEN HÄR — verkligt fel"; KVAR=$((KVAR+1))
   elif [ "$B" = "0" ] && [ "$K" != "0" ] && [ "$K" != "-" ]; then KOM="⚠️ GRÖN I LINUX MEN RÖD HÄR — oväntat"
   else KOM=""; fi
@@ -123,8 +132,13 @@ for id in $SLUTNING; do
   fi
 done
 echo
+# Tom eller oläsbar slutning är NEJ, aldrig "0 av 0 = allt grönt" (mekanismens granskning 2026-09-17).
+if [ "$SPECFEL" = 1 ]; then echo "NEJ: specs/tasks.spec.json kan inte läsas — ingen slutning, ingen mätning"; AGG_NEJ=$((AGG_NEJ+1)); fi
+if [ "$N" = 0 ] && [ "$SPECFEL" = 0 ]; then echo "NEJ: tom slutning — h-015 saknar depends_on eller finns inte i specen"; AGG_NEJ=$((AGG_NEJ+1)); fi
 echo "SUMMA: $PASS PASS·kval · $DIAG PASS·diag · $FAIL FAIL · $ANNAT ODÖMBART/annat   av $N (slutning ur specen)"
-echo "RAD:  $RESULTAT"
+# Mätraden i den form redo-for-codex.sh binder: revisionen direkt ovanför, ett blanksteg efter RAD:
+echo "mätrevision: \`$(git rev-parse HEAD 2>/dev/null)\`"
+echo "RAD: $(printf '%s' "$RESULTAT" | sed 's/^ *//')"
 echo "DELTA mot Linux-baslinjen: $VANDA vände till grönt (plattformsbundna, friska)"
 echo "                           $KVAR röda på BÅDA maskinerna (verkliga fel)"
 echo

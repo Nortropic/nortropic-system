@@ -4,7 +4,7 @@
 # kartan i drift.md måste vara revisionsbunden, hooken måste vara identisk med repots.
 #   REDO=<fil> bash tests/scripts/redo-for-codex/fall.sh
 set -u
-HAR="${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}"
+HAR="${1:-${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}}"   # första argumentet = kandidatrot (granskaren får inte miljöprefix)
 REDO="${REDO:-$HAR/docs/loop/raddning/artefakter/redo-for-codex.sh}"
 [ -f "$REDO" ] || { echo "ODÖMBART: $REDO saknas"; exit 2; }
 T="$(mktemp -d "${TMPDIR:-/tmp}/redo-fall.XXXXXX")"; export T; trap 'rm -rf "$T"' EXIT
@@ -43,6 +43,9 @@ bygg; rc="$(STUB_VAL=0 kor)"; r="$(radtext "underlaget")"; case "$r" in *"✓"*)
 bygg; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✓"*) ok "R4a RAD bunden till förfader, kärna oförändrad → JA" ;; *) fel "R4a" "$r" ;; esac
 echo y >> "$A/verify/bin/h-001-exit"; git -C "$A" commit -qam kärna; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✗"*"kärnan ändrad"*) ok "R4b kärnan ändrad sedan mätningen → NEJ, kör matning" ;; *) fel "R4b" "$r" ;; esac
 bygg; printf '# drift\n\nRAD: h-001:0\n' > "$A/docs/loop/drift.md"; git -C "$A" commit -qam u; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✗"*"saknar revision"*) ok "R4c RAD utan revision → NEJ" ;; *) fel "R4c" "$r" ;; esac
+bygg; B="$(git -C "$A" rev-parse HEAD)"; printf '# drift\n\nen prosarad som nämner `RAD: h-001`-blocket och commiten `%s`\n' "$B" > "$A/docs/loop/drift.md"; git -C "$A" commit -qam u; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✗"*"ingen RAD"*) ok "R4e prosarad med literalen + förfader-sha binder INTE (bara mätrader räknas; kärnan oförändrad)" ;; *) fel "R4e" "$r" ;; esac
+bygg; git -C "$A" switch -q -c annan; echo z > "$A/z"; git -C "$A" add -A; git -C "$A" commit -qm annan; X="$(git -C "$A" rev-parse HEAD)"; git -C "$A" switch -q main; printf '# drift\n\n`%s`\nRAD: h-001:0\n' "$X" > "$A/docs/loop/drift.md"; git -C "$A" commit -qam u; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✗"*"inte förfader"*) ok "R4f RAD bunden till sha som finns men inte är förfader → NEJ" ;; *) fel "R4f" "$r" ;; esac
+bygg; B="$(git -C "$A" rev-parse HEAD)"; printf '# drift\n\nmätrevision: `%s`\nRAD: h-001:PASS(0) h-002:FAIL(1)\n' "$B" > "$A/docs/loop/drift.md"; git -C "$A" commit -qam u; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✓"*) ok "R4g matningens egen utdataform (mätrevision + RAD: h-001:PASS(0)) binder → JA" ;; *) fel "R4g" "$r" ;; esac
 bygg; printf '# drift\n\n`deadbeefdeadbeef`\nRAD: h-001:0\n' > "$A/docs/loop/drift.md"; git -C "$A" commit -qam u; kor >/dev/null; r="$(radtext "kartan")"; case "$r" in *"✗"*) ok "R4d RAD med okänd revision → NEJ" ;; *) fel "R4d" "$r" ;; esac
 # R5 hooken: stale kopia → NEJ SKILJER; identisk → JA
 bygg; printf '#!/usr/bin/env bash\nexit 0\n# gammal\n' > "$HOME/hooks/post-commit"; kor >/dev/null; r="$(radtext "autopush")"; case "$r" in *"✗"*SKILJER*) ok "R5a stale hook → NEJ SKILJER" ;; *) fel "R5a" "$r" ;; esac

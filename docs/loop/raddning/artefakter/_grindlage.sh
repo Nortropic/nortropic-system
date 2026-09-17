@@ -43,8 +43,11 @@ PY
 
 # Beroendeslutningen (BFS över depends_on) från ett task-id, som radbruten lista; saknade
 # id:n skrivs som "SAKNAS:<id>". Läser grafen, aldrig prosan (VAGEN.md §3).
+# Kan specen inte läsas (ogiltig JSON, saknad fil, python saknas) skrivs sentinelraden FEL:spec —
+# en tyst tom lista blev annars "0/0 PASS = UPPFYLLT" (mekanismens granskning 2026-09-17).
 gl_slutning() {
-  python3 - "$GL_ROT/specs/tasks.spec.json" "$1" <<'PY' 2>/dev/null
+  local ut rc
+  ut="$(python3 - "$GL_ROT/specs/tasks.spec.json" "$1" <<'PY' 2>/dev/null
 import json, sys
 d = json.load(open(sys.argv[1])); by = {t["id"]: t for t in d.get("tasks", []) if "id" in t}
 start = sys.argv[2]; sedda = []; ko = list(by.get(start, {}).get("depends_on", []))
@@ -55,6 +58,9 @@ while ko:
     if x in by: ko.extend(by[x].get("depends_on", []))
 for x in sorted(sedda): print(x if x in by else "SAKNAS:" + x)
 PY
+)"; rc=$?
+  if [ "$rc" != 0 ]; then echo "FEL:spec"; return 0; fi
+  printf '%s\n' "$ut"
 }
 
 gl_kor_mappa() { # $1=rc $2=loggfil → token
@@ -69,7 +75,9 @@ gl_kor_mappa() { # $1=rc $2=loggfil → token
 grindlage() {
   local id="$1" kor="${2:-0}" diag="${3:-0}" logg="${4:-}" svar rc path vid
   GL_TOKEN=""; GL_KOD="-"; GL_ID="$id"; GL_PATH=""; GL_VID=""; GL_FRYS="-"; GL_DETALJ=""
-  [ -n "$logg" ] || logg="$(mktemp "${TMPDIR:-/tmp}/grindlage.XXXXXX")"
+  # Loggar under GL_TMP (anroparen skapar katalogen och städar med trap) — en mktemp per anrop
+  # utan städning läckte tusentals filer till TMPDIR (mekanismens granskning 2026-09-17).
+  [ -n "$logg" ] || logg="$(mktemp "${GL_TMP:-${TMPDIR:-/tmp}}/grindlage.XXXXXX")"
   case "$id" in
     @*) path="${id#@}"; GL_ID="$(basename "$path")"
         # Programgrind (inte ett task): registrerad om cli list bär sökvägen.
@@ -78,6 +86,7 @@ grindlage() {
         fi ;;
     *)  if ! command -v "$GL_PY" >/dev/null 2>&1; then
           path="$(gl_exit_test "$id")"; vid=""
+          [ -z "$path" ] || { GL_TOKEN=PYTHON_SAKNAS; GL_DETALJ="$GL_PY saknas — registret kan inte läsas"; printf '%s|%s|%s\n' "$GL_TOKEN" "$GL_KOD" "$GL_DETALJ"; return; }
           [ -n "$path" ] || { GL_TOKEN=EJ_SPECAD; GL_DETALJ="$id finns inte som task"; printf '%s|%s|%s\n' "$GL_TOKEN" "$GL_KOD" "$GL_DETALJ"; return; }
         else
           svar="$("$GL_PY" "$GL_ROT/controller/verify/cli" task "$GL_ROT/specs/tasks.spec.json" "$id" 2>&1)"; rc=$?

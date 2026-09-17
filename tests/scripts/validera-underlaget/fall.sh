@@ -4,7 +4,7 @@
 # finns de. Raderna om REV ska förbli BEKRÄFTAT@REV — vägen som lyckas får aldrig fälla startkontrollen.
 #   VALIDERA=<fil> bash tests/scripts/validera-underlaget/fall.sh
 set -u
-HAR="${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}"
+HAR="${1:-${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}}"   # första argumentet = kandidatrot (granskaren får inte miljöprefix)
 VAL="${VALIDERA:-$HAR/docs/loop/raddning/artefakter/validera-underlaget.sh}"
 [ -f "$VAL" ] || { echo "ODÖMBART: $VAL saknas"; exit 2; }
 T="$(mktemp -d "${TMPDIR:-/tmp}/validera-fall.XXXXXX")"; export T; trap 'rm -rf "$T"' EXIT
@@ -36,6 +36,9 @@ grep -q "HISTORISKT@$REV:" "$T/ut.txt" && ok "V1b summeringen skiljer HISTORISKT
 # V2 --operativt: inga @REV-rader, inga bundle/patch-rader, exit följer bara operativa rader
 rc="$(kor "$REV" --operativt)"; n_hist="$(grep -c "@$REV" "$T/ut.txt")"; n_bundle="$(grep -cE '^(bundle: |patchen bär)' "$T/ut.txt")"
 [ "$n_hist" = 0 ] && [ "$n_bundle" = 0 ] && ok "V2 --operativt visar inga historiska eller bundle-/patch-rader" || fel "V2" "hist=$n_hist bundle=$n_bundle"
+# V5 kanarie: --operativt exekverar INGEN grind under verify/bin (h-013 skapar workspaces i klonen)
+printf '#!/usr/bin/env bash\ntouch "$T/kanarie-h013"\nexit 1\n' > "$A/verify/bin/h-013-exit"; rm -f "$T/kanarie-h013"; ( cd "$A" && bash docs/loop/raddning/artefakter/validera-underlaget.sh --operativt ) >/dev/null 2>&1; [ ! -f "$T/kanarie-h013" ] && ok "V5 --operativt kör ingen grind live (kanarie orörd)" || fel "V5" "h-013-exit kördes under --operativt"
+( cd "$A" && bash docs/loop/raddning/artefakter/validera-underlaget.sh ) >/dev/null 2>&1; [ -f "$T/kanarie-h013" ] && ok "V5b utan --operativt körs h-013 (inforad) — som förut" || fel "V5b" "h-013 kördes inte i fullt läge"
 op_avvik="$(sed -nE 's/^OPERATIVT: BEKRÄFTAT [0-9]+ · AVVIKER ([0-9]+) .*/\1/p' "$T/ut.txt")"
 if [ "${op_avvik:-x}" != x ]; then
   if { [ "$op_avvik" -gt 0 ] && [ "$rc" = 1 ]; } || { [ "$op_avvik" = 0 ] && [ "$rc" != 1 ]; }; then ok "V2b --operativt: exit ($rc) följer bara operativa AVVIKER ($op_avvik)"; else fel "V2b" "rc=$rc op_avvik=$op_avvik"; fi

@@ -131,13 +131,15 @@ if [ -f "$P" ]; then
 else rad "AGENTS.md finns" NEJ; fi
 
 # ── 7. Läget är mätt, inte påstått ──────────────────────────────────────────
-# En RAD:-rad någonstans i drift.md är ingen aktuell mätning (AUD-02). Kartan räknas som
-# mätt bara om den senaste RAD:-raden anger sin revision (backtickat sha inom 30 rader
+# En RAD:-rad någonstans i drift.md är ingen aktuell mätning (AUD-02). Bara MÄTRADER räknas:
+# radstart, ev. `main`/`gren`-prefix, sedan `RAD: h-001:<exit>` — en prosarad som nämner
+# literalen (som L3:s egen drift-text gjorde; oberoende granskning 2026-09-17) binder inget.
+# Kartan räknas som mätt bara om mätraden anger sin revision (backtickat sha inom 30 rader
 # ovanför), revisionen är förfader till HEAD, och kärnan (verify/bin, controller, specs)
 # är oförändrad sedan dess. Annars: kör matning-pa-macen.sh.
 # Alla RAD-block prövas (det nyaste kan vara en grenmätning); det första som är bundet till
 # en revision som är förfader till HEAD räknas, om kärnan är oförändrad sedan dess.
-KANDIDATER="$(awk '{buf[NR]=$0} /RAD: h-001/ { s="INGEN"; for (i=NR; i>NR-30 && i>0; i--) { if (match(buf[i], /`[0-9a-f]{7,40}`/)) { s=substr(buf[i], RSTART+1, RLENGTH-2); break } } print s }' docs/loop/drift.md 2>/dev/null)"
+KANDIDATER="$(awk '{buf[NR]=$0} /^[[:space:]]*(main|gren)?[[:space:]]*RAD: +h-001:[0-9A-Za-z]/ { s="INGEN"; for (i=NR; i>NR-30 && i>0; i--) { if (match(buf[i], /`[0-9a-f]{7,40}`/)) { s=substr(buf[i], RSTART+1, RLENGTH-2); break } } print s }' docs/loop/drift.md 2>/dev/null)"
 KART=""; SKAL="ingen RAD: h-001-rad i drift.md"
 for k in $KANDIDATER; do
   [ "$k" = "INGEN" ] && { SKAL="en RAD-rad saknar revision"; continue; }

@@ -16,9 +16,9 @@
 # reflog, och reflog rensas. Det är regel 12:s farligaste kategori och den enda
 # som försvinner tyst.
 #
-# Bash 3.2-säkert (macOS systembash). Ingen sudo. Inget nät utom en `git fetch`
-# som du kör själv först — provet fetchar INTE, eftersom en stale origin/main ger
-# falska "föräldralösa" (det felet gjordes 2026-09-16 och fångades i tid).
+# Bash 3.2-säkert (macOS systembash). Ingen sudo. Enda nät- och skrivåtgärden är
+# `git fetch --prune origin` (L3): en stale origin/main gav falska "föräldralösa"
+# 2026-09-16, därför fetchar provet självt innan det dömer.
 
 set -u
 ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "inte ett git-repo"; exit 2; }

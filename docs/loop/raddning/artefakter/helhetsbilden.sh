@@ -29,6 +29,7 @@ KOR_GRINDAR=0
 
 ROT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "inte ett git-repo"; exit 2; }
 cd "$ROT" || exit 2
+GL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/grindlage-run.XXXXXX")"; trap 'rm -rf "$GL_TMP"' EXIT; export GL_TMP
 GL_ROT="$ROT"; . "$ROT/docs/loop/raddning/artefakter/_grindlage.sh"
 
 gron()  { printf '\033[32m%s\033[0m' "$1"; }
@@ -113,16 +114,19 @@ grindrad() { # nr, text, id
 if [ "$KOR_GRINDAR" = 1 ] && [ "$OS" = "Darwin" ] && [ "$HOOKVAKT" != 1 ] && [ -n "$HP" ]; then
   rad 1 "h-015:s beroendeslutning grön" OD "grindkörning stoppad: hooken i $HP saknar vakterna (L1c) — fixturcommits skulle pushas"
 else
-  N=0; P=0; NEJ_N=0; OD_N=0; REG=0; FRYS=0; SAKN=""; RAD=""
+  N=0; P=0; NEJ_N=0; OD_N=0; REG=0; FRYS=0; SAKN=""; RAD=""; SPECFEL=0
   for id in $(gl_slutning h-015); do
-    case "$id" in SAKNAS:*) SAKN="$SAKN ${id#SAKNAS:}"; NEJ_N=$((NEJ_N+1)); RAD="$RAD ${id#SAKNAS:}:EJ_SPECAD"; continue;; esac
+    case "$id" in FEL:spec) SPECFEL=1; continue;; SAKNAS:*) SAKN="$SAKN ${id#SAKNAS:}"; NEJ_N=$((NEJ_N+1)); RAD="$RAD ${id#SAKNAS:}:EJ_SPECAD"; continue;; esac
     N=$((N+1)); grindlage "$id" "$KOR_GRINDAR" 0 >/dev/null
     [ -n "$GL_VID" ] && REG=$((REG+1)); [ "$GL_FRYS" != "-" ] && FRYS=$((FRYS+1))
     case "$(gl_klass "$GL_TOKEN")" in ja) P=$((P+1));; od) OD_N=$((OD_N+1));; *) NEJ_N=$((NEJ_N+1));; esac
     RAD="$RAD $id:$GL_TOKEN($GL_KOD)"
   done
   N_TOT=$((N + $(printf '%s' "$SAKN" | wc -w | tr -d ' ')))
-  if [ -n "$SAKN" ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "$N_TOT noder ·$SAKN SAKNAS I SPEC · $P PASS"
+  # En slutning som inte kan läsas eller är tom är NEJ — aldrig "0/0 PASS" (AUD-01/AUD-10).
+  if [ "$SPECFEL" = 1 ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "specs/tasks.spec.json kan inte läsas (ogiltig JSON, saknad fil eller python saknas)"
+  elif [ "$N_TOT" = 0 ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "tom slutning — h-015 saknar depends_on eller finns inte i specen"
+  elif [ -n "$SAKN" ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "$N_TOT noder ·$SAKN SAKNAS I SPEC · $P PASS"
   elif [ "$NEJ_N" -gt 0 ]; then rad 1 "h-015:s beroendeslutning grön" NEJ "$P/$N PASS · $NEJ_N röda · $OD_N odömbara"
   elif [ "$KOR_GRINDAR" != 1 ]; then rad 1 "h-015:s beroendeslutning grön" OD "kräver körning · $REG/$N registrerade · $FRYS/$N frysta · --kor-grindar"
   elif [ "$OD_N" -gt 0 ]; then rad 1 "h-015:s beroendeslutning grön" OD "$P/$N PASS · $OD_N odömbara ($REG/$N registrerade)"

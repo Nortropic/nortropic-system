@@ -5,7 +5,7 @@
 #   bash tests/scripts/helhetsbilden/fall.sh
 #   HELHETSBILDEN=<fil> GRINDLAGE=<fil> bash tests/scripts/helhetsbilden/fall.sh   # prova andra kandidater
 set -u
-HAR="${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}"
+HAR="${1:-${HAR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)}}"   # första argumentet = kandidatrot (granskaren får inte miljöprefix)
 HB="${HELHETSBILDEN:-$HAR/docs/loop/raddning/artefakter/helhetsbilden.sh}"
 GL="${GRINDLAGE:-$HAR/docs/loop/raddning/artefakter/_grindlage.sh}"
 [ -f "$HB" ] && [ -f "$GL" ] || { echo "ODÖMBART: kandidat saknas ($HB, $GL)"; exit 2; }
@@ -115,6 +115,11 @@ case "$R" in *"h-001:PLATTFORM_ODOMBART"*) ok "H7 Linux + --kor-grindar → regi
 bygg h-001; mkdir -p "$HOME/hooks"; printf '#!/usr/bin/env bash\nexit 0\n# gammal\n' > "$HOME/hooks/post-commit"; chmod +x "$HOME/hooks/post-commit"; git -C "$T/arb" config core.hooksPath "$HOME/hooks"
 kor >/dev/null; grep -q 'SKILJER' "$T/ut.txt" && ok "H8a stale hookkopia → SKILJER (röd)" || fel "H8a" "$(grep autopush "$T/ut.txt")"
 cp "$T/arb/.githooks/post-commit" "$HOME/hooks/post-commit"; kor >/dev/null; grep -q 'hooken identisk' "$T/ut.txt" && ok "H8b identisk hook → grön" || fel "H8b" "$(grep autopush "$T/ut.txt")"
+# H10 python saknas → programgrindarna (rad 2/4/5) rapporterar PYTHON_SAKNAS, aldrig den osanna "inte i registret"
+bygg; GL_PY=/nonexistent/python3.12 kor >/dev/null; c="$(grep -c 'PYTHON_SAKNAS' "$T/ut.txt")"; f="$(grep -c 'inte i controller/verify/register.json' "$T/ut.txt")"; [ "$c" -ge 1 ] && [ "$f" = 0 ] && ok "H10 utan python: PYTHON_SAKNAS ($c rader), ingen osann registerdetalj" || fel "H10" "PYTHON_SAKNAS=$c registerdetalj=$f"
+# H11/H12 tom eller oläsbar slutning → rad 1 NEJ, aldrig "0/0 PASS"
+bygg; printf '{"tasks":[{"id":"h-015","depends_on":[],"exit_test":"verify/bin/h-015-exit"}]}\n' > "$A/specs/tasks.spec.json"; git -C "$A" commit -qam tom; kor --kor-grindar >/dev/null; r="$(grep -E '^ +1 ' "$T/ut.txt" | head -1)"; case "$r" in *"tom slutning"*) ok "H11 tom slutning (h-015 utan depends_on) → rad 1 NEJ" ;; *) fel "H11" "$r" ;; esac
+bygg; printf '{"tasks": [' > "$A/specs/tasks.spec.json"; git -C "$A" commit -qam trasig; kor --kor-grindar >/dev/null; r="$(grep -E '^ +1 ' "$T/ut.txt" | head -1)"; case "$r" in *"kan inte läsas"*) ok "H12 ogiltig JSON i specen → rad 1 NEJ (specen kan inte läsas)" ;; *) fel "H12" "$r" ;; esac
 # H9 hookvakt saknas i installerad hook + --kor-grindar → grindkörning STOPPAD (ODÖMBART), inga grindar körda
 bygg h-001; register "$T/arb" h-001; git -C "$T/arb" commit -qam reg >/dev/null 2>&1; git -C "$T/arb" config core.hooksPath "$HOME/hooks"; printf '#!/usr/bin/env bash\nexit 0\n# utan vakt\n' > "$HOME/hooks/post-commit"
 rc="$(kor --kor-grindar)"; r="$(rad 1)"
