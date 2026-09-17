@@ -51,6 +51,10 @@ bash docs/loop/raddning/artefakter/helhetsbilden.sh          # 2 sek
 bash docs/loop/raddning/artefakter/helhetsbilden.sh --kor-grindar   # + de 14, Darwin
 ```
 
+⚠️ `--kor-grindar` och `verify/bin/h-*-exit` får **inte** köras i en klon med `core.hooksPath`
+satt förrän hook-vakten är landad (drift.md 2026-09-17, L1c): grindarna committar i worktrees
+i den riktiga klonen och hooken pushar då fixturgrenar till origin. Se `VAGEN.md` "KÖR DETTA FÖRST".
+
 Rätt maskin, rätt klon, dagsfärsk, vilka av de sex raderna som är uppfyllda, vad
 plattformsgrenen bär som `main` saknar. Provet påstår aldrig ett grindutfall det inte
 kört. **Skälet att det är ett prov och inte ett stycke text:** katalogen är tjugo filer

@@ -16,6 +16,13 @@ Två sekunder. Den skriver ut **hela läget mätt**: står du på rätt maskin o
 vilka av slutkriteriets sex rader som är uppfyllda, och vad plattformsgrenen bär som
 `main` saknar. Med `--kor-grindar` kör den även de fjorton (kräver Darwin).
 
+> ⚠️ **Kör inte `--kor-grindar` eller någon `verify/bin/h-*-exit` i en klon där
+> `core.hooksPath` är satt förrän hook-vakten är landad** (drift.md 2026-09-17, L1c).
+> Grindarna skapar worktrees i den riktiga klonen och committar där; post-commit-hooken
+> pushar då fixturgrenar (`h007-prov-<pid>`, `radda/auto-*`) till origin. Kontroll före
+> körning: `git config --get core.hooksPath` är tomt, eller hooken innehåller vakten
+> "länkad worktree".
+
 **Varför ett prov och inte ett stycke text.** Ägaren 2026-09-16: *"det första måste ju
 vara skapa en bild av helheten, hjälper inte dokumentationen till med det? DETTA är varför
 vi snurrar runt i galenskap varje gång."*
