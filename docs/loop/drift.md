@@ -1,5 +1,96 @@
 # Att köra loopen
 
+## 2026-09-17 — L2: en ingång — AGENTS.md är kontraktet, CLAUDE.md är en symbolisk länk till det (importformen mättes och föll); PROMPT-TILL-CODEX.txt avförd
+
+### Vad som ändrats (uppdraget §4.1/§4.2)
+- **`AGENTS.md`** omskriven till en router på ≈100 rader med markören `NORTROPIC_INGANG=AGENTS.md-2026-09-17`:
+  vad repot är; en hemvist per uppgift (VÄGEN / drift + helhetsbilden / beslutslogg / regler / metod);
+  auktoritetsordning; repoidentitet + `NO_FORCE_SEMANTICS` + grindkörningsvarningen; roller = workflow-separation
+  med det mekaniska skyddet utskrivet (identitet, `allowed_write`, frysta prov, hash-pinnat register,
+  attestation, falskt PASS förbjudet — träffar plattformsgrindens `REQUIRED_AGENTS`-regexar); bevarande ≠
+  publicering; publicering enligt `PUBLICERING-V2`; före varje merge = `scripts/publicera.sh`; evidens; frysta
+  ägarkontrakt som pekare; Codex-anrop. Historiken (operating model v1–v4, publiceringshistorikens
+  `<details>`, delegationsstycket, `PRODUCT=`-stycket) ligger ordagrant i
+  `docs/loop/arkiv/agents-operating-models-v1-v4.md` med proveniens (blob `3a6c777b` @ `371b4a76`).
+  `PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY` bärs fryst av `harness-substitution-contract-v1.md:11`
+  (blob-pinnad av autopiloten) — AGENTS-kopian var inte asserterad av något (mätt: noll träffar i
+  verify/controller/scripts på båda grenarna).
+- **`CLAUDE.md`** (§A, regel 6 — ändrad HÖGRISK-märkt med `LOOP-ÄGARUPPDRAG-20260917` §4.2 som auktoritet):
+  **symbolisk länk till `AGENTS.md`** (git-typ `120000`). Uppdragets första form — tunn `CLAUDE.md` med `@AGENTS.md` +
+  Claude-detaljer — **prövades först och föll i mätningen**: från reporoten laddades `CLAUDE.md` (`session_start`) och
+  `AGENTS.md` (`include`) och markören svarades rätt, men från `docs/loop/raddning` laddades bara `CLAUDE.md` och
+  svaret blev *"Ingen rad som börjar med NORTROPIC_INGANG= finns i mina laddade instruktioner … `@AGENTS.md`, vars
+  innehåll inte expanderats"* (`~/nortropic-bevis/ingang-20260917T155250Z/`); varianten `@./AGENTS.md` gav samma
+  (`…T155410Z-variant-punktslash/`). Claude Code 2.1.257 expanderar alltså inte relativa importer i en förälderkatalogs
+  `CLAUDE.md`. Nästa enklaste stödda form är länken: samma bytes för båda verktygen, ingen dubblett att hålla lika;
+  Claude-specifika anropsdetaljer står i `AGENTS.md` §12 (16 rader). Innehåller literal `agentoverlamning`
+  (`check-docs-coherence.mjs:409`, som läser genom länken — 24/24 gröna). Ingen `@` utanför backticks.
+- **Avfört:** `docs/loop/raddning/PROMPT-TILL-CODEX.txt` (424 rader; bar status, återkallade order,
+  dubbletter av VÄGEN; blob `acd132be` @ `eb9483e9` i git-historiken). Konsumenter ompekade i samma commit:
+  `AGENTS.md`, `VAGEN.md` §0-tabellen, `raddning/README.md`, `00-LAS-FORST.md`, `redo-for-codex.sh` (kontroll 6
+  prövar nu `AGENTS.md`), `validera-underlaget.sh` (kommentar). `raddning/README.md` bär **en** pekare
+  (`VAGEN.md`), `12-arbetsorder.md` är "delplan för FAS 1", `10-…-h014.md` är "arbetspaket, FAS 4",
+  `03`/`05` citerar `AGENTS.md` §7 i stället för "rad 148"; rot-`README.md` beskriver den nya formen.
+- `.claude/settings.json`: hook-kommandona via `${CLAUDE_PROJECT_DIR:-.}` (relativ sökväg bröt utanför roten).
+
+### Konsumentkarta (mätt före ändringen)
+Ingen grind eller `controller/**` på `main` hashar/radpinnar AGENTS.md/CLAUDE.md (bara sökvägslistor:
+`specs:30,810,821`, `h-035-exit:253,257`, `h-007-exit:32`). Plattformsgrenen pinnar dem per innehåll
+(`document-authority-exit:42–43`, `controller/verify/cli:76–77 PLATFORM_DOCUMENTS`,
+`nortropic-codex-autopilot.py:100–101 SUBSTITUTION_BLOBS`, `platform-governance-exit:104–112,497,501`) och
+de pinsen var redan brutna mot main (`regler.md:70`) — därför görs L2 **före** FAS 1:s ompinning, som sker
+en gång mot dessa blobbar. Frysta `docs/loop/*`-kontrakt (delegationen, substitution-kontraktet, v2/v3)
+rördes inte.
+
+### Laddningsbevis — båda verktygen, två startkataloger
+Prov: `laddningsprov.sh` (i `~/nortropic-bevis/ingang-*/launcher`-form: `launch-clean.py` → ren miljö utan `CLAUDECODE`, `claude -p --max-turns 1 --tools "" --output-format json --settings '<InstructionsLoaded-hook som loggar file_path/load_reason>'`, fråga: *"skriv exakt den rad i dina laddade instruktioner som börjar med NORTROPIC_INGANG= och sökvägen till filen som säger vad som görs härnäst, utan verktyg"*), Darwin 25.3.0 arm64, Claude Code 2.1.257, `~/kernel-arbete`, identitet per körning i `identitet.txt` (UTC, host, user, HEAD, blob-hash för `AGENTS.md`/`CLAUDE.md` via `git hash-object`).
+
+| Form | Startkatalog | Laddat (InstructionsLoaded) | Svar | Utfall |
+|---|---|---|---|---|
+| tunn `CLAUDE.md` med `@AGENTS.md` | reporoten | `CLAUDE.md` session_start · `AGENTS.md` include | markör + `docs/loop/raddning/VAGEN.md`, 1 tur, inga verktyg | PASS (`ingang-20260917T155250Z`) |
+| samma | `docs/loop/raddning` | **bara** `CLAUDE.md` session_start | *"Ingen rad som börjar med NORTROPIC_INGANG= … `@AGENTS.md`, vars innehåll inte expanderats"* | **FALL** |
+| `@./AGENTS.md` | `docs/loop/raddning` | bara `CLAUDE.md` | samma | **FALL** (`…T155410Z-variant-punktslash`) |
+| **`CLAUDE.md` → symbolisk länk till `AGENTS.md`** (blob `88f0c733` för båda) | reporoten | `CLAUDE.md` session_start (innehåll = `AGENTS.md`) | markör + `VAGEN.md`, 1 tur | **PASS** (`…T155544Z-slutlig`) |
+| samma | `docs/loop/raddning` | `CLAUDE.md` session_start | markör + `VAGEN.md`, 1 tur | **PASS** (samma körning) |
+| Codex (`codex exec -C <rot|raddning> -s read-only`) | båda | — | — | **EJ KÖRT** (kvota slut till 2026-09-19 20:22; app-motorn 0.154.0-alpha; CLI 0.147.0 kan inte tala med `gpt-6-astra`) |
+
+Slutsats: importformen är stödd men expanderas inte från en underkatalog i 2.1.257 — därför länken. Codex-ledet
+måste mätas när kvotan är tillbaka; tills dess är "båda verktygen laddar samma kontrakt" **bevisat för Claude Code,
+OVERIFIERAT för Codex** (Codex autoladdar `AGENTS.md` enligt sin dokumentation, samma bytes som länken pekar på).
+
+**Sidoeffekt som blev ett fynd (AUD-08 i praktiken):** laddningsprovet måste köras MED projektets inställningar
+(annars laddas inte `CLAUDE.md`), och projektets `.claude/settings.json` bär Stop/SessionEnd-hookarna →
+`scripts/nortropic-autocommit.sh` committade och pushade de okommitterade L2-filerna i slutet av varje provsession:
+`66d4690`+`a2f0f6a` (17:52) och `ae305e7`+`ac55b9a` (17:55), varav två `[HÖGRISK-OGRANSKAD] §A-ytor rörda`
+för `CLAUDE.md`. Ingen force (regel 12): commiten nedan är människohandens auktorisation enligt formen i
+autocommitens eget meddelande, med `LOOP-ÄGARBESLUT-INGANG-V1` som rad. L4 inför `NORTROPIC_AUTOCOMMIT=0`
+(Spärr 0) så att prov- och rollsessioner inte bevarar åt drivaren; laddningsprovet sätter den då.
+
+### Omtest av konsumenter
+Mätt på grenen efter patchen (arbetsträdet med L2-filerna): `node scripts/kor-vakter.mjs` **24/24** (inkl.
+`check-docs-coherence.mjs`, som läser `CLAUDE.md` genom länken); `node scripts/check-granskningsmekanismen.mjs` 22/22;
+`bash tests/scripts/nortropic-autocommit/fall.sh` 7/7 (hook-kommandot med `${CLAUDE_PROJECT_DIR:-.}`);
+`redo-for-codex.sh`: kontroll 6 (ingången bär ingen egen ordning · ingången pekar på `VAGEN.md`) ✓ mot `AGENTS.md`;
+de röda raderna är arbetsträdets okommitterade filer, autopush-raden (kloner mäts före `--kor`) och den kända
+AUD-03-flippen "underlaget: inga AVVIKER — 2 rader" (validera mäter vid spetsen; L3 rättar). `validera-underlaget.sh`
+rc 2 (ODÖMBART > 0: bundle/patch-raderna, oförändrat). Samma torrkörning gjordes 17:38 i en engångsklon av
+`6574271` med samma utfall (foundation-smoke K1 föll där bara därför att klonens origin var en lokal sökväg).
+
+## 2026-09-17 — L1b LANDAD: PR #264 mergad av mekanismen själv (granskat `1164bdd`, merge `bea934dc`)
+Sjunde körningen av `scripts/publicera.sh` mot sin egen PR gav `DOM: TILLSTYRKS @1164bdd…`, båda required checks
+gröna, merge `--match-head-commit`, kvitto `origin/main^2 == 1164bdd` verifierat (17:50 CEST; rapport
+`~/.nortropic/granskningar/pr264-1164bdd4f44e.md`, logg `~/nortropic-bevis/publicera-l1b-r5-20260917/publicera-dogfood-264-r7.log`).
+En oberoende subagent (separat kontext) gav samtidigt `DOM: TILLSTYRKS @1164bdd…` med tre advisories som tas i denna
+PR: mutantrad 28 pekade på fel prov (H4 → H16), räkningen 34/35/36 förenad med ett slutgiltigt svep mot 79-fallsharnessen,
+och två meningar som övertolkade Bash-vakten (a') kvalificerade — vakten är porös mot obfuskerade former (`"git" -c`,
+`command git`, `git${IFS}push`, `$(echo git)`, heredoc till python3), vilket nu står i skript och drift; de bärs av
+skalet (b) respektive klassificerare + prompt (G4/G5). **L1b:s klart-när är uppfyllt:** en leverans gick
+bevara → PR → separat granskning → merge utan ägarfråga, alla negativa fall gröna, kvittot står här.
+Sju självgranskningar och två oberoende granskningar krävdes; varje varv fann något verkligt (macOS `sed`, variadiska
+flaggor, opostat kvitto, `ci` utan författarfilter, ärvd gh-inloggning, skal som bröt proven, `PATH=`/`git -c`-kringgång,
+skalkedjan) — mekanismen är byggd av sina egna fynd. Hooken ominstallerad efter mergen (`installera-hooks.sh --kor`:
+4 redan rätt, 5 evidensrötter hoppade; `cmp` mot repots hook lika).
+
 ## 2026-09-17 — L1b: publicera.sh — bevara → PR → separat granskning → merge som mekanism; L0 landad; evidensundantag i installeraren
 
 ### Femte självgranskningen (14:20–14:52 CEST): git-skalet stoppade provens fixturpushar; "död transport" struket
@@ -26,10 +117,16 @@ nättransport** (`GIT_SSH_COMMAND=false`, ingen terminalprompt, ingen askpass, `
 schema eller scp-form = nät; okänt namn = nät, fail-closed) men **släpper push till lokala sökvägar/file://** — S1–S20
 kör skalen mot **riktig git** (S17 utan provmiljöns `GIT_SSH_COMMAND` visar att ingen ssh startas); skalen är ett
 skydd inifrån tillåtna skript och kringgås av egen PATH eller absolut sökväg (G5/G6), vilket (a') stoppar på
-Bash-nivån; **(c)** `GH_CONFIG_DIR` via `--settings`. Skript, drift och beslutslogg säger nu exakt detta. Advisories: talen 24→26, 29→77, AGENTS "två skalproven"→"skalproven"; bevisen kopierade
+Bash-nivån i de raka formerna; **(c)** `GH_CONFIG_DIR` via `--settings`. Skript, drift och beslutslogg säger nu exakt detta.
+**Vakten (a') är porös mot obfuskerade former** (oberoende granskning av `1164bdd`, mätt mot hooken): `"git" -c …`,
+`command git push`, `git${IFS}push`, `$(echo git) push`, `gi""t push`, `\git push`, `find . -exec git push \;` och
+absolut git inifrån `python3 <<EOF` släpps av vakten; de raka formerna (`PATH=`, `env`, `-c`, `send-pack`, absolut
+sökväg, `..`, `exec`, `xargs`, `g=git; $g`) nekas. För de släppta formerna gäller skalet (b) — lokal vs nät — utom vid
+absolut sökväg (G4/G5), som bärs av klassificerare + prompt. Vakten är alltså ett lager mot misstag och raka
+kringgångar, inte en fullständig parser; det står nu så även i skriptet. Advisories: talen 24→26, 29→77, AGENTS "två skalproven"→"skalproven"; bevisen kopierade
 till `~/nortropic-bevis/publicera-l1b-r5-20260917/` (loggar, mutantsvep, mätskript); väggklockan mätt mot **riktig**
 `claude`-binär (Mach-O arm64): `perl alarm 5` → rc 142 efter 5 s (`~/nortropic-bevis/publicera-vaggklocka-*/`).
-Prov nu: **77 fall gröna** (38 + N6i/N6j + S1–S20 + H1–H17); mutanter: **34 byggda, 34 fällda** (nio nya, rader 27–35 i
+Prov då (716a992): **77 fall gröna** (38 + N6i/N6j + S1–S20 + H1–H17); mutanter: **34 byggda, 34 fällda** (nio nya, rader 27–35 i
 tabellen; svep mot en klon av kandidaten: `~/nortropic-bevis/publicera-l1b-r5-20260917/mutA.log`, `mutB.log`, `mutC.log`).
 **Mätprov 4 mot riktig `claude`** (första försöket 15:16 CEST stoppades av `You've hit your session limit · resets
 4:50pm` — bokfört som EJ KÖRT i `716a992`; kört 16:55 mot exakt `716a992`, `publicera.sh` blob `297b629d`, arbetsträd
@@ -49,7 +146,7 @@ rent; launcher, identitet, svar i `~/nortropic-bevis/publicera-sparrar-20260917T
 | `which git gh ssh` | skalen |
 | `bash tests/scripts/publicera/fall.sh \| tail -1` | **`50 gröna · 27 röda`** — ett riktigt fynd: harnessens eget skal (S-fallen) exekverade *mekanismens* skal med sina åtstramande `-c`-nycklar, som policyn vägrade, och kedjan löste inte fram till riktiga git. Rättat i nästa commit: uppslaget av den riktiga binären hoppar över **alla** skal i PATH (igenkända på markören), inte bara sig självt, så en kedja av skal exekverar riktiga git direkt utan att ett skal ser ett annat skals `-c`-nycklar; S21/S22 kör skal på skal, S-fallen har väggklocka (ett skal som loopar ger 142, inte ett hängt prov). (Ett första försök tillät skalens egna `-c`-nycklar i policyn; med kedjeupplösningen var den regeln likvärdig — mutanten överlevde — och togs bort: policyn är oförändrat snäv.) Lokalt under mekanismens skal därefter: publicera 79/79 · 8/8 · 7/7 · 14/14 (publicera · post-commit-hook · autocommit · installera-hooks). Mekanismens nästa granskning kör harnessen själv och är det levande beviset. |
 
-Prov nu: **79 fall gröna**; mutanter: **35 byggda, 35 fällda** (nr 36: uppslaget löser inte kedjan → S21 via väggklockan, `mutE.log`).
+Prov nu: **79 fall gröna**; mutanter: **35 byggda, 35 fällda** mot 79-fallsharnessen (räkningen förenad under tabellen nedan).
 
 ### Fjärde självgranskningen (13:20–13:46 CEST): granskaren hade ägarens gh-inloggning — spärrar mätta mot riktig `claude`
 Mekanismen granskade sig själv en fjärde gång (`claude -p`, separat process, PR #264 @ `11993795`) och gav
@@ -66,7 +163,7 @@ mätt: nekas även i formen `X=1 git push …`; kommandon utanför allow-listan 
 `git -c`, `env`, absoluta sökvägar, `..`, `bash -c`) — se femte självgranskningen ovan; (b) granskarens `PATH`
 börjar med en katalog med skal: `gh` vägrar (77), `git` kör med död nättransport och vägrar push mot nätet men
 släpper lokala mål, `ssh` vägrar (255) — täcker kommandon som slås upp via PATH inifrån tillåtna skript, kringgås
-av egen PATH eller absolut sökväg; (c) `GH_CONFIG_DIR` → tom
+av egen PATH eller absolut sökväg (G5/G6), vilket (a') stoppar i de raka formerna men inte i obfuskerade — se nedan; (c) `GH_CONFIG_DIR` → tom
 katalog via `--settings` (kommandoraden slår användarinställningen; en lös variabel gjorde det inte). Miljön bär
 **ingen** git-spärr: `GIT_*`-variabler når inte granskarens Bash (mätt, tabellen nedan). Granskarens prompt säger
 att GitHub-läget kontrolleras av mekanismen efter den. *(Första versionen av detta stycke påstod "död
@@ -136,7 +233,7 @@ räkning (byggda ur den rättade kandidaten, en rad ändrad per mutant, harnesse
 | 26 | ssh-skalet bort | P1c |
 
 | 27 | git-skalet utan död nättransport | S17 |
-| 28 | Bash-vakten släpper `PATH=` | H4 |
+| 28 | Bash-vakten släpper `PATH=` (regexen bort) | H16 — H4 fångas även av tilldelningsregeln; överlevde 75-fallsharnessen (`mutB.log`), fälld sedan H16 lades till |
 | 29 | hooken saknas i `--settings` | P1c |
 | 30 | git-skalets `-c`-policy av | S16/S19/S20 |
 | 31 | git-skalet släpper nätpush | S2–S6 |
@@ -146,8 +243,12 @@ räkning (byggda ur den rättade kandidaten, en rad ändrad per mutant, harnesse
 | 35 | git-skalet släpper okänt fjärrnamn | S12 |
 | 36 | git-skalet hoppar bara över sig självt, inte andra skal i kedjan (loopar) | S21 (väggklocka 142) |
 
-**34 byggda, 34 fällda** (svep `~/nortropic-bevis/publicera-l1b-r5-20260917/mutanter5.log` + `mutanter6.log`; nr 20 omkörd efter
-att gh-stubben gjorts trogen även utan `select`, `mutanter7.log`; nr 27–35 i `mutB.log`; svepet kört mot en klon av samma kandidat, `mutA.log`+`mutB.log`). Kända luckor som harnessen INTE mäter: att riktig
+**Räkningen, förenad:** tabellen har 36 rader men 35 namngivna mutanter i svepet — rad 6 ("git-skalet släpper igenom
+push") och rad 31 är samma mutant efter att skalet byggdes om (m34), och en trettiosjätte (m39, "skalet vägrar sina egna
+`-c`-nycklar") var likvärdig efter kedjeupplösningen och togs bort tillsammans med regeln. Historik: `mutA.log`/`mutB.log`
+kördes mot 75-fallsharnessen (m31 överlevde där), `mutC.log` fällde m31 med H16, `mutD.log` körde om skalmutanterna efter
+kedjefixen, `mutE.log` m39/m40. **Slutgiltigt svep mot HEAD:s 79-fallsharness i en klon av `1164bdd`: mutF.log (17/17) + mutG.log (18/18) — 35 byggda,
+35 fällda** (`~/nortropic-bevis/publicera-l1b-r5-20260917/`). Kända luckor som harnessen INTE mäter: att riktig
 `claude` ärver PATH och `--settings`-miljön (det mäts av mätproven ovan, inte av stubben), och G4.
 
 ### Mekanismen (ägarkrav 11:40: "auto PR review och push, så vi inte hamnar med 100 commits")
