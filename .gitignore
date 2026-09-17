@@ -23,6 +23,18 @@
 # i repot. Installerarens ODÖMBART-spärr fällde den på Macen. Samma felklass som
 # FYND 37 — ett tyst utelämnande som ser ut som framgång.
 !/.githooks/
+
+# .github/ spåras. GitHub Actions läser BARA filer som ligger på grenen — en workflow
+# som inte är committad existerar inte, och vitlistan hade svalt den lika tyst som den
+# svalde .githooks/post-commit natten innan (`git add -A` säger ingenting, commiten går
+# igenom, mekanismen finns aldrig). Raden skrevs därför INNAN den första workflowen, och
+# prövad med `git check-ignore -v`, inte efteråt.
+#
+# Katalogen släpps in och stängs omedelbart igen: bara workflows/ spåras, så
+# .github/ aldrig blir en ny bakväg in i trädet.
+!/.github/
+/.github/*
+!/.github/workflows/
 !/README.md
 !/CLAUDE.md
 !/AGENTS.md

@@ -1,5 +1,340 @@
 # Att köra loopen
 
+## 2026-09-17 — PR #261, andra oberoende granskningen av hela intervallet: fyra blockerande, sex rådgivande — alla åtgärdade
+
+Granskaren (separat read-only-kontext, `nortropic-reviewer` + `PR-TILLAGG.md`, körningar bara i en
+arkivkopia) läste `eb9483e9..f3aa4f92` och gav `DOM: FYND @f3aa4f92 — blockerande: #1–#4`. Varje fynd
+omprövades av kedjedrivaren innan åtgärd; alla höll.
+
+| # | Fynd | Åtgärd i denna commit |
+|---|---|---|
+| 1 | Domen band inte head-SHA och protokollet skrevs av författaren i PR-texten — spetsen flyttade under granskning två gånger i denna PR | `PR-TILLAGG.md` "Domen": `DOM: TILLSTYRKS @<sha>` / `FYND @<sha>`, postad av granskaren som PR-review-kommentar; `AGENTS.md` steg 3–5: merge bara vid dom på exakt spetsen, ny commit ogiltigförklarar |
+| 2 | `check-granskningsmekanismen.mjs` fällde **inte** ett halvvägs påslaget granskningsjobb (mutation M5: 16/16 PASS med `granskning:` live och `FORVANTADE_JOBB` orört) trots påståendet på fem ställen | jobbmängden läses ur kodraderna och måste vara lika med `FORVANTADE_JOBB`; nytt kontrollprov "ett OVÄNTAT jobb FLAGGAS" |
+| 3 | `AGENTS.md`: "repot har ingen branch protection och inget ruleset" — falskt | ersatt med mätt läge: legacy-skydd (PR krävs, 0 approvals, admins enforced) utan required checks; rulesetet "main" (1 approval) har tom ref-selektor. Varning: rikta aldrig rulesetet mot main |
+| 4 | PR-texten beskrev inte spetsen (tre jobb, /install-github-app, tio prov) | PR-texten omskriven mot spetsen |
+| 5 | `permissions: pull-requests/issues: write` gav kandidatkod en token som kan skriva "DOM: TILLSTYRKS" | `contents: read` enbart; per jobb när granskningsjobbet slås på |
+| 6 | "9 h 32 min" fel med fem minuter: installeraren mergades i PR #242 `20:33:06Z`, inte #244 | 9 h 37 min på alla ställen (`fall.sh`, drift, beslutslogg ×2) |
+| 7 | Vakten blind för `push:` efter kommentarsrad i on-blocket och för secret som `env:` till levande jobb | on-blocket läses ur kodrader; secret i annat jobb än `granskning` flaggas; två nya kontrollprov |
+| 8 | Vaktens huvud sa "två mekanismprov", det är tre | rättat |
+| 9 | `helhetsbilden.sh` talade om en nyckel som inte längre finns | raden mäter spårad workflow; diffgranskning = separat process; required checks ODÖMBART härifrån |
+| 10 | Granskarkonfigurationen (`.github/workflows/**`, `nortropic-reviewer/**`, vakten) kunde ändras av kandidaten utan extra granskning | felklass 6 i `PR-TILLAGG.md` utvidgad |
+
+Mätt efter åtgärd (i `~/kernel-arbete`, gren `claude/inspiring-galileo-6w1pvw`): `check-granskningsmekanismen.mjs`
+**19/19** (tre nya kontrollprov, no-op-spärren fällde först det gamla skalkommando-fallet — rättat);
+`check-vaktankare.mjs --pinna-om` 29 vakter; `installera-hooks/fall.sh` 13 gröna; `nortropic-autocommit/fall.sh`
+7 PASS; `kor-vakter.mjs` **24/24**; `check-provanropare.mjs` 20/20; `check-vaktankare.mjs` 34/34. Regel 22: drift + beslutslogg + AGENTS + PR-TILLAGG i samma commit.
+
+Kvar från granskningen som **UNVERIFIED**: Darwin-grindarna kördes inte (avsiktligt, se L0-posten om
+hook-läckan); att `${{ }}` i YAML-kommentarer aldrig interpoleras är specgrundat, inte mätt i Actions.
+Efter merge: required status checks på `main` sätts för `vaktsviten (webbfabriken)` och `skalprov under
+tests/scripts` (ägarval 11:45), aldrig för ett granskningsjobb.
+
+## 2026-09-17 — Andra granskningen: fyra fynd till, och ett av dem var en riktig bugg
+
+`DOM: FYND`. Den granskade `eb9483e..463989e` med uppdraget att pröva om **åtgärderna
+från första granskningen håller** — inte om de finns. Rätt fråga, och den gav utdelning.
+
+### F1 — jobbet kunde presentera ett äkta kandidatfel som en miljö
+
+`provsviter`-loopen bar `[ "$K" = "0" ] || rc="$K"`. **Sist vinner, inte värst vinner.**
+
+Mätt, och det är den kombination som spelar roll:
+
+```
+prov1=1 (äkta FAIL) · prov2=2 (ODÖMBART) → jobbets exit=2
+sammanfattning: "Detta är INTE ett fel i kandidaten."
+```
+
+Ett verkligt fel i `nortropic-autocommit/fall.sh` maskerat som en miljö — **exakt den
+bokföringsinversion som FYND 4-åtgärden infördes för att hindra, bara åt andra hållet.**
+Jag lagade ena riktningen och byggde den andra i samma andetag.
+
+Lagat: `case` med FAIL-dominans, domen tas **efter** loopen ur det slutliga utfallet, och
+båda listorna skrivs ut. En exitkod utanför algebran (t.ex. `127`) är fail-closed som FAIL.
+**Prövat mot alla nio kombinationer av 0/1/2** — verdikt och sammanfattning stämmer i
+samtliga.
+
+### F2 — mallen bar samma kategorifel, oåtgärdad
+
+Det återstartbara jobbet avslutade `exit 1` på ett ODÖMBART. Actions ser bara rött, men
+exitkoden är repots egen algebra och varje omslutande körare läser den. Den mallen hade
+klistrats in ordagrant den dag jobbet slås på. `exit 2`.
+
+### F3 — ett föråldrat tal inuti en grön vakt
+
+`check-provanropare.mjs` registerrad sa fortfarande *"tio fall … fem mutationer"* medan
+drift.md och beslutsloggen i **samma commit** sa 13 och 8 av 9. Talet stod på den yta som
+är minst benägen att läsas om: inuti en vakt som är grön.
+
+### F4 — mitt eget obelagda anspråk om ett provs skärpa
+
+`K6`-kommentaren sa *"inget annat fall märker det"*. Mätt: mutationen fäller **K3, K3b,
+K5, K5b och K6** — fyra andra fall märker det.
+
+**Det är samma felklass som fallet självt infördes för att rätta, en nivå upp.** Jag
+rättade `K6` från att jämföra ett gissat namn, och skrev i samma andetag ett obelagt
+påstående om vad det nya fallet kunde. Rättat, och den egenskap `K6` faktiskt äger ensam
+— ett **dinglande** hookhem — står nu i stället.
+
+### De nio mutationerna räknas nu upp
+
+*"Åtta av nio dödade"* gick inte att pröva, eftersom de nio inte fanns någonstans. Ett tal
+ingen kan pröva är ett påstående, inte en mätning. De står nu i provets huvud, med vilket
+fall som fäller vilken.
+
+### Metodnotis: granskarens rena klon var ett mätartefakt
+
+Granskaren rapporterade att `kor-vakter` faller i en ren utcheckning av `463989e`
+(`check-foundation-smoke` → *"0 kvittensrader"*), och alltså att evidensraden `24/24` inte
+reproducerar.
+
+**Mätt och motbevisat:** klonen var gjord från en **lokal sökväg**, så dess `origin` var
+`/home/user/nortropic-system`. Foundation-svitens `K1` är identitetsbunden med flit —
+*"identitet före konsumtion"* — och vägrar köra mot fel origin. Samma klon med
+`origin` satt till `Nortropic/nortropic-system`: **`PASS 24/24`**. Det förklarar också
+varför GitHub Actions var grön på samma commit.
+
+Fyndet var alltså falskt, men **frågan var rätt ställd**, och svaret hör hemma här: `24/24`
+är identitetsbundet, inte arbetsträdsbundet.
+
+### Och branch protection är nu MÄTT, inte grep:at
+
+Mitt tidigare påstående vilade på att ett grep inte hittade någon konfiguration — vilket
+inte är ett bevis. Mekaniskt i stället: PR #261 stod **`mergeable_state: "unstable"`**
+medan en check var röd. Hade en required status check funnits hade tillståndet varit
+`blocked`. **Ingenting hindrar en merge i dag.**
+
+## 2026-09-17 — ÄGARBESLUT "Nej i nuläget": diffgranskningen ur CI, inte lämnad röd
+
+Ägaren på frågan om `/install-github-app`: **"Nej i nuläget"**.
+
+Jag hade sagt i förväg vad ett nej innebär, och gör det: **jobbet tas bort, det lämnas
+inte permanent rött.** Ett kryss som aldrig kan bli grönt lär bara ut att ignorera rött,
+och `raddning/11-tre-vakter-mot-aterfall.md` säger det om sig själv — *"en vakt som skriker
+varg blir ignorerad, och en ignorerad vakt är värre än ingen."*
+
+**Granskningen försvann inte. Den flyttade dit den redan fungerade samma dag:** till den
+session som driver kedjan. Den vägen fann åtta fynd i den PR som införde mekanismen, och
+den behövde ingen nyckel — en session är redan inloggad. Det är nu steg 3 i `AGENTS.md`.
+
+### Texten ligger på ETT ställe, inte två
+
+Prompten låg begravd i workflowens `prompt:`. Den flyttade till
+`.agents/skills/nortropic-reviewer/PR-TILLAGG.md`, bredvid rollskillen, och läses
+ordagrant av båda vägarna — handen i dag, maskinen om jobbet slås på.
+
+Det är inte kosmetik. Att skriva av rollskillen i YAML var det **första** felet den filen
+gjorde, rättat samma morgon: två definitioner av "granskning" i samma repo driver isär,
+och den som läses av en maskin vinner tyst över den som läses av en människa.
+
+### Vad som faktiskt går förlorat, sagt rakt ut
+
+**Granskning när ingen session är igång.** Släpps Codex autonomt över natten är det den
+luckan som öppnas, och då är beslutet värt att ta om. Det står i `granska-pr.yml`, i
+`AGENTS.md` och här — inte som en fotnot.
+
+Återstartblocket ligger längst ned i workflowen: två steg, färdig YAML, och kravet att
+`check-granskningsmekanismen.mjs` uppdateras i **samma** commit. Görs det halvvägs fäller
+vakten, vilket är meningen — listan `FORVANTADE_JOBB` är mekanismens definition, inte en
+spegling av den.
+
+### Vakten fällde sig själv, två gånger, och båda var äkta
+
+**1. Den läste en BORTKOMMENTERAD secret som om den vore ett skalkommando.** Det
+återstartbara jobbet ligger i kommentarer just för att inte köras; `${{ secrets.X }}` i en
+YAML-kommentar interpoleras aldrig av Actions. Vakten prövade vad raden SÅG UT SOM i
+stället för vad den GÖR — **felklass 1, begången av vakten mot felklass 2.** Lagat: både
+secret-kontrollen och ODÖMBART-räkningen läser nu bara kodrader, och två nya kontrollprov
+håller båda hållen (en bortkommenterad secret flaggas inte; en bortkommenterad
+sammanfattning räknas inte som en mekanism).
+
+**2. Ett kontrollprov hade tyst slutat mäta.** Jag ändrade en rad i den syntetiska
+`GILTIG`-workflowen, och två `GILTIG.replace(...)` blev **no-ops** — mönstret fanns inte
+längre. Fallet förblev grönt medan det slutat pröva något. Det är samma felklass som
+`K6`, en nivå upp: *provet på provet* var dekoration.
+
+Lagat med en spärr som fäller varje fall vars mutation inte ändrade texten. **Prövad
+genom att göras nödvändig:** jag ändrade en rad i `GILTIG` så att en mutation blev en
+no-op, och spärren fällde med *"mutationen ändrade ingenting — mönstret finns inte längre
+i GILTIG, så fallet mäter inget"*.
+
+### Mätt efter ändringen
+
+| Prov | Utfall |
+|---|---|
+| `kor-vakter` | **24/24** |
+| `check-granskningsmekanismen` | **16/16** |
+| Mutationer av workflowen (6) | **6 dödade** — push som utlösare, borttaget jobb, borttagen exit-2-hantering, `cancel-in-progress: true`, kärnans Darwin-prov inlagt, borttagen rollpekare |
+| Mutationer av vakten (2 prövbara) | **2 dödade** — kommentarsfiltret bort, push-kontrollen bort |
+| No-op-spärren | **fäller när den ska** |
+
+### Kvar hos ägaren, och det är nu EN sak
+
+**Branch protection.** `vaktsviten` och `skalprov` → required på `main`. Det är den enda
+spaken som faktiskt stoppar 28-mergarmönstret; allt annat här är rådgivande. Nyckeln är
+avförd tills vidare.
+
+## 2026-09-17 — Granskningen fällde sitt eget införande: åtta fynd, sju mina
+
+Mekanismen infördes 06:10 och granskades 06:19. **Domen blev `FYND`, inte `TILLSTYRKS`** —
+åtta stycken, varav sju i mitt eget arbete. Det är första gången i det här repot som en
+PR granskats av något annat än sin författare, och den fann på tio minuter fem saker jag
+missat under en timmes bygge.
+
+Varje fynd prövades av mig innan det åtgärdades; en granskares påstående är också bara
+ett påstående.
+
+| # | Fynd | Min kontrollmätning | Utfall |
+|---|---|---|---|
+| **4** | Workflowen bokförde ODÖMBART som FAIL | `kor-vakter.mjs` rad 25 deklarerar `exit 2 = ODÖMBART` och når den på sex ställen; Actions har ingen exit-2-algebra | **BEKRÄFTAT** |
+| **1** | Provet fäller inte den senast lagade buggen | `-maxdepth 6 → 4` kört mot provet: **10/10 gröna** | **BEKRÄFTAT** |
+| **3** | *"main låg röd i ett dygn"* | installeraren mergades i PR #242 `20:33:06Z`, rättad `06:10:19Z` → **9 h 37 min** *(andra granskningen: "9 h 32" blandade 064870a:s författartid med #244:s mergetid)* | **BEKRÄFTAT** |
+| **5** | Mekanismen kan inte hindra en merge | inga required status checks (legacy-skydd finns, rulesetet "main" träffar inga refs — rättat vid andra granskningen; här stod "ingen branch protection"); ingen `check-*.mjs` läser `.github/`; `check-invariants.mjs` menar rot-`workflows/` | **BEKRÄFTAT** |
+| **2** | `K6` ⊆ `K3`, alltså dekoration | K3 kräver redan `SATT = $HOOKHEM`; mutanten fälldes av K3 och K5, aldrig av K6 | **BEKRÄFTAT** |
+| **8** | Falskt skäl i provets huvud | `ROT` kommer ur `git rev-parse`, inte ur `$HOME` | **BEKRÄFTAT** |
+| **7** | `CLAUDE.md` nämner mekanismen noll gånger | grep: noll träffar | **BEKRÄFTAT — ägarens hand, se nedan** |
+| **6** | Actionens inputs oprövade | granskaren nådde inte nätet; **jag gjorde det** — samtliga `with:`-nycklar finns i `action.yml`, och prompt-läge på `pull_request` postar en PR-kommentar som standard | **AVFÄRDAT, men grundad oro** |
+
+### Den tyngsta: ODÖMBART bokfördes som ett kandidatfel
+
+Filens egen header förbjöd exakt detta — jag hade tillämpat resonemanget på de
+Darwin-bundna grindarna som **inte** körs, och inte på jobben som faktiskt kördes.
+
+**Valet, uttalat för att kunna ifrågasättas:** ODÖMBART blir nu **rött**, men skriver
+först en sammanfattning vars första rad säger att det ÄR odömbart och **inte** ett fel i
+kandidaten. Av de två möjliga missläsningarna i ett tvåvärt system är den falska gröna
+värre: en grön bock som betyder *"kunde inte dömas"* är mekanismen-som-ser-ut-att-finnas.
+Det gäller nu även den saknade nyckeln, som tidigare var grön — inkonsekvensen var min.
+
+**Följd som måste stå:** `granskning av diffen` får därför **aldrig** bli en required
+status check. Utan nyckel är den röd, och som required hade den låst repot helt. De två
+mekaniska jobben är grinden.
+
+### Provet: 10 → 13 fall, 8 av 9 mutationer dödade
+
+`K3b` (klon på djup 6) fäller `maxdepth`-regressen. `K5b` fäller att torrläget ljuger om
+vad som redan är installerat — den grenen nåddes aldrig av något fall. `K6` prövar nu den
+egenskap rättelsen handlar om: hookhemmet överlever att klonens `.githooks/` raderas.
+`K1b` fäller att `--torr` stryks ur gränssnittet.
+
+**Kvarvarande lucka, utskriven i provets huvud i stället för upptäckt senare:**
+`SEDDA`-dedupliceringen kan tas bort utan att något fall faller. Sannolikt en likvärdig
+mutant — att sätta samma `core.hooksPath` två gånger är idempotent — men provet
+**bevisar** inte det, det missar det.
+
+### Ny vakt, med sin blindfläck utskriven
+
+`scripts/check-granskningsmekanismen.mjs` — tio kontrollprov mot en syntetisk workflow
+som tvingar den att bevisa att den kan säga NEJ. Den fäller borttagen utlösare, borttaget
+jobb, `push` som utlösare, kärnans Darwin-prov i en kodrad, borttagen exit-2-hantering,
+`cancel-in-progress: true`, en secret inbakad i ett skalkommando, och borttagen
+skillpekare.
+
+**Två av kontrollerna är verkliga mekanismprov, resten är lexikala:** att filen är
+**spårad**, och att vitlistan inte ignorerar den. Det är just de två som hade fångat
+natten innan. Resten läser vad YAML:en SÄGER — den metod som gav elva av repots tretton
+falska påståenden — och används här för att inget annat är möjligt utan att köra Actions.
+Det står i vaktens huvud.
+
+### Två saker som kräver ägarens hand, och som jag inte gör åt dig
+
+1. **`/install-github-app`** — nyckeln. Utan den är granskningsjobbet rött.
+2. **Branch protection** — gör `vaktsviten` och `skalprov` till required på `main`.
+   Utan den är hela mekanismen rådgivande och 28-mergarmönstret är oförändrat möjligt.
+
+**Och en tredje, som är ett öppet fynd:** `CLAUDE.md` nämner granskningsmekanismen noll
+gånger. En Claude-session bootar ur `CLAUDE.md` och får ingen pekare till
+`granska-pr.yml` — samma *"bara en människa minns det"*-klass som PR:en bekämpar.
+`CLAUDE.md` ligger i §A-kontrollens yta (`LOOP-ÄGARBESLUT-AUTONOM-KARNA` räknar upp den
+explicit bland de ytor som står orörda), så **jag ändrar den inte på eget bevåg.**
+Raden som behövs är en mening under `AGENTS.md`-hänvisningen; ägaren säger ja eller nej.
+
+## 2026-09-17 — Granskningen blev en mekanism, och mätningen fällde main på köpet
+
+Ägaren: *"jag vill att den pr reviewar och sen pushar, det är väl praxis"* och *"detta
+måste vi ha, det ska ske per automatik så vi inte fastnar med opushade commits etc."*
+
+**Mätt före bygget, inte efter:** `actions_list` → `total_count: 0`. Noll workflows i
+repot. `get_check_runs` på PR #261 → noll. `get_reviews` på PR #261 → **tom lista**,
+trots att `request_copilot_review` anropades. Kravet i `AGENTS.md` hade alltså ingen
+mekanism alls bakom sig, och den granskning jag trodde jag beställt fanns inte.
+
+### Fyndet mätningen gav på köpet: `main` låg RÖD i nio och en halv timme
+
+Första körningen av `node scripts/kor-vakter.mjs` på Linux: **22 av 23 gröna**.
+`check-provanropare.mjs` FAIL:
+
+> `scripts/installera-hooks.sh` körs av ingenting och står inte i `UTAN_ANROPARE` —
+> byggt, kanske granskat, men aldrig testat
+
+Vakten hade rätt. Installeraren skrevs kvällen innan, mergades till `main`, och
+ingenting i repot körde den. **Ingen märkte det, för ingenting körde sviten.** Det är
+exakt argumentet för automatiken, levererat av den sak automatiken skulle införas för.
+
+### Åtgärdat
+
+| Vad | Hur det prövades |
+|---|---|
+| `tests/scripts/installera-hooks/fall.sh` — tio fall mot ett engångs-`$HOME` | **Fem mutationer av installeraren, alla dödade.** Två överlevde första formen |
+| Registerrader för installeraren och provet i `check-provanropare.mjs` | Vaktens egna blindfläcksresonemang, samma form som autocommit-raderna |
+| `.github/workflows/granska-pr.yml` | YAML parsad; `git check-ignore` prövad **före** filen skrevs |
+| `!/.github/` i `.gitignore`, katalogen omedelbart stängd igen | `.github/losfil.md` och `.github/ISSUE_TEMPLATE/x.md` prövade — båda ignorerade |
+
+**De två mutanterna som överlevde är det som gör provet värt något.** `K6` jämförde
+provets EGEN uträknade `$HOOKHEM` i stället för den sökväg installeraren faktiskt satte
+— ett gissat namn, inte ett utfall, alltså samma fel som `smuts_sakrad` gjorde dagen
+innan. `K8` prövade bara `--kor`, där ett andra `cp`-fel råkar fånga samma sak; i
+torrläget fanns ingen andra linje, så en klon utan hook hade glatt rapporterat
+"skulle sätta". Båda lagade, båda nu dödade.
+
+### Vad workflowen INTE gör
+
+Den kör **aldrig** `verify/bin/h-*-exit` eller `controller/verify/cli`. Darwin-bundna,
+faller på `undefined symbol: sysctl` under Linux, och fel maskin är `ODÖMBART` — kördes
+de på `ubuntu-latest` hade varje PR bokfört en miljö som ett fel i kandidaten och röd CI
+slutat betyda något. Kärnans dom ligger kvar på Macen.
+
+Den kör **aldrig** på `push`. Bevarande (autocommit, autopush, `radda/*`) passerar den
+inte och kan inte fastna i den. Regel 12a oförändrad.
+
+### Två svagheter i mitt eget bygge, hittade innan granskaren svarat
+
+**Workflowen skrev av granskarrollen i stället för att peka på den.** Repot har redan
+`.agents/skills/nortropic-reviewer/SKILL.md` — rollskillen ur `AGENTS.md`:s
+rollseparation, med hård gräns (`PRODUCTION_FILES_MODIFIED=NO`, `PUSH=NO`, `MERGE=NO`)
+och egen arbetsordning. Min prompt uppfann en egen lista bredvid den. **Två definitioner
+av "granskning" i samma repo driver isär, och den som läses av en maskin vinner tyst över
+den som läses av en människa** — samma kategorifel som Doctor #12(e) WARN:ar om mellan
+lagren. Prompten läser nu skillen först; felklasslistan lägger till det som är
+PR-specifikt och ersätter ingenting.
+
+**Helhetsbilden mätte inte granskningen.** Den bär en `autopush`-rad sedan i går men
+sa ingenting om PR-granskningen, alltså precis den mekanism som just infördes. Ny rad,
+och den skiljer på tre lägen som inte får blandas ihop: *spårad* (Actions kan se den),
+*ospårad fil* (vitlistan har svalt den — röd, för det är natten innans felklass), och
+*saknas*. Att nyckeln finns går **inte** att mäta lokalt — den är en repo-secret — så
+raden är `ODÖMBART` och blir aldrig grön av att filen finns.
+
+### Ägarens hand krävs, en gång: `/install-github-app`
+
+Ett steg i Claude Code — det installerar appen och sätter repo-secreten. **En agent kan
+inte sätta secrets.** Manuellt alternativ: en secret under *Settings → Secrets and
+variables → Actions* (`ANTHROPIC_API_KEY` eller `CLAUDE_CODE_OAUTH_TOKEN`). Steget fäller
+inget under tiden, men skriver `ODÖMBART` i sammanfattningen i stället för att tiga, så
+ett grönt kryss aldrig läses som "granskad". De två mekaniska jobben kräver ingen nyckel
+och gäller från första körningen.
+
+**Rättat samma dag, på ägarens invändning:** *"vad pratar du om api? det finns ju review
+skill"*. Han har rätt i sakfrågan, och min betoning var fel — jag ledde med
+`ANTHROPIC_API_KEY` när svaret är ett kommando. **Men skillen och nyckeln svarar på olika
+frågor.** `.agents/skills/nortropic-reviewer/SKILL.md` säger HUR man granskar; nyckeln
+säger VEM SOM KÖR DEN NÄR INGEN ÄR HÄR. En skill är en instruktion, inte en motor: i en
+Claude Code-session är motorn sessionen självt och ingen nyckel behövs — därför kunde
+granskningen av denna PR köras utan en — men på en GitHub-runner finns ingen session.
+**Skillen låg i repot hela tiden medan 28 PR:er mergades ogranskade.** Den var aldrig det
+som saknades; motorn var det. Huruvida abonnemanget räcker eller separat API-fakturering
+krävs är **omätt** och besvaras av `/install-github-app`, inte av mig.
+
 ## 2026-09-17 — Tog vi bort mer än vi vet? Mätt: fyra av 38, och de 24 andra var redan borta
 
 Ägaren frågade: *"Frågan är ju om vi tog bort någon annan evidens som vi inte bara har

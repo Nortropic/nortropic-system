@@ -1,0 +1,260 @@
+# granska-pr.yml — mekaniska kontroller på varje pull request.
+#
+# VARFÖR DEN FINNS. AGENTS.md kräver sedan 2026-09-17 att en PR granskas av någon
+# annan än den som skrev den, innan merge. Kravet stod som text och följdes inte:
+# 28 PR:er mergades av samma agent som öppnade dem. En regel som bara en människa
+# kan minnas är exakt den felklass repot försöker bli av med.
+#
+# Och behovet mättes samma dag: `check-provanropare.mjs` låg RÖD på main i nio och en
+# halv timme utan att någon märkte det, eftersom ingenting körde vaktsviten automatiskt.
+#
+# ── SJÄLVA DIFFGRANSKNINGEN KÖRS INTE HÄR ───────────────────────────────────────
+# ÄGARBESLUT 2026-09-17: *"Nej i nuläget"* på `/install-github-app`. Jobbet som lät
+# Claude läsa diffen krävde en repo-secret, och utan den var det RÖTT PÅ VARJE PR —
+# ett kryss som aldrig kunde bli grönt. Ett sådant kryss lär bara ut att ignorera
+# rött, och en vakt som skriker varg är värre än ingen
+# (`raddning/11-tre-vakter-mot-aterfall.md`). Jobbet är därför borttaget, inte
+# lämnat rött.
+#
+# GRANSKNINGEN FINNS KVAR — den flyttade dit den faktiskt fungerade samma dag: till
+# den session som driver kedjan. Den granskningen fann åtta fynd i den PR som införde
+# den här filen, och den behövde ingen nyckel, eftersom en session redan är
+# inloggad. Texten ligger i `.agents/skills/nortropic-reviewer/SKILL.md` plus
+# `PR-TILLAGG.md` — EN text, läst av både handen och (om den slås på) maskinen.
+# Se AGENTS.md steg 2.
+#
+# VAD SOM GÅR FÖRLORAT, sagt rakt ut: granskning när ingen session är igång. Släpps
+# Codex autonomt över natten är det den luckan som öppnas, och då är det här beslutet
+# värt att ta om. Så här slås jobbet på — det står längst ned i filen.
+#
+# DEN BLOCKERAR ALDRIG EN PUSH. Utlösaren är `pull_request`, aldrig `push`. Bevarande
+# (autocommit, autopush, radda/*-grenar) publicerar ingenting och passerar aldrig
+# den här filen — regel 12a. Att arbete kan bli liggande opushat är det problem
+# mekanismen finns för att hindra, inte ett verktyg den får använda.
+#
+# DEN KÖR ALDRIG KÄRNANS EXITPROV. `controller/verify/cli` och `verify/bin/h-*-exit`
+# är Darwin-bundna och faller på `undefined symbol: sysctl` under Linux. Fel maskin är
+# ODÖMBART, aldrig FAIL (CLAUDE.md). Kördes de här hade varje PR bokfört en MILJÖ som
+# ett fel i kandidaten, och röd CI hade slutat betyda något. Kärnans dom ligger kvar
+# på Macen.
+#
+# VAD EN GRÖN KÖRNING SÄGER. Exakt: webbfabriken är inte söndrad, och de två
+# skalproven under tests/scripts/ håller. Ingenting om kärnan. Citera den aldrig som
+# bevis för kernelarbete (regel 8a — evidens är ytbunden).
+#
+# ── VERDIKTALGEBRAN I ETT TVÅVÄRT SYSTEM ────────────────────────────────────────
+# `kor-vakter.mjs` rad 25 och skalproven deklarerar alla `0 = PASS · 1 = FAIL ·
+# 2 = ODÖMBART`. GitHub Actions har bara grönt och rött. Första versionen av den här
+# filen körde proven rakt av och bokförde därmed varje ODÖMBART som ett FEL I
+# KANDIDATEN — precis det headern ovan förbjuder, applicerat på Darwin-grindarna men
+# inte på jobben som faktiskt körs. Fångat av granskningen av den PR som införde filen.
+#
+# VALET, uttalat för att kunna ifrågasättas: ett ODÖMBART blir RÖTT, men skriver
+# först en sammanfattning som säger i första raden att det ÄR odömbart och INTE ett
+# fel i kandidaten. Skälet är att av de två möjliga missläsningarna är den falska
+# gröna värre: en grön bock som betyder "kunde inte dömas" är den mekanism-som-ser-ut-
+# att-finnas som hela repot handlar om, medan ett rött kryss vars första rad säger
+# ODÖMBART inte går att missförstå och dessutom stoppar en merge tills någon tittar.
+# Bokföringsinvändningen — att en miljö bokförs som ett kandidatfel — besvaras av att
+# texten säger raka motsatsen, på den plats den läses.
+#
+# ── VAD DEN HÄR FILEN INTE KAN ──────────────────────────────────────────────────
+# EN WORKFLOW KAN INTE HINDRA EN MERGE. Utan branch protection (required status
+# checks) är varje jobb här rådgivande, och samma agent kan öppna och merga i samma
+# minut med checken pending. Det kräver ÄGARENS HAND, en gång, och det är en ANDRA
+# handling utöver nyckeln — se AGENTS.md.
+#
+#   Gör `vaktsviten (webbfabriken)` och `skalprov under tests/scripts` till REQUIRED
+#   på `main`. Båda kräver ingen nyckel och är gröna i dag.
+#
+#   Slås diffgranskningen på senare: gör den ALDRIG required. Den är rådgivande —
+#   skillen säger det själv, *"Reviewer approval is never root of trust"* — och utan
+#   nyckel är den röd, vilket som required check hade låst repot helt.
+#
+# OCH: `.github/workflows/**` vaktas av ingenting. Ingen `scripts/check-*.mjs` läser
+# katalogen (`workflows/**` i regler.md §6 och `check-invariants.mjs` syftar på
+# ROTKATALOGEN `workflows/`, en annan sak). Granskningsmekanismen kan alltså stängas av
+# i en PR den själv granskar. `scripts/check-granskningsmekanismen.mjs` fäller den
+# grövsta formen; branch protection är det verkliga svaret.
+
+name: granska-pr
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Minsta möjliga, på riktigt: jobben här kör PR-SPETSENS EGEN KOD (kor-vakter, skalproven),
+# och en token som kan skriva PR-kommentarer hade låtit en kandidat skriva sitt eget
+# "DOM: TILLSTYRKS" (andra granskningen av PR #261, fynd 5). Slås granskningsjobbet på
+# ges det `pull-requests: write` PER JOBB, aldrig här på toppnivå.
+permissions:
+  contents: read
+
+# INGEN cancel-in-progress. Första versionen avbröt pågående körningar vid en ny push,
+# och en AVBRUTEN körning är varken grön eller röd — en push strax före merge kunde
+# alltså lämna PR:en utan dom alls. Att två körningar överlappar kostar sekunder;
+# att en dom tyst försvinner är felklassen filen finns emot.
+concurrency:
+  group: granska-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Den mekaniska domen ────────────────────────────────────────────────────
+  vakter:
+    name: vaktsviten (webbfabriken)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fullt djup: flera vakter läser historik, inte bara trädet. En grund
+          # klon hade gjort dem ODÖMBARA utan att säga det.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: node scripts/kor-vakter.mjs
+        run: |
+          set +e
+          node scripts/kor-vakter.mjs
+          K=$?
+          set -e
+          if [ "$K" = "2" ]; then
+            {
+              echo "## ⛔ ODÖMBART — vaktsviten kunde inte dömas (exit 2)"
+              echo
+              echo "**Detta är INTE ett fel i kandidaten.** Något gick inte att MÄTA:"
+              echo "en vakt nådde sin ODÖMBART-gren (saknad git-topp, hash som inte går"
+              echo "att fastställa, en vakt som inte skrev sin signaturfras)."
+              echo
+              echo "Rött därför att ett ODÖMBART aldrig blir grönt — inte därför att"
+              echo "diffen är fel. Läs jobbloggen och åtgärda mätbarheten, inte koden."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $K
+
+  provsviter:
+    name: skalprov under tests/scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Proven bygger sina egna engångsrepon och sitt eget $HOME. De når aldrig
+      # nätet och rör aldrig arbetsträdet de ligger i.
+      # ETT FAIL DOMINERAR ETT ODÖMBART. Första formen var `[ "$K" = "0" ] || rc="$K"`
+      # — SIST VINNER, inte värst vinner — och skrev sammanfattningen inne i loopen.
+      # Mätt: prov 1 exit 1 (äkta kandidatfel) följt av prov 2 exit 2 gav jobbet exit 2
+      # och den ENDA texten i sammanfattningen sa *"Detta är INTE ett fel i kandidaten."*
+      # Alltså samma bokföringsinversion som filen finns emot, bara åt andra hållet: ett
+      # verkligt fel maskerat som en miljö. Fångat av andra granskningen, FYND F1.
+      #
+      # Domen tas nu EFTER loopen, ur det slutliga utfallet, och båda listorna skrivs ut.
+      - name: skalproven
+        run: |
+          rc=0
+          fallda=""
+          odombara=""
+          for p in tests/scripts/nortropic-autocommit/fall.sh \
+                   tests/scripts/installera-hooks/fall.sh; do
+            set +e
+            bash "$p"
+            K=$?
+            set -e
+            echo "── $p → exit $K"
+            case "$K" in
+              0) ;;
+              1) fallda="$fallda $p"; rc=1 ;;
+              2) odombara="$odombara $p"; [ "$rc" = "1" ] || rc=2 ;;
+              # Utanför algebran 0/1/2 — t.ex. 127 när ett kommando saknas. Fail-closed:
+              # en kod vi inte kan tolka får aldrig tolkas som det mildare utfallet.
+              *) fallda="$fallda $p(exit $K)"; rc=1 ;;
+            esac
+          done
+          if [ -n "$fallda" ]; then
+            {
+              echo "## ❌ FAIL — skalprov föll"
+              echo
+              echo "Fällda prov:$fallda"
+              [ -n "$odombara" ] && echo "Dessutom ODÖMBART (kunde inte mätas):$odombara"
+              echo
+              echo "**Detta ÄR ett fel i kandidaten.** Ett FAIL dominerar ett ODÖMBART —"
+              echo "läs det fällda provets utdata i jobbloggen, inte ODÖMBART-raden."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$odombara" ]; then
+            {
+              echo "## ⛔ ODÖMBART — skalprov kunde inte dömas (exit 2)"
+              echo
+              echo "Odömbara prov:$odombara"
+              echo
+              echo "**Detta är INTE ett fel i kandidaten.** Provet vägrade köra — det"
+              echo "hittade inte skriptet det prövar, eller kunde inte bygga sin"
+              echo "engångsvärld. Rött därför att ett ODÖMBART aldrig blir grönt."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $rc
+
+# ── SÅ HÄR SLÅR DU PÅ DIFFGRANSKNINGEN IGEN ─────────────────────────────────────
+# Två steg, i den ordningen. Hoppa inte över steg 1 — utan nyckel blir jobbet rött
+# på varje PR, vilket är exakt varför det togs bort 2026-09-17.
+#
+#   1. ÄGARENS HAND: `/install-github-app` i Claude Code, på
+#      Nortropic/nortropic-system. Eller en secret under
+#      Settings → Secrets and variables → Actions. En agent kan inte sätta secrets.
+#
+#   2. Klistra in jobbet nedan under `jobs:`, och uppdatera
+#      `scripts/check-granskningsmekanismen.mjs` (`FORVANTADE_JOBB` och
+#      `MIN_ODOMBART`) i SAMMA commit — annars fäller vakten, vilket är meningen.
+#
+# Prompten skrivs INTE av här. Den ligger i .agents/skills/nortropic-reviewer/ och
+# läses ordagrant, så att handens och maskinens granskning är samma text. Att skriva
+# av den var det första felet den här filen gjorde.
+#
+#   granskning:
+#     name: granskning av diffen
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+#       # Nyckeln läses som env, aldrig interpolerad in i ett kommando: en secret i en
+#       # `run`-rad hamnar i skalhistorik och felmeddelanden. Bara tomheten prövas.
+#       - name: finns en nyckel?
+#         id: nyckel
+#         env:
+#           NYCKEL: ${{ secrets.ANTHROPIC_API_KEY }}
+#           TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#         run: |
+#           if [ -n "$NYCKEL" ] || [ -n "$TOKEN" ]; then
+#             echo "finns=ja" >> "$GITHUB_OUTPUT"; exit 0
+#           fi
+#           echo "finns=nej" >> "$GITHUB_OUTPUT"
+#           {
+#             echo "## ⛔ ODÖMBART — granskningen kördes aldrig"
+#             echo
+#             echo "**Detta är INTE ett fel i kandidaten.** Ingen nyckel i repot."
+#             echo "Kör \`/install-github-app\`. En agent kan inte sätta secrets."
+#           } >> "$GITHUB_STEP_SUMMARY"
+#           # exit 2, inte 1: repots algebra är 0=PASS · 1=FAIL · 2=ODÖMBART. Actions ser
+#           # bara rött, men exitkoden är repots egen och varje omslutande körare läser
+#           # den. Mallen bar `exit 1` — samma kategorifel som FYND 4, oåtgärdat på det
+#           # tredje jobbet. Fångat av andra granskningen, FYND F2, i en mall som annars
+#           # hade klistrats in ordagrant den dag jobbet slås på.
+#           exit 2
+#       - name: Claude granskar diffen
+#         if: steps.nyckel.outputs.finns == 'ja'
+#         uses: anthropics/claude-code-action@v1
+#         with:
+#           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+#           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           use_sticky_comment: true
+#           display_report: true
+#           claude_args: '--max-turns 20'
+#           prompt: |
+#             Du granskar en pull request i Nortropics trust kernel.
+#             Läs och FÖLJ, i denna ordning, ordagrant:
+#               1. .agents/skills/nortropic-reviewer/SKILL.md   (granskarrollen)
+#               2. .agents/skills/nortropic-reviewer/PR-TILLAGG.md  (de nio felklasserna)
+#             Sedan CLAUDE.md, AGENTS.md och docs/loop/regler.md — bindande, du
+#             refererar dem och återger dem inte.
+#             Du MERGAR ALDRIG och PUSHAR ALDRIG. Du skriver en granskning, inget annat.
