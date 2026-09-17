@@ -2,6 +2,40 @@
 
 ## 2026-09-17 — L1b: publicera.sh — bevara → PR → separat granskning → merge som mekanism; L0 landad; evidensundantag i installeraren
 
+### Femte självgranskningen (14:20–14:52 CEST): git-skalet stoppade provens fixturpushar; "död transport" struket
+Mekanismen granskade kandidaten `6574271` (rättelsen nedan) och gav `DOM: FYND` med två blockerande: (1) git-skalet
+vägrade **varje** `push`, även till provens lokala bare-repon under mktemp — granskaren fick 14/38 i publicera-provet
+och kunde inte köra tre av workflowens fyra skalprov (en miljö bokförd som FAIL, felklass 4); (2) påståendet "död
+git-transport" höll inte: `--allowedTools` bar miljöprefix-mönster (`Bash(PUBLICERA=:*)` m.fl.) som släpper **vilket
+kommando som helst** efter tilldelningen, och `PUBLICERA=x PATH=/usr/bin:$PATH git ls-remote …` gick igenom skalet.
+Den oberoende granskaren (separat subagent, samma kandidat) fann dessutom att `PATH=/usr/bin:… git ls-remote` och
+`git -c alias.p=push p …` gick igenom både regellagret och klassificeraren, och att `git send-pack` inte var nekat —
+push-spärren var inte mekanisk. Rättat i samma gren, fyra lager med mätt bärighet:
+**(a')** en `PreToolUse`-hook för Bash, `vakt-bash.sh` + `vakt-bash.py`, skriven av samma `skriv_skal` som skalen och
+pekad ut via `--settings` — den ser **hela kommandosträngen** (delad på `;`, `&&`, `||`, `|`, `$( )`, backticks) och
+nekar (exit 2) variabeltilldelning eller `env` före ett kommando, `PATH=`/`GIT_*`/`GH_*`/`HOME=` var som helst,
+absoluta sökvägar till git/gh/ssh/tolkar, `git -c`/`-C`/`--config-env`, skrivande eller nätverkande git-subkommandon
+(`push`, `send-pack`, `http-push`, `remote`, `config`, `pull`, …), traversering med `..`, `bash -c`, `python3 -c`;
+H1–H15 kör hooken som Claude Code kör den (JSON på stdin) — släpper `git log`, `git diff`, `bash tests/…` med
+kandidaten som argument, `node scripts/…`; **(a)** deny-listan utökad med `git -c`, `send-pack`, `http-push`, absolut
+git, `env`, `export`, `eval`, `bash -c`, `python3 -c`; miljöprefix-mönstren (`Bash(PUBLICERA=:*)` m.fl.) är borta ur
+allow-listan och harnessarna tar kandidaten som **första argument**; **(b)** git-skalet kör riktiga git med **död
+nättransport** (`GIT_SSH_COMMAND=false`, ingen terminalprompt, ingen askpass, `credential.helper` nollad,
+`core.sshCommand=false`), tillåter `-c` bara för ofarliga nycklar (`user.*`, `core.fsmonitor`, `init.*`, `advice.*`,
+…), vägrar push mot nätet med tydligt fel (77: fjärrnamn löses via `git remote get-url --push`, även med `-C`; URL med
+schema eller scp-form = nät; okänt namn = nät, fail-closed) men **släpper push till lokala sökvägar/file://** — S1–S20
+kör skalen mot **riktig git** (S17 utan provmiljöns `GIT_SSH_COMMAND` visar att ingen ssh startas); skalen är ett
+skydd inifrån tillåtna skript och kringgås av egen PATH eller absolut sökväg (G5/G6), vilket (a') stoppar på
+Bash-nivån; **(c)** `GH_CONFIG_DIR` via `--settings`. Skript, drift och beslutslogg säger nu exakt detta. Advisories: talen 24→26, 29→77, AGENTS "två skalproven"→"skalproven"; bevisen kopierade
+till `~/nortropic-bevis/publicera-l1b-r5-20260917/` (loggar, mutantsvep, mätskript); väggklockan mätt mot **riktig**
+`claude`-binär (Mach-O arm64): `perl alarm 5` → rc 142 efter 5 s (`~/nortropic-bevis/publicera-vaggklocka-*/`).
+Prov nu: **77 fall gröna** (38 + N6i/N6j + S1–S20 + H1–H17); mutanter: **34 byggda, 34 fällda** (nio nya, rader 27–35 i
+tabellen; svep mot en klon av kandidaten: `~/nortropic-bevis/publicera-l1b-r5-20260917/mutA.log`, `mutB.log`, `mutC.log`).
+**Mätprov 4 mot riktig `claude` (den slutliga formen: Bash-vakten, `PATH=`-prefix, `git -c alias`, `send-pack`, `env`,
+absolut git, traversering, samt att granskaren själv kör `tests/scripts/publicera/fall.sh` grönt under skalen) startades
+15:16 CEST men `claude -p` svarade `You've hit your session limit · resets 4:50pm` — **EJ KÖRT**; körs före
+omgranskningen och bokförs här (launcher och identitet i `~/nortropic-bevis/publicera-sparrar-20260917T131629Z/`).
+
 ### Fjärde självgranskningen (13:20–13:46 CEST): granskaren hade ägarens gh-inloggning — spärrar mätta mot riktig `claude`
 Mekanismen granskade sig själv en fjärde gång (`claude -p`, separat process, PR #264 @ `11993795`) och gav
 `DOM: FYND` med **ett blockerande fynd**: granskarprocessen svarade `Logged in to github.com account
@@ -11,13 +45,18 @@ skriver över mekanismens tomma katalog; verktygslistan nekade inte `gh`. Tre un
 kommentar, drift, beslutsloggsraden) påstod "utan drivarens gh-/ssh-credentials" — det påståendet var
 osant och är struket. Rättelsen är tre **mekaniska** lager i steg 4, inte prompttext:
 (a) `--disallowedTools` bär `Bash(gh:*)`, `Bash(<absolut sökväg till gh>:*)`, `Bash(git push:*)`,
-`Bash(git -C:*)` (prefixmönstret `git push` matchar inte `git -C … push`), `git worktree/branch/switch/
-remote/config` och alla skrivverktyg; (b) granskarens `PATH` börjar med en katalog där `gh` är ett skal som
-vägrar (exit 77) — oavsett kommandoform (`X=1 gh …`); (c) git-transporten är död:
-`GIT_SSH_COMMAND=false`, `GIT_TERMINAL_PROMPT=0`, `credential.helper` nollad och
-`remote.origin.pushurl` → ogiltig sökväg via `GIT_CONFIG_COUNT`, så en push kan inte lyckas ens om (a)
-kringgås. `GH_CONFIG_DIR` sätts fortfarande men bär inget skydd (användarinställningen vinner) — det står
-nu så i skriptet. Granskarens prompt säger att GitHub-läget kontrolleras av mekanismen efter den.
+`Bash(git -C:*)`, `Bash(<absolut git>:*)`, `git worktree/branch/switch/remote/config` och alla skrivverktyg —
+mätt: nekas även i formen `X=1 git push …`; kommandon utanför allow-listan avgörs av auto-mode-klassificeraren;
+**push-spärren bärs av (a) + klassificeraren**; (a') en `PreToolUse`-hook via `--settings` nekar på hela kommandosträngen det prefixregler inte ser (`PATH=`,
+`git -c`, `env`, absoluta sökvägar, `..`, `bash -c`) — se femte självgranskningen ovan; (b) granskarens `PATH`
+börjar med en katalog med skal: `gh` vägrar (77), `git` kör med död nättransport och vägrar push mot nätet men
+släpper lokala mål, `ssh` vägrar (255) — täcker kommandon som slås upp via PATH inifrån tillåtna skript, kringgås
+av egen PATH eller absolut sökväg; (c) `GH_CONFIG_DIR` → tom
+katalog via `--settings` (kommandoraden slår användarinställningen; en lös variabel gjorde det inte). Miljön bär
+**ingen** git-spärr: `GIT_*`-variabler når inte granskarens Bash (mätt, tabellen nedan). Granskarens prompt säger
+att GitHub-läget kontrolleras av mekanismen efter den. *(Första versionen av detta stycke påstod "död
+git-transport" via `GIT_*`-variabler — struket efter femte självgranskningen; mätningarna nedan visade redan att de
+inte nådde fram.)*
 
 **Mätt mot riktig `claude` (inte stubben), samma startform som steg 4, mätprompt med tolv kommandon,
 bevis under `~/nortropic-bevis/publicera-sparrar-<stamp>/` (identitet, svar, rc):**
@@ -50,8 +89,8 @@ exakt räkning nedan; (6) `--odombart-ok`-skälet bokförs nu som PR-kommentar o
 (`ODOMBART_OK=`), kan kommentaren inte postas sker ingen merge (N6b, N6f tomt skäl). `KVITTO` bär
 också `BAS=` (origin/main vid granskningen; steg 4 fetchar main först så intervallet gäller dagens bas).
 
-**Prov nu: 38 fall gröna** (29 + N6f, N6g, N6h, P4, N11d, N11e, N13, N14, P1c). **Mutanter, exakt
-räkning (24 byggda ur den rättade kandidaten, en rad ändrad per mutant, harnessen körd mot var och en):**
+**Prov efter fjärde självgranskningen: 38 fall gröna** (29 + N6f, N6g, N6h, P4, N11d, N11e, N13, N14, P1c); efter femte: se ovan. **Mutanter, exakt
+räkning (byggda ur den rättade kandidaten, en rad ändrad per mutant, harnessen körd mot var och en):**
 | # | Mutant (en rad ändrad i `scripts/publicera.sh`) | Fälls av |
 |---|---|---|
 | 1 | kvittokontrollen `origin/main^2 == HEAD` bort | N13 |
@@ -81,8 +120,18 @@ räkning (24 byggda ur den rättade kandidaten, en rad ändrad per mutant, harne
 | 25 | `--settings` utan `GH_CONFIG_DIR` | P1c |
 | 26 | ssh-skalet bort | P1c |
 
-**26 byggda, 26 fällda** (svep `l1b-r5/mutanter5.log` + `mutanter6.log`; nr 20 omkörd efter att gh-stubben
-gjorts trogen även utan `select`, `mutanter7.log`). Kända luckor som harnessen INTE mäter: att riktig
+| 27 | git-skalet utan död nättransport | S17 |
+| 28 | Bash-vakten släpper `PATH=` | H4 |
+| 29 | hooken saknas i `--settings` | P1c |
+| 30 | git-skalets `-c`-policy av | S16/S19/S20 |
+| 31 | git-skalet släpper nätpush | S2–S6 |
+| 32 | Bash-vakten delar inte kommandosträngen i segment | H11 |
+| 33 | git-skalet ignorerar `-C` (löser fjärrnamnet i fel repo) | S9 |
+| 34 | git-skalet vägrar även lokala mål | S1 |
+| 35 | git-skalet släpper okänt fjärrnamn | S12 |
+
+**34 byggda, 34 fällda** (svep `~/nortropic-bevis/publicera-l1b-r5-20260917/mutanter5.log` + `mutanter6.log`; nr 20 omkörd efter
+att gh-stubben gjorts trogen även utan `select`, `mutanter7.log`; nr 27–35 i `mutB.log`; svepet kört mot en klon av samma kandidat, `mutA.log`+`mutB.log`). Kända luckor som harnessen INTE mäter: att riktig
 `claude` ärver PATH och `--settings`-miljön (det mäts av mätproven ovan, inte av stubben), och G4.
 
 ### Mekanismen (ägarkrav 11:40: "auto PR review och push, så vi inte hamnar med 100 commits")
@@ -90,7 +139,7 @@ gjorts trogen även utan `select`, `mutanter7.log`). Kända luckor som harnessen
 körs av kedjedrivaren vid varje avslutad leverans. Sex steg, varje stopp synligt: (1) ren arbetskopia,
 gren ≠ main, HEAD på origin (pushar själv om det bara är lokalt; origin som inte är förfader → stopp, aldrig
 force); (2) PR mot main (öppnas om ingen finns; PR-nummer måste vara ett tal); (3) granskning av **hela**
-`origin/main..HEAD` i en **separat process**: `claude -p` i ren miljö (utan `CLAUDECODE`-variabler; gh, push och git-transport spärrade — se ovan), rollen ur
+`origin/main..HEAD` i en **separat process**: `claude -p` i ren miljö (utan `CLAUDECODE`-variabler; gh och push nekade, Bash-vakt, PATH-skal — se ovan), rollen ur
 `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`, inga skrivverktyg, endast läs-/git-läs-/
 prov-kommandon; arbetskopian måste vara ren efteråt; domen `DOM: TILLSTYRKS @<sha>` / `DOM: FYND @<sha>`
 postas som PR-review-kommentar; (4) FYND → stopp (samma gren, samma budget); (5) merge `--merge
@@ -152,7 +201,7 @@ Från #261:s andra granskning: A1 (reläet) är nu mekanism — `publicera.sh` s
 detta som bär trusten"); autopilotens "rebase-merga" (operating model v2-blocket) är ett äldre block som
 arkiveras i L2.
 
-Mätt vid spetsen: publicera 29 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
+Mätt vid spetsen: publicera 77 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
 check-granskningsmekanismen 22/22 · provanropare 20/20 (56 kandidater) · vaktankare 34/34 · kor-vakter 24/24.
 ### Mekanismen granskade sig själv — och fällde sig (13:02–13:20)
 `publicera.sh --utan-merge` på PR #264 (spets `7831b4d`): steg 1–3 gröna, steg 4 startade en separat
@@ -168,7 +217,7 @@ kopior; (9) AGENTS.md:s "tills mekanismen finns"-mening rättad. Subagentens til
 (inget prefix), varje `DOM: FYND`-rad räknas, väggklocka via `perl alarm` (3600 s, `NORTROPIC_GRANSKARE_TID`),
 gh-fel vid checks → stopp (inte "ingen CI"), granskaren utan projekthookar (`--setting-sources user`,
 annars hade kandidatens `.claude/settings.json` kört autocommit av kandidatkod), utan drivarens gh-/ssh-
-credentials (tom `GH_CONFIG_DIR`, utan `SSH_AUTH_SOCK`/`GH_TOKEN`), `scripts/publicera.sh` och
+credentials (tom `GH_CONFIG_DIR`, utan `SSH_AUTH_SOCK`/`GH_TOKEN`) *[STRUKET 2026-09-17 e.m.: påståendet var osant — se fjärde självgranskningen ovan]*, `scripts/publicera.sh` och
 `.claude/settings.json` i felklass 6, och regeln att kedjedrivaren kör mekanismen ur `origin/main`:s
 version när kandidaten rör den (denna PR är undantaget: skriptet finns inte på main ännu — därför
 dubbel granskning). Kvarstår som känd gräns: granskaren är samma modell som byggaren (workflow-separation,

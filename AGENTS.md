@@ -218,7 +218,7 @@ publiceringsvägen, och `SELF_CERTIFICATION_AS_PROOF=NO` förbjuder exakt det.
 
 **Den mekaniska domen är automatiserad sedan 2026-09-17** — ägaren: *"detta måste vi ha,
 det ska ske per automatik så vi inte fastnar med opushade commits etc."* Workflowen kör två
-jobb på varje PR: vaktsviten och de två skalproven under `tests/scripts/`. Den gäller
+jobb på varje PR: vaktsviten och skalproven under `tests/scripts/` (listan i `granska-pr.yml`). Den gäller
 **PR:en, aldrig pushen** — utlösaren är `pull_request`, så bevarande passerar den inte och
 kan per konstruktion inte fastna i den.
 

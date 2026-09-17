@@ -2,10 +2,10 @@
 # tests/scripts/post-commit-hook/fall.sh — vakterna i .githooks/post-commit, i engångsrepon.
 # Eget $HOME, egen bare-origin, core.hooksPath → en KOPIA av repots hook. Rör aldrig riktiga repot.
 #   bash tests/scripts/post-commit-hook/fall.sh
-#   HOOK=<sökväg> bash tests/scripts/post-commit-hook/fall.sh     # prova annan kandidat
+#   bash tests/scripts/post-commit-hook/fall.sh <sökväg>          # prova annan kandidat (även HOOK=<sökväg>)
 set -u
 HAR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
-HOOK="${HOOK:-$HAR/.githooks/post-commit}"
+HOOK="${1:-${HOOK:-$HAR/.githooks/post-commit}}"   # första argumentet = kandidat (granskaren får inte miljöprefix)
 [ -f "$HOOK" ] || { echo "ODÖMBART: $HOOK saknas"; exit 2; }
 T="$(mktemp -d "${TMPDIR:-/tmp}/post-commit-fall.XXXXXX")"; export T; trap 'rm -rf "$T"' EXIT
 export HOME="$T/hem"; mkdir -p "$HOME/hooks"; cp "$HOOK" "$HOME/hooks/post-commit"; chmod +x "$HOME/hooks/post-commit"
