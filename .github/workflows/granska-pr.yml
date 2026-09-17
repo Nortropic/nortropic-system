@@ -86,7 +86,8 @@ on:
 # Minsta möjliga, på riktigt: jobben här kör PR-SPETSENS EGEN KOD (kor-vakter, skalproven),
 # och en token som kan skriva PR-kommentarer hade låtit en kandidat skriva sitt eget
 # "DOM: TILLSTYRKS" (andra granskningen av PR #261, fynd 5). Slås granskningsjobbet på
-# ges det `pull-requests: write` PER JOBB, aldrig här på toppnivå.
+# ges det `pull-requests: write` PER JOBB — och `check-granskningsmekanismen.mjs`
+# (jobbnivå-spärren + `TILLATNA_SECRET_JOBB`) utökas i SAMMA commit, annars fäller vakten.
 permissions:
   contents: read
 
@@ -156,7 +157,8 @@ jobs:
           odombara=""
           for p in tests/scripts/nortropic-autocommit/fall.sh \
                    tests/scripts/installera-hooks/fall.sh \
-                   tests/scripts/post-commit-hook/fall.sh; do
+                   tests/scripts/post-commit-hook/fall.sh \
+                   tests/scripts/publicera/fall.sh; do
             set +e
             bash "$p"
             K=$?

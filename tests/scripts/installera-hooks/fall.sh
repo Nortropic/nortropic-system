@@ -32,7 +32,7 @@
 # är sann både om vad den ändrar och om vad som redan är installerat (regel 8a:
 # provet dömer den yta det läser).
 #
-# DE NIO PRÖVADE MUTATIONERNA, uppräknade. Talet "åtta av nio dödade" stod tidigare
+# DE TIO PRÖVADE MUTATIONERNA, uppräknade. Talet "åtta av nio dödade" stod tidigare
 # utan att de nio fanns någonstans — ett tal ingen kunde pröva, alltså ett påstående
 # och inte en mätning (andra granskningen, icke-blockerande). Uppräknade i stället:
 #
@@ -45,6 +45,7 @@
 #   7. ODÖMBART-spärren (rad 34) borttagen        → K8b
 #   8. `--av` gör ingenting                       → K7
 #   9. `SEDDA`-dedupliceringen borttagen          → ÖVERLEVER
+#  10. evidensundantaget (nortropic/evidence/) borttaget → K3c   (tillagt 2026-09-17, L1b)
 #
 # KÄND LUCKA (nr 9): `SEDDA`-dedupliceringen (installeraren rad 72) kan tas bort utan
 # att något fall faller. Sannolikt en likvärdig mutant — att sätta samma
@@ -106,6 +107,10 @@ bygg_klon "$HOME/frammande" "$T/fjarrB"
 # skyddar inte mot en regress; det beskriver bara dagens beteende.
 bygg_klon "$HOME/a/b/c/d/djup" "$T/fjarrA"
 
+# En klon av SAMMA origin under ~/nortropic/evidence/ — en fryst evidensfixtur. Den får
+# ALDRIG hooksPath: 2026-09-17 satte installeraren den i fem h-039-fixturer (K3c).
+bygg_klon "$HOME/nortropic/evidence/v0-prov/fixtur" "$T/fjarrA"
+
 hooksPath() { git -C "$1" config --get core.hooksPath 2>/dev/null || true; }
 
 # ── K1: okänt argument → exit 2, ingenting rört ──────────────────────────────
@@ -150,6 +155,14 @@ if [ "$K" = "0" ] \
   ok "K3 --kor sätter core.hooksPath i båda klonerna av samma origin"
 else
   nej "K3 --kor nådde inte båda — exit=$K kontroll='$(hooksPath "$HOME/kontroll")' klon2='$(hooksPath "$HOME/annan/klon2")' [$UT]"
+fi
+
+# ── K3c: evidensrötter rörs ALDRIG, även med samma origin ────────────────────
+if [ -z "$(hooksPath "$HOME/nortropic/evidence/v0-prov/fixtur")" ] \
+   && printf '%s' "$UT" | grep -q "HOPPAD"; then
+  ok "K3c klonen under nortropic/evidence/ hoppas över och rapporteras HOPPAD"
+else
+  nej "K3c evidensfixturen rördes — hooksPath='$(hooksPath "$HOME/nortropic/evidence/v0-prov/fixtur")' [$UT]"
 fi
 
 # ── K3b: klonen på DJUP 6 nås också ──────────────────────────────────────────

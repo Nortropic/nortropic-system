@@ -38,6 +38,10 @@ case "$(refs)" in *"h007-prov-123"*) fel "N1b" "fixturgren pushad" ;; *) ok "N1b
 # N2 huvudträd, author nortropic-utforare → ingen push
 bygg; git -C "$T/arb" switch -q -c nortropic/loop-y; echo f > "$T/arb/f.txt"; git -C "$T/arb" add -A; GIT_AUTHOR_NAME=nortropic-utforare GIT_COMMITTER_NAME=nortropic-utforare git -C "$T/arb" commit -q -m kand 2>"$T/e3"
 case "$(refs)" in *"nortropic/loop-y"*) fel "N2" "utförarens commit pushad" ;; *) grep -q 'utföraren' "$T/e3" && ok "N2 commit av nortropic-utforare → ingen push, tydligt skäl" || fel "N2" "inget skäl: $(cat "$T/e3")" ;; esac
+# N2b bara COMMITTER-namnet är utförarens (author är någon annan) → ingen push. Fäller en
+# mutant som bara läser %an. (#262-granskningen, advisory 1: "author eller committer" var obevisat.)
+bygg; git -C "$T/arb" switch -q -c nortropic/loop-y2; echo f2 > "$T/arb/f2.txt"; git -C "$T/arb" add -A; GIT_AUTHOR_NAME=Prov GIT_COMMITTER_NAME=nortropic-utforare git -C "$T/arb" commit -q -m kand2 2>/dev/null
+case "$(refs)" in *"nortropic/loop-y2"*) fel "N2b" "commit med utföraren som committer pushad" ;; *) ok "N2b committer nortropic-utforare (author annan) → ingen push" ;; esac
 # N3 på main → ingen push (oförändrat)
 bygg; echo g > "$T/arb/g.txt"; git -C "$T/arb" add -A; git -C "$T/arb" commit -q -m m 2>/dev/null
 [ "$(git -C "$T/origin.git" rev-parse main)" != "$(git -C "$T/arb" rev-parse HEAD)" ] && ok "N3 på main → ingen push" || fel "N3" "main pushad"

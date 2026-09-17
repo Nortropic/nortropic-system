@@ -64,13 +64,20 @@ elif [ "$LAGE" = "torr" ]; then
 fi
 echo
 
-n=0; n_andrade=0; n_redan=0
+n=0; n_andrade=0; n_redan=0; n_hoppade=0
 behandla() { # <katalog> <källa>
   local d="$1" kalla="$2" nuv onskad
   # Worktrees delar konfiguration med sitt huvudrepo — sätt den bara en gång där.
   local gemensam; gemensam="$(git -C "$d" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return
   case " $SEDDA " in *" $gemensam "*) return;; esac
   SEDDA="$SEDDA $gemensam"
+
+  # EVIDENSRÖTTER RÖRS ALDRIG. 2026-09-17 12:48 satte installeraren core.hooksPath i fem
+  # h-039-evidensfixturer under ~/nortropic/evidence/ (samma origin, djup ≤ 6): en skrivning
+  # i .git/config i ett fryst beroende (regel 13b:5 — en grind som pekar på sökvägen gör
+  # katalogen till infrastruktur). Återställt för hand samma minut; inoden är ändå ny.
+  case "$d" in "$HOME/nortropic/evidence/"*)
+    echo "  HOPPAD     ${d#$HOME/}  (evidensrot — frysta beroenden rörs aldrig)"; n_hoppade=$((n_hoppade+1)); return;; esac
 
   [ "$(git -C "$d" remote get-url origin 2>/dev/null)" = "$MIN_ORIGIN" ] || return
   n=$((n+1))
@@ -114,6 +121,6 @@ while IFS= read -r d; do [ -d "$d" ] && behandla "$d" "worktree"; done < <(
   git -C "$ROT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
 
 echo
-echo "$n repon av samma origin · $n_andrade $([ "$LAGE" = "torr" ] && echo 'att ändra' || echo 'ändrade') · $n_redan redan rätt"
+echo "$n repon av samma origin · $n_andrade $([ "$LAGE" = "torr" ] && echo 'att ändra' || echo 'ändrade') · $n_redan redan rätt · $n_hoppade hoppade (evidensrot)"
 [ "$LAGE" = "torr" ] && [ "$n_andrade" -gt 0 ] && echo && echo "Kör om med --kor för att sätta dem."
 exit 0

@@ -49,7 +49,7 @@ const odombart = (skal) => { console.error(`ODÖMBART: ${skal}`); process.exit(2
 const passes = []
 const fails = []
 const check = (namn, ok, detalj) => (ok ? passes.push(namn) : fails.push(`${namn}: ${detalj}`))
-const FORVANTAD_KALLHASH = 'e7f20a7d91064a1b'
+const FORVANTAD_KALLHASH = '38a53825cf779639'
 
 // ---- DET SOM FÖRLITAR SIG PÅ MÄNSKLIGT MINNE, utskrivet ---------------------
 // Varje rad är en skuld, inte ett undantag. Skälet måste säga VEM som kör och NÄR.
@@ -65,9 +65,11 @@ const UTAN_ANROPARE = {
   'scripts/nortropic-codex-autopilot.py': 'exekverare i styrplanet, inget prov — prövas av verify/bin/h-032-exit (ägarhand)',
   'scripts/nortropic-autocommit.sh': 'ÄR prövad — tests/scripts/nortropic-autocommit/fall.sh kör den i sju fall. Vakten kan inte se det: körarmängden är hårt avgränsad till scripts/(kor|check)-*.mjs, alltså webbsvitens egna körare, och når per konstruktion inget kerneltest under tests/. Registerraden beskriver vaktens blindfläck, inte en oprövad fil (regel 12a, 2026-09-16)',
   'tests/scripts/nortropic-autocommit/fall.sh': 'provet självt — körs av Stop/SessionEnd-hooken i .claude/settings.json och för hand; samma blindfläck som raden ovan, eftersom en hook inte är en scripts/check-*.mjs',
-  'scripts/installera-hooks.sh': 'ÄR prövad — tests/scripts/installera-hooks/fall.sh kör den i 13 fall mot ett engångs-$HOME, och åtta av nio prövade mutationer av installeraren fälls (den nionde står som känd lucka i provets huvud). Vakten kan inte se det av samma skäl som autocommit-raden: körarmängden är hårt avgränsad till scripts/(kor|check)-*.mjs och når aldrig ett prov under tests/. Raden beskriver vaktens blindfläck, inte en oprövad fil (2026-09-17)',
+  'scripts/installera-hooks.sh': 'ÄR prövad — tests/scripts/installera-hooks/fall.sh kör den i 14 fall mot ett engångs-$HOME, och nio av tio prövade mutationer av installeraren fälls (den nionde står som känd lucka i provets huvud). Vakten kan inte se det av samma skäl som autocommit-raden: körarmängden är hårt avgränsad till scripts/(kor|check)-*.mjs och når aldrig ett prov under tests/. Raden beskriver vaktens blindfläck, inte en oprövad fil (2026-09-17)',
   'tests/scripts/installera-hooks/fall.sh': 'provet självt — körs av .github/workflows/granska-pr.yml på varje PR och för hand; en workflow är ingen scripts/check-*.mjs, alltså samma blindfläck som raden ovan',
   'tests/scripts/post-commit-hook/fall.sh': 'provet för .githooks/post-commit (hooken själv är ingen kandidat, den ligger utanför scripts/ och tests/) — körs av .github/workflows/granska-pr.yml på varje PR och för hand; samma blindfläck som raderna ovan (2026-09-17, L1c: vakterna mot autopush från länkade worktrees och utförarcommits)',
+  'scripts/publicera.sh': 'ÄR prövad — tests/scripts/publicera/fall.sh kör den i 14 fall med stubbade gh och claude, och sju mutationer av merge-villkoren fälls. Körs av kedjedrivaren vid varje avslutad leverans (AGENTS.md "Före varje merge"); samma blindfläck som autocommit-raden: vaktens körarmängd når inget prov under tests/ (2026-09-17, L1b)',
+  'tests/scripts/publicera/fall.sh': 'provet självt — körs av .github/workflows/granska-pr.yml på varje PR och för hand; en workflow är ingen scripts/check-*.mjs (2026-09-17, L1b)',
 }
 
 // ---- MEKANISMEN, FAKTORISERAD UT -------------------------------------------

@@ -1,5 +1,71 @@
 # Att köra loopen
 
+## 2026-09-17 — L1b: publicera.sh — bevara → PR → separat granskning → merge som mekanism; L0 landad; evidensundantag i installeraren
+
+### Mekanismen (ägarkrav 11:40: "auto PR review och push, så vi inte hamnar med 100 commits")
+`scripts/publicera.sh --repo <klon> [--gren] [--granskare claude|ci|ingen] [--utan-merge] [--odombart-ok "<check>: <skäl>"] [--torr]`
+körs av kedjedrivaren vid varje avslutad leverans. Sex steg, varje stopp synligt: (1) ren arbetskopia,
+gren ≠ main, HEAD på origin (pushar själv om det bara är lokalt; origin som inte är förfader → stopp, aldrig
+force); (2) PR mot main (öppnas om ingen finns; PR-nummer måste vara ett tal); (3) granskning av **hela**
+`origin/main..HEAD` i en **separat process**: `claude -p` i ren miljö (utan `CLAUDECODE`-variabler), rollen ur
+`.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`, inga skrivverktyg, endast läs-/git-läs-/
+prov-kommandon; arbetskopian måste vara ren efteråt; domen `DOM: TILLSTYRKS @<sha>` / `DOM: FYND @<sha>`
+postas som PR-review-kommentar; (4) FYND → stopp (samma gren, samma budget); (5) merge `--merge
+--match-head-commit <sha>` **endast** om PR-head fortfarande == granskat SHA, alla checks gröna (röd check
+= vänta; ODÖMBART accepteras bara uttryckligt med `--odombart-ok` och skälet skrivs ut); (6) kvitto:
+`origin/main^2` måste vara det granskade SHA:t. Exit 0 mergad · 1 stopp · 2 ODÖMBART · 3 anropsfel.
+Domen från `--granskare ci` läses ur PR:ens reviews (för den dag CI-granskningen slås på).
+
+Prov `tests/scripts/publicera/fall.sh` (stubbade `gh` och `claude`, bare origin + klon + hjälpklon som
+utför stub-mergen på riktigt så `origin/main^2` kan prövas): N1 `--granskare ingen` → stopp · N2 granskare
+utan DOM-rad → ODÖMBART · N2b tom rapport → ODÖMBART · N3 DOM med fel SHA → stopp · N4 FYND → stopp,
+rapport postad · N5 ny commit efter granskning → stopp · N6 röd check utan skäl → stopp · N6b röd check
+med uttryckligt skäl → merge · N7 smutsig arbetskopia → stopp före granskning · N8 granskaren smutsar
+trädet → stopp · N9 på main → stopp · P1 legitim grön kandidat → granskad, mergad med
+`--match-head-commit`, kvitto · P2 ingen PR → öppnas, granskad, mergad · P3 opushad commit → pushas,
+`--utan-merge` stannar efter granskningen. **14 gröna.** Sju mutanter av merge-villkoren (utan SHA-kontroll,
+utan omkontroll av head, utan `--match-head-commit`, FYND mergar, röda checks ignoreras, smuts efter
+granskning, saknad DOM blir OK) fälls alla. Lokala fixturer bevisar inte GitHubs serverkonfiguration —
+den evidensen står nedan.
+
+### Serverbevis för required status checks (satta 12:27, L1c)
+PR #263 vid 12:38 CEST: `mergeStateStatus: BLOCKED` med checkarna `IN_PROGRESS`/`QUEUED`; 12:39 `CLEAN`
+med båda `SUCCESS` (`gh pr view --json mergeStateStatus,statusCheckRollup`). Positivt bevis: mergen
+hålls tills checkarna är gröna. Negativt serverbevis (röd check → BLOCKED kvarstår) görs med en engångs-
+PR i nästa leverans som rör CI-ytan; tills dess bär `publicera.sh`:s N6 den lokala halvan.
+
+### L0 landad
+PR #263 mergad `476a5c4` (andra förälder = granskad spets `6fde134`) efter oberoende falsifiering i fem
+pass (tre + två + ett blockerande fynd åtgärdade; sista två passen VERIFIED).
+
+### Sidoeffekt 12:48 — rättad, och nu omöjlig: installeraren rörde fem evidensrepon
+`bash scripts/installera-hooks.sh --kor` (för att få L1c-hooken på plats i `~/kernel-arbete`) skannar
+`$HOME` till djup 6 och satte `core.hooksPath` i **fem** repon med samma origin under
+`~/nortropic/evidence/v316-h039-continuity-review-20260912/` (`h039-local-two-edge-method-53ms1swj/
+repository`, `h039-observer-causal-method-7z704bbk/{positive,untracked_attribute,bad_config,
+committed_attribute}`) — frysta h-039-beroenden (regel 13b:5). Återställt 12:50 med `git config --unset
+core.hooksPath` i exakt de fem (config-innehållet är som före; `.git/config` har ny inod/mtime, vilket inte
+går att återställa). Inga commits, inga pushar, inga andra filer rörda. h-039 är avslutad `OVERIFIERAT`;
+om dess R33-bindning läser inod/mtime på `.git/config` är den bruten för de fem — OVERIFIERAT.
+**Lagat:** installeraren hoppar `~/nortropic/evidence/**` och rapporterar `HOPPAD … (evidensrot)`;
+prov K3c (klon med samma origin under evidensroten rörs inte), mutant utan undantaget fälls. Hooksveper
+i dag: bara de fyra klonerna (`~/kernel-arbete`, `~/nortropic-kontrollklon`,
+`~/nortropic-repos/nortropic-system`, `~/nortropic/nortropic-system`) bär `core.hooksPath`; hooken i
+`~/.nortropic/githooks` är identisk med repots (med vakterna).
+
+### Rådgivande fynd från #262-granskningen, tagna här
+A1 N2b: commit där bara **committern** är `nortropic-utforare` → ingen push (mutant som bara läser `%an`
+fälls) · A2 workflow-kommentaren om jobbnivå-permissions säger nu att vakten utökas i samma commit ·
+A3 hookens kommentar: "utan vakten skulle … (hooksPath-arvet mätt; ingen fixtur nådde origin)".
+Från #261:s andra granskning: A1 (reläet) är nu mekanism — `publicera.sh` steg 3 postar domen; A6:
+`publicera.sh` väljer **merge-commit** (`--merge`), aldrig squash/rebase (AGENTS.md:288); autopilotens
+"rebase-merga" (AGENTS.md:336) är ett äldre block som arkiveras i L2.
+
+Mätt vid spetsen: publicera 14 · post-commit-hook 8 · installera-hooks 14 · autocommit 7 ·
+check-granskningsmekanismen 22/22 · provanropare 20/20 (56 kandidater) · vaktankare 34/34 · kor-vakter 24/24.
+Denna PR granskas av **båda** vägarna: `publicera.sh --utan-merge` (den nya mekanismen dömer sin egen
+kandidat i separat `claude -p`) och en separat read-only-subagent; mergen sker med `publicera.sh`.
+
 ## 2026-09-17 — L1c: post-commit-hooken pushar inte längre från länkade worktrees eller utförarcommits; L1 landad; required status checks satta
 
 ### Hook-vakten (L1c)
