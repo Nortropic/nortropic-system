@@ -1,0 +1,147 @@
+{
+  "audit_date": "2026-09-17",
+  "repository": "Nortropic/nortropic-system",
+  "main_commit": "eb9483e932be528231d3e9212d816ebad76ef114",
+  "platform_commit": "8095d947c83202e2b87801531d9f7cb1457c8719",
+  "method": "Reduced decision-fragment reproductions in disposable fixtures; not whole-script or Darwin/kernel qualification",
+  "environment": {
+    "os": "Linux",
+    "python": "3.13.5",
+    "git": "git version 2.47.3"
+  },
+  "real_network_calls": 0,
+  "real_kernel_gates_executed": 0,
+  "tests": [
+    {
+      "id": "T01",
+      "source": "docs/loop/raddning/artefakter/helhetsbilden.sh",
+      "property_under_test": "Completion must require passing, not merely existing, required gates.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "classifier_exit": 0,
+        "classifier_output": "UPPFYLLDA=6\nKERNEL_COMPLETE",
+        "three_required_gates_not_invoked_by_classifier": true,
+        "their_exits_when_actually_invoked": {
+          "h-014-exit": 1,
+          "h-015-exit": 1,
+          "autonomous-loop-exit": 1
+        },
+        "substitution_tasks_have_no_exit_test": true,
+        "acceptance_document_empty": true
+      },
+      "controls": {
+        "missing_acceptance_exit": 1,
+        "red_member_of_fourteen_exit": 1
+      }
+    },
+    {
+      "id": "T02",
+      "source": "docs/loop/raddning/artefakter/redo-for-codex.sh",
+      "property_under_test": "Unknown or failed validation must not produce a green readiness row.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "unknown": "validator_exit=2 row=JA",
+        "crash": "validator_exit=127 row=JA",
+        "empty_output": "validator_exit=0 row=JA",
+        "genuine_deviation": "validator_exit=1 row=NEJ",
+        "genuine_confirmation": "validator_exit=0 row=JA"
+      },
+      "controls": {
+        "genuine_deviation": "validator_exit=1 row=NEJ",
+        "genuine_confirmation": "validator_exit=0 row=JA"
+      }
+    },
+    {
+      "id": "T03",
+      "source": "docs/loop/raddning/VAGEN.md",
+      "property_under_test": "Candidate divergence must not be confused with stale main; tree equality is not commit identity.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "clean_candidate": true,
+        "missing_commits_from_origin_main": 0,
+        "origin_main_is_ancestor_exit": 0,
+        "documented_diff_probe_exit": 1,
+        "empty_commit_diff_exit": 0,
+        "empty_commit_has_same_identity_as_origin_main": false
+      },
+      "controls": {
+        "unchanged_base_diff_exit": 0
+      }
+    },
+    {
+      "id": "T04",
+      "source": "scripts/nortropic-autocommit.sh",
+      "property_under_test": "A code change and its required documentation must remain in the same commit.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "commits_created": 2,
+        "files_per_commit_in_creation_order": [
+          [
+            "docs/loop/drift.md"
+          ],
+          [
+            "controller/demo.py"
+          ]
+        ],
+        "any_commit_contains_code_and_documentation": false,
+        "network_or_push_used": false
+      },
+      "controls": null
+    },
+    {
+      "id": "T05",
+      "source": "docs/loop/raddning/artefakter/inventera-lokalt-arbete.sh",
+      "property_under_test": "Fresh origin evidence cannot be replaced by a local reference belonging to another remote.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "before_other_remote_reference": "FORALDRALOS",
+        "after_other_remote_reference": "PA_REMOTE",
+        "origin_references_containing_candidate": [],
+        "real_remote_contacted": false
+      },
+      "controls": {
+        "with_matching_origin_reference": "PA_REMOTE"
+      }
+    },
+    {
+      "id": "T06",
+      "source": "docs/loop/raddning/artefakter/inventera-lokalt-arbete.sh",
+      "property_under_test": "A scoped preservation verdict must not authorize lossless cleanup of excluded content.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "normal_git_status_clean": true,
+        "ignored_status_entries": [
+          "!! scratch/"
+        ],
+        "evidence_is_tracked": false,
+        "final_decision_exit": 0,
+        "final_decision_output": "✅ REGEL 12 UPPFYLLD — allt lokalt arbete finns på git.\n   Städning kan ske utan att något går förlorat.",
+        "files_deleted_in_this_test": false
+      },
+      "controls": null
+    },
+    {
+      "id": "T07",
+      "source": "docs/loop/raddning/artefakter/matning-pa-macen.sh",
+      "property_under_test": "Equal status-entry counts do not prove unchanged filesystem contents.",
+      "result": "DEFECT_REPRODUCED",
+      "evidence": {
+        "status_counts_before": {
+          "normal": 0,
+          "ignored": 1
+        },
+        "status_counts_after": {
+          "normal": 0,
+          "ignored": 1
+        },
+        "ignored_file_sha256_before": "1f3b2a3d702d880ab59b670c25f0bb39a1c53e8239b4f9ec3c68e70b3769a4c6",
+        "ignored_file_sha256_after": "603de13b9c07abc710e1e4fdfd58e2febf1388cf06a356aae03d57b025c2705d",
+        "decision_output": "OK — grindarna lämnade trädet orört, ignorerade filer inräknade"
+      },
+      "controls": {
+        "no_mutation_keeps_counts_equal": true
+      }
+    }
+  ],
+  "all_counterexamples_reproduced": true
+}

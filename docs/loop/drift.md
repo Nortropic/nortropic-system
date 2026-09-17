@@ -1,5 +1,159 @@
 # Att köra loopen
 
+## 2026-09-17 — Reparationsuppdrag utgåva 2: validerad läges- och vägförståelse (L0)
+
+Ägarens uppdrag `docs/loop/raddning/underlag-20260917/UPPDRAG-TILL-CLAUDE.md` (sha256 `8b0a8a62…`,
+beslutsrad `LOOP-ÄGARUPPDRAG-20260917`) ersätter utgåva 1, ursprungsprompten och auditens HANDOFF som
+körinstruktion. Detta är uppdragets första resultat: en validering utan ändringar i kod, mätt
+2026-09-17 11:20 CEST på Macen. Skilj tre källtyper nedan: **vad koden gör** (mätt), **vad ägarbeslut
+tillåter** (beslutsloggen) och **vad en äldre plan föreslog** (auditens HANDOFF, utgåva 1) — ingen ersätter
+automatiskt de andra.
+
+### Syfte och slutmål — oförändrade
+`KERNEL_COMPLETE` enligt `00-VAD-NORTROPIC-AR.md`/`VAGEN.md` §1. Reparationspasset ändrar inte slutmålet;
+det reparerar vägen dit och sessionsingångarna så att Claude Code och Codex driver samma arbete.
+
+### Byggrevision och arbetsmiljö — mätt
+| | |
+|---|---|
+| `origin/main` | `eb9483e932be528231d3e9212d816ebad76ef114` = auditens revision. `gh api …/ref/heads/main`, `git ls-remote`. |
+| Plattformsgren | `nortropic/platform-integration-20260910` @ `8095d947`, 55 före / 111 efter main, bas `ed584ec3` (`gh api compare`: `diverged`). Saknar hela `docs/loop/raddning/`, `docs/05-beslutslogg.md`, `.githooks/`, `scripts/nortropic-autocommit.sh`; main saknar `SEPARATION-20260910/`. |
+| **Arbetsklon** | **`~/kernel-arbete`**, skapad i dag från `origin/main` enligt VÄGEN §2, `core.hooksPath` satt, hooken byteidentisk med `.githooks/post-commit`. Senare sessioner återanvänder den (ren + `rev-list --count HEAD..origin/main` = 0 före arbete). |
+| Övriga kloner | `~/nortropic-kontrollklon` = ägarens mätklon (main, ren, rörs inte). `~/nortropic-repos/nortropic-system` står på plattformsgrenen med `origin/main` 111 commits stale. `~/nortropic/nortropic-system` HEAD 10 aug, 606 commits efter verkliga `main` (556 efter dess egen stale `origin/main` `bc5d7ec7`), **smutsig**: `specs/tasks.spec.json` ändrad + 8 otrackade (`verify/bin/h-031…h-035-exit`, `python-interpreter-authority-v1-exit`, `specs/owner-production-paths.v1.json`, `verify/h034/`). Rörs inte; ägarbeslut om räddning. |
+| Sessionsmiljöns "hållna worktree" `/private/tmp/h35n.7c112658/r` | finns inte på disk (stale post i `~/.claude/settings.local.json`). |
+
+### Auditen AUD-01–AUD-12 mot dagens `main` — alla kvarstår, byteidentiskt
+Alla nio källblobbar auditen granskade är oförändrade på `eb9483e9` (`helhetsbilden.sh cbf267a7`,
+`redo-for-codex.sh c55788e4`, `matning-pa-macen.sh 96387494`, `inventera-lokalt-arbete.sh cb8eaf04`,
+`nortropic-autocommit.sh 9f9d23e9`, `.githooks/post-commit dd22e865`, `codex-autopilot-report.schema.json
+a755139d`, `harness-substitution-contract-v1.md 3997437c`, `VAGEN.md 5de48145`). Radnummer avser
+blobbarna vid `eb9483e9`; efter PR #261 (L1) flyttar `helhetsbilden.sh`:s rader +14 från rad 54, och
+`validera-underlaget.sh` rad 123–124 (`23`, `16/2/1/4`) blir AVVIKER (mätt av granskaren: 24 och 16/2/2/4)
+— AUD-03:s felklass på nästa merge. Disposition:
+
+| Fynd | Läge | Avgörande mätning | Stängs i |
+|---|---|---|---|
+| AUD-01 helhetsbilden räknar `-f` som PASS | kvarstår | rad 103/118–120 `-f`; `UPPFYLLDA=6 → KERNEL_COMPLETE` rad 124/151 | L3 |
+| AUD-02 redo ignorerar validatorns exitkod | kvarstår | `v=$?` rad 87 används aldrig; dom = antal `AVVIKER` rad 91–93 | L3 |
+| AUD-03 validera kräver att leveranser SAKNAS | kvarstår, **självblockerande** | rad 97–103 (h-014/h-015/autonomous-loop `SAKNAS`, `verify/bin`=29, h-030 ej i spec), rad 108 registret=2; FAS 1 och varje färdig leverans ger AVVIKER → redo säger INTE REDO | L3 |
+| AUD-04 grenövergång + regelnummer + färskhetsprov | kvarstår, **självblockerande** | `VAGEN.md:130` `git diff --quiet HEAD origin/main` omöjlig på grenen; regel 11/12/13 betyder olika på main och gren; grenens AGENTS.md bär `PUSH=NO/MERGE=NO` | L5 (stegplan), FAS 1 (genomförande) |
+| AUD-05 h-017 utanför de fjorton men i slutningen | kvarstår | `GRINDAR="001…016"` (helhetsbilden:82, matning:78); h-015 → h-030 (saknas i spec) → h-017 via kontraktet §6 rad 137/162/221 (§7 rad 246–254 bekräftar h-015 → h-030) | L5 |
+| AUD-06 programgrind fryses för sent | kvarstår | VÄGEN FAS 7 rad 349 vs `07-v1-acceptans.md:107` "Programdomen först … RED innan" | L5 |
+| AUD-07 rapportschemat saknar advisory/basis/minItems | kvarstår | `a755139d`: inga `advisory`/`basis`/`reopen_basis`/`minItems`; `tests: []` giltigt; `additionalProperties: false` | L5 |
+| AUD-08 autocommit klassar specs/verify/controller som §A och delar commits | kvarstår, **självblockerande** | rad 63 `specs/*\|verify/*\|controller/*`, rad 84–96 två commits; regel 6 säger motsatsen sedan `LOOP-ÄGARBESLUT-AUTONOM-KARNA` | L4 |
+| AUD-09 inventeringen dömer PA_REMOTE mot alla remotes och ger städningsfullmakt | kvarstår | `klassa()` rad 108 `git branch -r --contains`; rad 264–265 "Städning kan ske" medan `IG_TOT` inte ingår i `FARA` | L3 |
+| AUD-10 mätningen: direkt bash, `tail -40`, räkning ≠ innehåll | kvarstår (frasen "sista fyrtio" finns inte, mekanismen gör det) | rad 83 `bash "$G"`, rad 101–102, rad 146–152 | L3 |
+| AUD-11 motstridiga "enda ordningar" och fasta lägestal | kvarstår | `README.md:20/178/196`, `12-arbetsorder.md:3–7`, `10-…:7`; VÄGEN bär lägestal trots §0:58 "status står aldrig här": `8 av 14` (§1 rad 84), `28ca1af` (§3 rad 163), `48 → 24` (§4 rad 362); AGENTS.md:196 vs :233 om h-035 | L2, L5 |
+| AUD-12 rollseparation kallas både "inte säkerhetsgräns" och "ÄR integriteten" | kvarstår | AGENTS.md:124 vs :189; h-005 exit_criterion och kontraktet §6 rad 178–180 kräver OS-gräns | L2, L5 |
+
+**Nytt fynd utanför auditlistan (mätt i dag, skärpt av oberoende granskare 11:58):** `.githooks/post-commit`
+ärvs av **varje** länkad worktree i klonen (`core.hooksPath` står i `.git/config`, delad) — både kernelns
+kandidat-worktrees (`controller/workspace/cli:184` `git worktree add --detach`; `controller/utforare/cli:105`
+committar som `nortropic-utforare`) **och de fjorton grindarnas fixturer**: `verify/bin/h-007-exit:18` gör
+`git worktree add` på den riktiga klonen och committar tio gånger på grenen `h007-prov-$$`; ingen av de
+fjorton, `_lib.sh`, `matning-pa-macen.sh` eller `helhetsbilden.sh` sätter `NORTROPIC_AUTOPUSH=0` eller
+`--no-verify`. ⚠️ **Kallstartsfara:** `helhetsbilden.sh --kor-grindar` eller `bash verify/bin/h-NNN-exit`
+i en hook-aktiverad klon (`~/kernel-arbete`, `~/nortropic-kontrollklon`) publicerar fixturcommits som
+`h007-prov-<pid>`/`radda/auto-*` på origin. Ännu inte inträffat (`git ls-remote --heads origin
+'refs/heads/h0*-prov-*' 'refs/heads/radda/auto-*'` → 0). **Kör inga grindar i en hook-aktiverad klon
+förrän hook-vakten (L1c) är landad.** Stängs i L1c (hooken) och L4 (autocommiten).
+
+**Kvalificeringsförutsättning (mätt):** ingen av de fjorton slutningsgrindarna är registrerad i
+`controller/verify/register.json` (bara `check-invariants`, `nortropic-verify-suite`); `cli task
+specs/tasks.spec.json h-014` → `ogrindad`, `cli run h-001` → exit 3. Direkt `bash verify/bin/*` är
+diagnostik, aldrig kvalificering. **Förslag (L5, inget beslut ännu):** registrering är en
+kontraktsflödesändring och föreslås skrivas in i VÄGEN före Milstolpe A.
+
+### Instruktionkedjan — mätt (uppdraget §4.1)
+| Källa | Laddas av | Fakta |
+|---|---|---|
+| `CLAUDE.md` (121 rader) | Claude Code, reporot + underkataloger | ingen `@`-import; handdublett av AGENTS.md ("håll dem lika" rad 29); §A-yta (regel 6) |
+| `AGENTS.md` (308 rader) | Codex (`~/.codex/AGENTS.md` är tom, ingen override, 32 KiB-gräns räcker) | Claude Code läser den **inte**; bär historiska operating-model v1–v4-block; `PUSH=NO/MERGE=NO` gäller som direktiv bara i plattformsgrenens version (rad 113–114) — main bär tokenen som proveniens (rad 183/221/227), så ett kallt grep träffar |
+| `.claude/settings.json` (spårad) | Claude Code i reporoten | Stop/SessionEnd → `bash scripts/nortropic-autocommit.sh` (relativ sökväg) |
+| `~/.nortropic/githooks/post-commit` via `core.hooksPath` | alla verktyg, alla kloner | autopush av varje commit utom på main |
+| `.agents/skills/*/SKILL.md` (6) | Codex | Claude Code läser inte `.agents/skills` |
+| `docs/loop/raddning/PROMPT-TILL-CODEX.txt` | ingen automatiskt | 424 rader, bär status och återkallade order; dubblerar VÄGEN |
+| `~/.claude/settings.json` `autoMode.environment` | Claude Code (alla repon) | bär Nortropic-styrningstext med stale sökväg och "push/merge out of scope" — konkurrerande order; ägaråtgärd |
+| `~/.claude/CLAUDE.md`, `~/.claude/rules/` | — | finns inte |
+| Grindpinning av AGENTS/CLAUDE | main: ingen (bara sökvägslistor). Plattformsgren: `document-authority-exit`, `controller/verify/cli PLATFORM_DOCUMENTS`, autopilotens `SUBSTITUTION_BLOBS`, governance-regexar — redan brutna mot main (`regler.md:70`) | ingångsbygget (L2) görs före FAS 1:s omfrysning |
+
+Laddningen är här **inventerad**, inte beteendeprövad; beteendeprovet (markör i AGENTS.md, `claude -p`
++ `codex exec` från två startkataloger) görs i L2 och bokförs här.
+
+### GitHub — mätt (uppdraget §6)
+`gh api repos/…/rules/branches/main` → `[]`. Rulesetet "main" (id 20553421: 1 approval, inga bypass)
+har **tom ref-selektor** och träffar inga refs. Legacy-skydd: PR krävs, 0 approvals, `enforce_admins`,
+ingen force-push, inga required checks. PR #260 mergades 07:51 med 0 reviews av enda collaboratorn.
+Ingen CI på main. Öppen PR #261 (`claude/inspiring-galileo-6w1pvw` @ `f3aa4f92`, 7 commits, 0 reviews)
+är föregående Claude-sessions §6-arbete: `granska-pr.yml` (vaktsvit + skalprov på `pull_request`;
+diffgranskningsjobbet ur drift efter ägarens "Nej i nuläget" till `/install-github-app`),
+granskningssteg i AGENTS.md, `PR-TILLAGG.md`, ny vakt `check-granskningsmekanismen.mjs`. Dess text
+säger "mergas inte än — en andra granskare läser hela intervallet". Ägarval i dag: lokal
+auto-granskning (separat process) nu, appen senare; required status checks för de två CI-jobben sätts
+efter att #261 landat.
+
+### Andra utförare (rättat efter oberoende granskning 11:58)
+`/bin/ps -axo pid,etime,command`: **3** Claude Code-processer (pid 14119 VS Code-tillägget, 6 d 23 h;
+pid 90969, 5 d 17 h; pid 1459 startad ~10:30 = denna session) och **6** Codex app-server/code-mode-
+processer (uptime 50 min – 7 dygn). `lsof -d cwd`: Claude-processerna står i `/Users/elinhaggstrom`,
+Codex i `/` — ingen står i en Nortropic-klon. Om någon är mitt i en uppgift: **OVERIFIERAT**. PR #261:s
+spets orörd sedan 09:34; inga registrerade worktrees i någon klon.
+
+### Verktygstillgänglighet — mätt 11:57 med ren miljö (launcher utan sessionsvariabler)
+| Verktyg | Utfall | Bevis |
+|---|---|---|
+| `claude -p` (Claude Code 2.1.257) | fungerar nästlat från denna session när `CLAUDECODE`/`CLAUDE_CODE_*` tas bort ur miljön: `-p --max-turns 1 --output-format json` → exit 0, `"result":"OK"`, 11,5 s | scratchpad `smoke/claude1.stdout` |
+| `codex exec` 0.147.0 (`/opt/homebrew/bin/codex`) | **kan inte användas**: `The 'gpt-6-astra' model requires a newer version of Codex` (modellen står i `~/.codex/config.toml`) | `smoke/codex1.stdout` |
+| `codex exec` 0.154.0-alpha.6.2 (`/Applications/ChatGPT.app/Contents/Resources/codex`, = `CODEX_CLI_PATH` i config) | når API:et men **`You've hit your usage limit … try again at Sep 19th, 2026 8:22 PM`** | `smoke/codex2.stdout` |
+
+Konsekvens: alla Codex-led i L2 (laddningsbevis) och L6 (verktygsbyte) står **EJ KÖRT — kvota, återställs
+2026-09-19 20:22** tills dess; de Claude-led som inte beror på Codex körs. Ingen kapacitet köps och inga
+credentials delas (uppdraget §4.3). När Codex körs igen ska app-motorn användas, inte 0.147.0.
+
+### Gällande mandat (beslutsloggen, inte tolkning)
+`LOOP-ÄGARBESLUT-PUBLICERING-V2` (kedjedrivaren committar, pushar, öppnar PR, mergar inom vägen till
+`KERNEL_COMPLETE` efter identity/scope/gate/reviewer-kontroller) · `LOOP-ÄGARBESLUT-AUTONOM-KARNA`
+(`controller/**`, `specs/**`, `verify/**` ej människohand) · `LOOP-ÄGARBESLUT-SUB-SPECS` (h-027–h-030
+får skrivas, fyra villkor) · `LOOP-ÄGARBESLUT-SANDBOX-OPEN` · `LOOP-ÄGARBESLUT-REGELREVISION` ·
+`LOOP-ÄGARMANDAT-0909` · separationens ägarbeslut 2026-09-10 (beslutsloggen är webbens; kärnan får egen) ·
+uppdraget 2026-09-17 (`LOOP-ÄGARUPPDRAG-20260917`: reparera vägen och ingångarna, avför ersatta order,
+prova verktygsbyten, fortsätt bygget; ägarens krav i dag: autonomt i mål utan inblandning, auto-PR-
+granskning och push). Kvarvarande ägarstopp enligt VÄGEN §5 (plantext, inte beslutsrad): fyra. `CLAUDE.md`
+är §A (regel 6: människohand); uppdraget §4.2 ger ordern att **pröva** en tunn `CLAUDE.md` med `@AGENTS.md`
+— införs bara med laddningsbevis, HÖGRISK-märkt, med uppdraget som auktoritet. PR #261 bär dessutom två
+beslutsrader (`LOOP-ÄGARBESLUT-AUTOGRANSKNING`, `LOOP-ÄGARBESLUT-INGEN-CI-GRANSKNING`) som gäller när
+PR:en landat (L1).
+
+### Vad denna session INTE gjort
+Inga grindar körda. Ingen Codex-session genomförd (kvota, se ovan). Inget mergat. Inga ändringar av
+agenten i `~/.claude`, `~/.codex`, managed-settings (`~/.claude/settings.json` skrevs 11:01:55 av ägarens
+egna `/model`- och `/effort`-kommandon vid sessionsstart). Auditens reproducerare inte omkörda (de läser
+inte aktuell kod).
+
+### Åtkomstluckor (uppdraget §3: redovisas, antas inte konfliktfria)
+- `~/.claude/projects/**` är Read-nekad av managed policy → sessionstranskript och persisterade
+  verktygsutdata olästa.
+- `gh api /user/installations` → 403, `repos/…/installation` → 401 → installerade GitHub-appar okända
+  (inte "inga").
+- `~/.codex/sessions` ej läst utöver antal/storlek (privat).
+- Codex' faktiska instruktionsladdning obeprövad (kvota slut till 2026-09-19 20:22).
+- Om Claude Codes `InstructionsLoaded`-hook avfyras under `claude -p`: UNVERIFIERAT i dokumentationen —
+  prövas i L2 med `--debug-file` som reserv.
+
+### Nästa leveranser, i ordning, med klart-när
+| L | Leverans | Klart när |
+|---|---|---|
+| L1 | PR #261 granskad oberoende (separat read-only-subagent, hela `eb9483e9..f3aa4f92`) och mergad **först** — den rör samma ställen i drift.md/beslutslogg som L0 | `granska-pr.yml` på main; nästa PR får två checks |
+| L0 | denna post + underlaget i repot; grenen mergar in main efter L1 och löser sina egna konflikter (nyast överst); granskad av separat read-only-subagent (första granskningen gjord 11:58: FYND 1–3 åtgärdade i denna version, kvarvarande frågor prövas i andra passet) | på `origin/main` via PR |
+| L1c | hook-vakt i `.githooks/post-commit`: ingen autopush från länkade worktrees eller commits av `nortropic-utforare` (+ test) — **före varje grindkörning i en hook-aktiverad klon** | test grönt; `git ls-remote` visar inga `h0*-prov-*`/`radda/auto-*` efter en grindkörning |
+| L1b | `scripts/publicera.sh`: bevara → PR → separat granskarprocess → merge vid granskat SHA + gröna checks; required status checks satta | en leverans går igenom utan ägarfråga; negativa fall gröna |
+| L2 | en kort `AGENTS.md`, tunn `CLAUDE.md` med `@AGENTS.md`, `PROMPT-TILL-CODEX.txt` avförd, README/banners rena; laddningsbevis för båda verktygen | båda verktygen svarar med markören från två startkataloger |
+| L3 | helhetsbilden/redo/validera/inventera/matning sanningsenliga; tester mot auditens motexempel | fall gröna, mutanter döda, `helhetsbilden.sh` visar ingen KERNEL_COMPLETE |
+| L4 | autocommit enligt regel 6, en commit kod+docs, worktree-/utförarvakt i autocommit och post-commit | K-/P-/N-fall gröna |
+| L5 | VÄGEN: slutning ur specen (h-017), FAS 5 explicit, programgrind RED tidigt, FAS 1-stegplan; schema AUD-07; AUD-12-text | kall session svarar ur repot vad som återstår |
+| L6 | Claude Code → Codex → Claude Code med avbrott, per §4.4-tabellen | ett utfall per rad här (EJ KÖRT om verktyg saknas) |
+| L7 | etapprapport; sedan FAS 1 enligt korrigerad VÄG | rapport enligt uppdraget §9/§10 (tre separata omfattningsrader) i chatten och här; FAS 1 påbörjad enligt VÄGEN |
+
 ## 2026-09-17 — Tog vi bort mer än vi vet? Mätt: fyra av 38, och de 24 andra var redan borta
 
 Ägaren frågade: *"Frågan är ju om vi tog bort någon annan evidens som vi inte bara har
