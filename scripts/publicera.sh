@@ -46,8 +46,10 @@
 #       kommandosträngen: nekar (exit 2) variabeltilldelning eller `env` före ett kommando,
 #       `PATH=`/`GIT_*`/`GH_*` i strängen, absoluta sökvägar till git/gh/ssh/tolkar, `git -c`/
 #       `--config-env`/`-C` och skrivande eller nätverkande git-subkommandon, traversering
-#       med `..`, `bash -c`. Detta är den mekaniska push-spärren för Bash-verktyget; deny-
-#       reglerna och klassificeraren är lager under den.
+#       med `..`, `bash -c`. Den ser de RAKA formerna; obfuskerade former (`"git" -c`, `command git`,
+#       `git${IFS}push`, `$(echo git)`, heredoc till python3) släpps — mätt av oberoende granskning
+#       2026-09-17 — och bärs av skalet (b) för PATH-uppslagen git och av klassificerare + prompt
+#       för absolut sökväg (G4/G5). Deny-reglerna och klassificeraren är lager under vakten.
 #   (b) PATH-skal först i granskarens PATH, för kommandon som slås upp via PATH inifrån
 #       tillåtna skript: `gh` vägrar (77); `ssh` vägrar (255); `git` kör den riktiga binären
 #       med DÖD NÄTTRANSPORT (GIT_SSH_COMMAND=false, ingen terminalprompt, ingen askpass,

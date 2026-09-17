@@ -3,9 +3,8 @@
 *Filnamnet säger `10-forsta-arbetspaketet-h014.md` och är missvisande. Namnet står kvar
 för att ett tjugotal referenser pekar på det; rubriken är rättad i stället.*
 
-> ⚠️ **DETTA ÄR INTE FÖRSTA ARBETSPAKETET.** Titeln är från innan kartan mättes.
-> `h-014` är `VAGEN.md` FAS 4; vägens första bygge är `h-009`. **Läs filen som
-> ARBETSPAKET — dess spec, grindkrav och rollflöde gäller oförändrat.**
+> `h-014` är `VAGEN.md` **FAS 4**. Läs filen som **arbetspaket** — dess spec, grindkrav och
+> rollflöde gäller oförändrat; ordningen står i `VAGEN.md`.
 
 **Skrivet 2026-09-16.** `h-014` är **redan fullt specad** i `specs/tasks.spec.json` —
 till skillnad från rundtrampsvakten behöver ingenting uppfinnas. Det som saknas är

@@ -109,14 +109,16 @@ else rad "VAGEN.md finns" NEJ; fi
 # Mekanisk halva: ingen ANNAN fil får bära en egen numrerad ordningssektion.
 # Den andra halvan — att en text SÄGER något annat om vad som görs först — går
 # inte att greppa fram. Den måste läsas, och det står i VAGEN.md §0.
-P=docs/loop/raddning/PROMPT-TILL-CODEX.txt
+# Ingången är AGENTS.md (autoladdad av Codex, av Claude via CLAUDE.md); PROMPT-TILL-CODEX.txt
+# avfördes 2026-09-17 (L2) — den bar status och återkallade order.
+P=AGENTS.md
 if [ -f "$P" ]; then
   if grep -qE '^ *[0-9]+\. +(⭐ *)?BÖRJA HÄR' "$P"; then
-    rad "prompten bär ingen egen ordning" NEJ "den säger BÖRJA HÄR"
-  else rad "prompten bär ingen egen ordning" JA; fi
-  grep -q 'VAGEN.md' "$P" && rad "prompten pekar på VAGEN.md" JA \
-    || rad "prompten pekar på VAGEN.md" NEJ
-else rad "PROMPT-TILL-CODEX.txt finns" NEJ; fi
+    rad "ingången bär ingen egen ordning" NEJ "AGENTS.md säger BÖRJA HÄR"
+  else rad "ingången bär ingen egen ordning" JA; fi
+  grep -q 'VAGEN.md' "$P" && rad "ingången pekar på VAGEN.md" JA \
+    || rad "ingången pekar på VAGEN.md" NEJ
+else rad "AGENTS.md finns" NEJ; fi
 
 # ── 7. Läget är mätt, inte påstått ──────────────────────────────────────────
 if grep -q 'RAD: h-001' docs/loop/drift.md 2>/dev/null; then
@@ -128,7 +130,7 @@ echo
 echo "══════════════════════════════════════════════════════════════════════"
 printf ' %s uppfyllda · %s ej uppfyllda · %s odömbara\n' "$ja" "$nej" "$od"
 if [ "$nej" = "0" ] && [ "$od" = "0" ]; then
-  echo " ✅ REDO — starta Codex med docs/loop/raddning/PROMPT-TILL-CODEX.txt"
+  echo " ✅ REDO — starta Codex eller Claude Code i reporoten; AGENTS.md laddas automatiskt, VAGEN.md bär ordningen"
 elif [ "$nej" = "0" ]; then
   echo " ⚠️  INTE DÖMBART HÄR. Kör på Macen — ett ODÖMBART blir aldrig grönt."
 else

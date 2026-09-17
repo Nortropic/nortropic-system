@@ -173,10 +173,9 @@ Räkna med ett fjortonde fel.
 | `07-v1-acceptans.md` | Vad `Autonomy Kernel v1` betyder — fyra termer som inte är synonymer |
 | `08-mekanismer.md` | Hur arbetsreglerna kopplas till befintligt flöde så de FÄLLER |
 | `09-task-rundtrampsvakten.md` | Taskspec att frysa (h-040). Har en blockerande designfråga i §2 |
-| `10-forsta-arbetspaketet-h014.md` | Första bygget. Redan specad i repot; bara grinden saknas |
+| `10-forsta-arbetspaketet-h014.md` | Arbetspaket `h-014` = `VAGEN.md` FAS 4. Redan specad i repot; bara grinden saknas |
 | `11-tre-vakter-mot-aterfall.md` | **Mekanismerna mot återfall** — tre vakter, var och en med ett KÖRT positivt kontrollprov |
-| `12-arbetsorder.md` | **⭐ ARBETSORDERN.** EFTERARBETE.md:s elva punkter omprövade mot HEAD 2026-09-16: åtta åtgärdade, en utgår, tre kvarstår |
-| `PROMPT-TILL-CODEX.txt` | Klistras in som första meddelande till Codex |
+| `12-arbetsorder.md` | Delplan för `VAGEN.md` FAS 1 (separationens landning) + tvårotsanalysen. EFTERARBETE.md:s elva punkter omprövade mot HEAD 2026-09-16: åtta åtgärdade, en utgår, tre kvarstår |
 
 **⚠️ LÄS `SEPARATION-20260910/` FÖRE DETTA UNDERLAG — den finns INTE på `main`.**
 Den ligger på plattformsgrenen. Leta inte, hämta:
@@ -193,7 +192,7 @@ git ls-tree --name-only $B SEPARATION-20260910/ # hela katalogen
 att leta efter en katalog som inte finns i klonen.* Separationen bär sin egen
 dokumentation: `README.md` (ägarbeslut och allokeringsprinciper), `ALLOCATION.tsv`
 (443 filbeslut), `EFTERARBETE.md` (11 mätta kvarvarande bindningar med utpekad ägare) och
-proveniens per fil. **Arbetsordern ligger där, inte här.** Detta underlag är bakgrund,
+proveniens per fil. **Separationens dokumentation är FAS 1:s underlag; ordningen står i `VAGEN.md`.** Detta underlag är bakgrund,
 metod och diagnos — och det skrevs delvis utan kännedom om separationens dokumentation,
 vilket gav FYND 26: en rekommendation som upphävde ett ägarbeslut.
 

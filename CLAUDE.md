@@ -1,121 +1,119 @@
-Detta repo är Nortropics **trust kernel / bootstrap**. Leveransen är kontrollplanet:
-`controller/`, `verify/`, `specs/tasks.spec.json` och `docs/loop/`.
+# nortropic-system — arbetskontraktet (Codex läser det direkt, Claude Code via `CLAUDE.md`)
+NORTROPIC_INGANG=AGENTS.md-2026-09-17
 
-**Tre lager, inte två:**
+Detta är en **router**, inte ett regelverk. Reglerna står där de bor; här står var.
 
-- **Kärnan** — `controller/`, `verify/`, `specs/`, `docs/loop/`. Detta repos mål.
-- **Styrlagret kärnan är pinnad till** — `docs/07-konstitution.md` (§A/§B) och
-  `docs/03-regelverk.md` (invarianterna, §A1) bär webbfabrikens sakregler och nämner
-  kärnan inte alls; varje sökväg §A skyddar ligger i webbträdet. De är ändå bindande
-  här, av BEROENDE och inte av innehåll: fem respektive ett fryst exitprov i
-  `verify/bin/` läser dem, liksom `controller/verify/cli` och rollskillsen i
-  `.agents/`. `docs/05-beslutslogg.md` är genuint delad och kernel-dominerad — tio
-  frysta exitprov läser den. Alla tre ändras av människa.
-- **Webbfabrikslagret** — `agents/`, `skills/`, `packs/`, `backtests/`, `workflows/`
-  och `docs/00`, `01`, `02`, `04`, `06`. Ligger kvar i trädet efter repodelningen,
-  beskriver kundflödet och bär en orienteringsrad överst.
-- **BLANDADE kataloger** — `scripts/` och `tests/` är INTE webb, men kärnans andel är
-  mindre än den såg ut. Kärnans, enligt `PLATFORM_EXACT` i plattformsgrenens
-  `scripts/check-invariants.mjs` (PINV-003/005) — den mekanism som faktiskt dömer:
-  `check-invariants.mjs`, `nortropic-codex-autopilot.py` (allowed_write för
-  h-031/032/035), `check-verifierarregistret.mjs`, `tests/controller/**`,
-  `tests/scripts/**`. De får aldrig följa med när webbträdet flyttas.
-  **`check-provanropare.mjs`, `kor-styrprov.mjs` och `kor-vakter.mjs` är INTE kärnans**
-  (rättat 2026-09-16, FYND 31): `SEPARATION-20260910/ALLOCATION.tsv` dömer alla tre
-  `WEB / WEB_MOVE`, och ingen finns på plattformsgrenen, vars `scripts/` bär två filer.
-  Att de läser `controller/verify/register.json` gör dem inte till kernelfiler — det gör
-  dem till webbvakter som pinnar sig mot kärnans register.
+## 1. Vad repot är
+Nortropics **trust kernel / bootstrap**: `controller/`, `verify/`, `specs/tasks.spec.json`, `docs/loop/`.
+Webbfabrikslagret (`agents/`, `skills/`, `packs/`, `backtests/`, `workflows/`, `docs/0x-*`) ligger kvar i trädet
+men är inte målet. Kärnans dom är `controller/verify/cli` + taskens frysta `exit_test` under `verify/bin/`,
+körda på Macen (Darwin-bundna: fel maskin är `ODÖMBART`, aldrig `FAIL`). `node scripts/kor-vakter.mjs`
+säger exakt en sak — webbfabriken är inte söndrad — och är aldrig bevis för kernelarbete (regel 8a).
+`scripts/` och `tests/` är blandade kataloger; ägandet avgörs av `SEPARATION-20260910/ALLOCATION.tsv`.
 
-**Auktoritetsordning** — identisk med `AGENTS.md`, som Codex läser; håll dem lika:
-`docs/07-konstitution.md` → `docs/03-regelverk.md` → `docs/loop/regler.md` → aktuell
-task i `specs/tasks.spec.json` → taskens frysta `exit_test` → plan- och driftdokument i
-`docs/loop/`. Vid konflikt gäller den högre auktoriteten; återge aldrig reglerna, peka på
-källan. Konstitutionens §A utvidgas för kernelarbete av `docs/loop/byggplan-v3.md` §3.1
-(`specs/**`, `verify/**`, `controller/**`, `CLAUDE.md`).
+## 2. En hemvist per uppgift
+| Uppgift | Hemvist |
+|---|---|
+| Ordning, beroenden, klart-när | `docs/loop/raddning/VAGEN.md` — den enda filen som säger vad som görs härnäst |
+| Läge, återupptagningspunkt, körbevis | `docs/loop/drift.md` (nyast överst); räkna fram läget med `bash docs/loop/raddning/artefakter/helhetsbilden.sh` |
+| Beslut, källa, ersättning | `docs/05-beslutslogg.md` (aktuell kandidat först; kärnans egen logg kommer med FAS 1) |
+| Arbetsmetod och byggregler | `docs/loop/regler.md` (regel 6 §A, 8a bevis är ytbundet, 11 omfrysning, 12/12a bevarande, 13 rollkataloger) |
+| Metoden mot det återkommande felet | `docs/agentoverlamning.md` — pröva vad mekanismen GÖR, inte vad utdata SÄGER |
+Status skrivs aldrig här, i `CLAUDE.md` eller i `docs/loop/raddning/` — hittar du status där är det drift.
 
-De två högsta bär till större delen webbfabrikens sakregler. För kernelarbete är de
-bindande som §A-ytor du aldrig ändrar; de operativa byggreglerna står i
-`docs/loop/regler.md`.
+## 3. Auktoritetsordning
+1. `docs/07-konstitution.md` 2. `docs/03-regelverk.md` 3. `docs/loop/regler.md` 4. aktuell task i
+`specs/tasks.spec.json` 5. taskens frysta `exit_test` 6. plan- och driftdokument i `docs/loop/`.
+Vid konflikt gäller den högre. Återge inte reglerna; peka på källan. De två högsta bär webbfabrikens
+sakregler och binder kärnan av beroende (frysta prov läser dem), inte av innehåll.
 
-**Grindarna vaktar olika saker — men läs vad siffran mäter.** Av de 23
-`scripts/check-*.mjs` **refererar** 16 enbart webbträdet, 2 enbart kärnan, 1 båda
-(`check-v4-utkast.mjs`) och 4 inget träd alls. **Den fördelningen mäter vad en fil PEKAR
-PÅ, inte vad den TILLHÖR**, och de två svaren skiljer sig: `check-provanropare.mjs`
-refererar bara kärnan men är ägardömd `WEB / WEB_MOVE`. **Ägandet avgörs av separationen,
-aldrig av ett grep.** Kärnans två i sviten är `check-invariants.mjs` (på plattformsgrenen
-omskriven till plattformsinvariantgrinden PINV-001–006) och
-`check-verifierarregistret.mjs`. *Rättat 2026-09-16, FYND 31: här stod tidigare
-`check-provanropare.mjs` i stället för `check-invariants.mjs` — antalet var rätt, paret
-fel, och felet var lexikalt.*
+## 4. Repoidentitet före arbete
+Arbetsklon: `~/kernel-arbete` (ren, dagsfärsk: `git rev-list --count HEAD..origin/main` = 0). Före varje
+ändring som rör Git- eller trust-state: `git branch --show-current`, `git rev-parse HEAD`,
+`git status --short`, `git rev-parse origin/main`; kan remote inte kontrolleras: `ORIGIN_MAIN=OVERIFIERAT`.
+`NO_FORCE_SEMANTICS=YES`: aldrig `--force`, `--force-with-lease`, ledande `+`, rebase, amend, reset.
+⚠️ Kör ingen grind (`--kor-grindar`, `verify/bin/h-*-exit`) i en klon vars `~/.nortropic/githooks/post-commit`
+saknar vakten "länkad worktree" (`bash scripts/installera-hooks.sh --kor` först): grindarna committar i
+worktrees i den riktiga klonen.
 
-`node scripts/kor-vakter.mjs` säger därför **exakt en sak: webbfabriken är inte söndrad.**
-Citera den aldrig som bevis för kernelarbete. Mätt 2026-09-16: **noll** av de 23 vakterna
-läser `docs/loop/regler.md`, `docs/loop/drift.md` eller `docs/loop/raddning/**`, och
-`kor-vakter.mjs` finns inte på plattformsgrenen. Kärnans dom ligger i
-`controller/verify/cli` och taskens frysta `exit_test` under `verify/bin/`.
+## 5. Roller — workflow-separation, skyddet är mekaniskt
+En roll per tråd/agent: **test-author** fryser specrad och grind (RED före implementation), bygger inget ·
+**builder** bygger inom `allowed_write` och ändrar aldrig sin egen frysta grind · **reviewer** (granskare)
+är read-only och försöker falsifiera kandidaten · **gate-reviewer** granskar frysningen · **architect**
+(read-only) löser `OWNER_DECISION_REQUIRED` internt · **empirical-runner** (read-only) kör slutprov.
+Rollseparationen är workflow-separation, aldrig en säkerhetsgräns. Skyddet är mekaniskt: kandidatens
+identitet (exakt SHA), `allowed_write` via `controller/policy/cli`, frysta exitprov, registret med sha256-hash
+(`controller/verify/cli` kör bara verifierare som står i `controller/verify/register.json` med matchande hash),
+attestation. Ett falskt PASS är det regeln förbjuder: `SELF_CERTIFICATION_AS_PROOF=NO` — ingen roll får anföra
+sin skill eller sin egen utsaga som bevis; ett grönt exitprov rapporteras med kommando + exitkod.
+Innebörden av "den som bygger attesterar eller mergar aldrig sin egen kandidat" är hela publiceringsvillkoret.
+Codex startar rollerna som `$nortropic-<roll>` ur `.agents/skills/`; Claude Code: se `CLAUDE.md`.
 
-**Och de kräver MACEN — men inte av det skäl som är lätt att tro.** `controller/verify/cli`
-kräver Python 3.12+ och startar fint i en Linuxcontainer som har den. Det som fäller är
-**Darwin-bindningen**: grindarna faller på `undefined symbol: sysctl` (mätt på `h-013`:
-5 PASS, 11 FAIL, alla av den orsaken). Att installera Python 3.12 löser alltså ingenting.
-**Fel maskin är `ODÖMBART`, aldrig `FAIL`** — annars bokförs en miljö som ett fel i
-kandidaten, och ett ODÖMBART blir aldrig grönt av en grön webbsvit
-(`LOOP-RÄTTELSE-VAKTBEVIS`). Håll `kor-vakter` grön när du rör dokumentationen eller
-webbträdet.
+## 6. Bevarande ≠ publicering (regel 12a)
+| | Vad | Trust | Vem |
+|---|---|---|---|
+| **Bevarande** | commit + push till arbetsgrenen | ingen — en commit är inte en attestation | automatiskt, aldrig en människa |
+| **Publicering** | PR, granskning, merge till `main` | hela trustkedjan | kedjedrivaren via §7–8 |
+Bevara efter varje avslutat steg och alltid före avslut: `bash scripts/nortropic-autocommit.sh "<vad>"`
+(vägrar på main; §A-kontrollens yta enligt regel 6 hamnar i egen `[AUTOCOMMIT][HÖGRISK-OGRANSKAD]`-commit =
+bevarad, inte auktoriserad). `.githooks/post-commit` pushar (per klon: `bash scripts/installera-hooks.sh
+--kor`), aldrig från länkade worktrees eller utförarcommits, aldrig `main`. Okommitterat eller opushat
+arbete är ett fel, inte försiktighet (regel 12).
 
-**Läget** står i `docs/loop/drift.md` (nyast överst) och `docs/05-beslutslogg.md` (aktuell
-kandidat först). **Ingen annan fil i detta repo bär teknisk status** — hittar du status
-någon annanstans här är det drift; rätta den eller märk den `OVERIFIERAT`.
+## 7. Publicering — gällande befogenhet (`LOOP-ÄGARBESLUT-PUBLICERING-V2`)
+| Vem | Får publicera |
+|---|---|
+| rollagent (test-author, builder, reviewer) | **nej, aldrig** |
+| kedjedrivaren (autopiloten, eller Claude/Codex i arkitekt-/exekverarroll) | **ja, utan ny prompt per transition**, efter identity/scope/gate/reviewer-kontrollerna |
+Scope: hela vägen till `KERNEL_COMPLETE`. Oförändrat: `NO_FORCE_SEMANTICS`, normal merge-commit (aldrig
+squash/rebase-merge), frysta `exit_test` är trust authority, relock av repo/base/kandidat/PR-refs före merge,
+saknad evidens avvisar, odömbart utfall eller oväntad remote-identitet stoppar fail-closed. Fyra äkta
+ägarstopp (VÄGEN §5); allt annat är ditt. Historik: `docs/loop/arkiv/agents-operating-models-v1-v4.md`.
 
-Regeln gäller repot, och den har **en känd täckningslucka utanför det**: backupens
-kontinuitetslager (se nedan) bar 27 commits 2026-09-09→13 medan `drift.md` bar noll
-rader. Arbete utanför repot ska därför ändå ge en rad här samma dag — annars är
-lägesdokumentet falskt för den perioden, vilket det var för den veckan.
+## 8. Före varje merge — mekanismen
+`bash scripts/publicera.sh --repo ~/kernel-arbete` vid varje avslutad leverans: (1) ren arbetskopia och HEAD
+på origin, (2) PR mot `main`, (3) granskning av **hela** intervallet `main..HEAD` i en **separat process**
+(`claude -p` med `.agents/skills/nortropic-reviewer/SKILL.md` + `PR-TILLAGG.md`; aldrig samma tråd som byggde)
+med dom `DOM: TILLSTYRKS @<sha>` / `DOM: FYND @<sha> — blockerande: …` postad som PR-review-kommentar,
+(4) FYND → åtgärda på samma gren, granska om, (5) merge **endast** om domen bär exakt PR-spetsen och
+CI-checkarna `vaktsviten (webbfabriken)` + `skalprov under tests/scripts` (required på `main`) är gröna —
+en commit efter domen ogiltigförklarar den. Diffgranskningen körs inte i CI (ägarbeslut 2026-09-17, "Nej i
+nuläget" till `/install-github-app`; återstartblock i `granska-pr.yml`); granskningsjobbet blir aldrig
+required. Bevarande (`radda/*`, autocommit, autopush) granskas aldrig — det publicerar inget.
+Integrationstakt: en leverans = en PR; högst en öppen PR utöver den som granskas; framdrift räknas i
+mergade leveranser, inte commits.
 
-**Vägen till klar kärna** står i **`docs/loop/raddning/VAGEN.md`** — den **enda** filen i
-repot som säger vad som görs härnäst. Slutkriteriets sex mätbara rader, körbanan, faserna,
-autonomikontraktet och de sex fällorna. Läser du en ordning någon annanstans är den
-upphävd; `03`, `10` och `12` bär en banner som säger det. Katalogen bär i övrigt **analys
-och plan, aldrig status** — status är drift.md.
+## 9. Evidens
+Regel 22 (teknisk ändring och dess dokumentation i samma commit): kernelarbete bokförs i `docs/loop/drift.md` + `docs/05-beslutslogg.md`; rör ändringen webbfabrikslagret gäller `docs/00-borja-har.md`.
+Slutrapport enligt `docs/loop/codex-evidence-contract.md`: varje påstående med kommando + exitkod ur samma
+session; overifierat märks `OVERIFIERAT`; ett prov bevisar bara det provet läser (regel 8a). Teknisk
+ändring och dess drift-/beslutsrad i samma commit (regel 22).
 
-**Läget läser du aldrig, du räknar fram det:**
+## 10. Frysta ägarkontrakt (pekare — ändras aldrig utan kontraktsmigration)
+`docs/loop/harness-substitution-contract-v1.md` (provider-neutral kernel; blob-pinnad av autopiloten; bär
+`PRODUCT=NORTROPIC_AUTONOMOUS_WEBSITE_FACTORY` fryst — namnger nedströmskonsumenten, aldrig detta repos
+leverans) · `docs/loop/codex-autopilot-v2.md` · `docs/loop/codex-autopilot-v3-full-roadmap.md` ·
+`docs/loop/remaining-bootstrap-delegation-v1.md` (grindpinnad; dess scope h-031/h-032/h-035 — läget står i
+drift, inte här). Backupen: `Nortropic/nortropic-backups` — backuparbete ger en rad i drift samma dag.
 
-```bash
-bash docs/loop/raddning/artefakter/helhetsbilden.sh          # 2 sek
-bash docs/loop/raddning/artefakter/helhetsbilden.sh --kor-grindar   # + de 14, Darwin
-```
+## 11. Verktygsspecifikt — Codex
+Starta `codex` i `~/kernel-arbete`; `AGENTS.md` laddas automatiskt, ingen prompt klistras in. Roller:
+`$nortropic-<roll>`. Icke-interaktivt: `codex exec -C ~/kernel-arbete -s read-only …` (motorn i
+`CODEX_CLI_PATH`). Ingen Stop-hook finns för Codex: kör `scripts/nortropic-autocommit.sh` själv före avslut.
 
-Rätt maskin, rätt klon, dagsfärsk, vilka av de sex raderna som är uppfyllda, vad
-plattformsgrenen bär som `main` saknar. Provet påstår aldrig ett grindutfall det inte
-kört — utan `--kor-grindar` står det *"kräver körning"*, på fel plattform `ODÖMBART`.
-**Skälet att det är ett prov och inte ett stycke text:** katalogen är tjugo filer och
-~4 000 rader som beskriver helheten på fem överlappande sätt, och ingen av dem visar
-läget. Ett dokument om ett tillstånd är inaktuellt dagen efter.
+## 12. Claude Code — anropsdetaljer (`CLAUDE.md` är byteidentisk med denna fil; `check-docs-coherence.mjs` kräver det)
+- Projektets Stop/SessionEnd-hookar (autocommit) laddas **bara när sessionen startar i reporoten** (mätt 2026-09-17): startar du i en underkatalog sker ingen autocommit — bevara för hand (regel 12).
 
-Underlaget är evidens, inte facit: tretton felaktiga påståenden hittades under arbetet,
-**nio av dem i underlaget självt**, och elva av tretton kom av en lexikal metod som aldrig
-prövades mot beteendet. Kör därför
-`bash docs/loop/raddning/artefakter/validera-underlaget.sh` innan du lutar ett beslut mot
-ett tal där. Den prövar 37 påståenden mot repot; `exit 0/1/2` = stämmer / underlaget bär
-ett fel / kunde inte mätas. **Grönt betyder att talen är oförändrade, aldrig att de är
-sanna** — den oberoende omhärledningen i `raddning/06-inventering.md` §0 står kvar.
-
-**Backupen** ligger i `Nortropic/nortropic-backups` (repo-ID 1367371291). Den är inte en
-kopia av detta repo: git bär katalog, checksummor och återställningskvitton, medan
-arkiven ligger som **Release assets och följer inte med en vanlig klon**. Rutinen står i
-dess `BACKUP-RUNBOOK.md`. Där finns även ett kontinuitetslager (checkpoints,
-Codex→Claude-handoffs, disk-journal) som inte har någon motsvarighet här. **Sker
-backuparbete ska en rad om det stå i `docs/loop/drift.md` samma dag** — annars uppstår
-en vecka utan spår, vilket hände 2026-09-09→13 (27 commits där, 0 rader här).
-
-**Rollseparation** (test-author / builder / reviewer), evidenskrav och push/merge-befogenhet
-står i `AGENTS.md`. De rollerna är workflow-separation, aldrig en mekanisk säkerhetsgräns.
-
-**Arbetssättet och det återkommande felet** — att pröva vad utdata SÄGER i stället för vad
-mekanismen GÖR — står i `docs/agentoverlamning.md`. Läs det före första vaktändringen.
-
-**Regel 22:** teknisk ändring och dess dokumentation i samma commit. Hemvisten för
-kernelarbete är `docs/loop/drift.md` + `docs/05-beslutslogg.md`; rör ändringen
-webbfabrikslagret gäller `docs/00-borja-har.md`. Doctor #12(e) är en MODE i
-`agents/nortropic-steward.md` — webbfabrikens stewardrevision — och WARN:ar om lagren
-driftar isär; den fäller ingenting och är ingen kernelgrind.
+- Starta i reporoten `~/kernel-arbete`. `.claude/settings.json` (spårad) kör
+  `scripts/nortropic-autocommit.sh` på `Stop` och `SessionEnd` via `$CLAUDE_PROJECT_DIR`. Kontrollera
+  laddningen med `/context` (Memory files: `CLAUDE.md` + `AGENTS.md`).
+- Rollskillsen i `.agents/skills/` är Codex-format och laddas inte av Claude Code. Samma roll här: läs
+  `.agents/skills/nortropic-<roll>/SKILL.md` som instruktion i en **separat agent** (subagent med egen kontext)
+  och blanda aldrig roller i tråden. Granskarrollen (AGENTS.md §8) körs av `scripts/publicera.sh` som
+  `claude -p` i ren miljö; för hand: separat read-only-subagent + `PR-TILLAGG.md`, aldrig författaren.
+- Kärnans grindar döms via `controller/verify/cli` på Macen; en Linuxcontainer eller CI är `ODÖMBART`,
+  aldrig `FAIL`. Direkt `bash verify/bin/…` är diagnostik, aldrig kvalificering.
+- Sandboxen är öppnad (`LOOP-ÄGARBESLUT-SANDBOX-OPEN`); §A-skyddet (regel 6) är regel + autocommitens
+  HÖGRISK-delning, inte OS:et. `sudo`, `git push --force` och `chmod` är nekade av policy.
+- Metoden — pröva vad mekanismen GÖR, inte vad utdata SÄGER — står i `docs/agentoverlamning.md`.
+  Läs den före första ändringen av en vakt.
