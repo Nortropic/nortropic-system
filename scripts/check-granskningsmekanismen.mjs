@@ -105,6 +105,16 @@ function dom(text) {
   // kod. En secret i ett sådant jobb — även som env-mappning till steget — är ett fynd
   // (ägarkrav 2026-09-17: kör inte obetrodd kandidatkod med produktionshemligheter).
   // Slås granskningsjobbet på igen läggs dess namn till TILLATNA_SECRET_JOBB i samma commit.
+  // Token-minimum. Jobben kör kandidatkod; en token med skrivrätt hade låtit kandidaten
+  // skriva sin egen dom. Andra granskningen av PR #261 (A2): åtgärden var rätt men ovaktad —
+  // permissions-blocket kunde tas bort eller få `write` utan att något föll.
+  const permBlock = kod.match(/^permissions:\n((?:[ \t]+.*\n|\n)*)/m)
+  if (!permBlock) rad('inget permissions:-block på toppnivå i kod — standardtoken kan ha skrivrätt')
+  else {
+    const rader = permBlock[1].split('\n').map((l) => l.trim()).filter(Boolean)
+    if (rader.length !== 1 || rader[0] !== 'contents: read') rad(`permissions: måste vara exakt \`contents: read\` — fann: ${rader.join(' | ') || '(tomt)'}`)
+  }
+  if (/^\s{4}permissions:/m.test(kod)) rad('ett jobb bär egen permissions: — en token med skrivrätt i ett jobb som kör kandidatkod')
   const TILLATNA_SECRET_JOBB = ['granskning']
   kod.split('\n').forEach((l, i) => {
     if (/secrets\./.test(l) && !TILLATNA_SECRET_JOBB.includes(jobbPerRad[i] || '')) {
@@ -164,6 +174,8 @@ const GILTIG = `name: granska-pr
 on:
   pull_request:
     types: [opened]
+permissions:
+  contents: read
 concurrency:
   group: g
   cancel-in-progress: false
@@ -218,6 +230,12 @@ const KONTROLL = [
   ['push: efter en KOMMENTARSRAD i on-blocket FLAGGAS',
     GILTIG.replace('  pull_request:\n', '  # kommentar\n  push:\n  pull_request:\n'),
     (f) => f.some((x) => x.includes('bevarande'))],
+  ['borttaget permissions-block FLAGGAS', GILTIG.replace('permissions:\n  contents: read\n', ''),
+    (f) => f.some((x) => x.includes('permissions'))],
+  ['permissions med skrivrätt FLAGGAS', GILTIG.replace('  contents: read\n', '  contents: read\n  pull-requests: write\n'),
+    (f) => f.some((x) => x.includes('exakt'))],
+  ['egen permissions: i ett jobb FLAGGAS', GILTIG.replace('  vakter:\n    steps:', '  vakter:\n    permissions:\n      contents: write\n    steps:'),
+    (f) => f.some((x) => x.includes('egen permissions'))],
   ['secret som env till ett levande jobb FLAGGAS',
     GILTIG.replace('      - run: las .agents/skills/nortropic-reviewer/SKILL.md',
       '      - env:\n          NYCKEL: \${{ secrets.ANTHROPIC_API_KEY }}\n        run: las .agents/skills/nortropic-reviewer/SKILL.md'),
