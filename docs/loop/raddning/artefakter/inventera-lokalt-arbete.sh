@@ -30,6 +30,47 @@ echo "repo:   $ROT"
 echo "datum:  $(date '+%Y-%m-%d %H:%M:%S %Z')"
 echo
 
+# Är ett smutsigt worktrees NUVARANDE innehåll redan säkrat på origin?
+# Tillagt 2026-09-16 efter att provet larmat "STÄDA INGENTING" om 31 worktrees
+# vars innehåll radda-okommitterat.sh just hade pushat. En vakt som skriker varg
+# blir ignorerad, och en ignorerad vakt är värre än ingen
+# (11-tre-vakter-mot-aterfall.md).
+#
+# PROVET ÄR INNEHÅLL, INTE NAMN — och det blev det först 2026-09-17.
+# Fram till dess läste det refs/remotes/origin/radda/smuts-<basnamn>, alltså en
+# NAMNKONVENTION förklädd till mekanism. Fyra grindfixturer räddades till
+# radda/fixtur-<hela sökvägen>; innehållet låg på origin, och provet rapporterade
+# ändå "4 med osäkrat okommitterat". Bevarandet var korrekt, namnet var det inte.
+# En vakt som kräver att räddaren gissar rätt grennamn vaktar namnet, inte
+# innehållet.
+#
+# Nu byggs trädmängden EN gång ur ALLA radda/*-grenar, och jämförelsen sker mot
+# mängden. Grennamnet är därmed fritt.
+RADDA_TRAD=""
+bygg_raddatrad() {
+  local c t
+  while IFS= read -r c; do
+    t="$(git rev-parse -q --verify "$c^{tree}" 2>/dev/null)" || continue
+    RADDA_TRAD="$RADDA_TRAD $t"
+  done < <(git for-each-ref --format='%(objectname)' 'refs/remotes/origin/radda/*' 2>/dev/null)
+}
+
+# core.fsmonitor=false: en grindfixtur kan sätta core.fsmonitor till en sökväg som
+# AVSIKTLIGT inte finns (/never/invoked/method-helper) för att bevisa att den
+# aldrig anropas. Utan flaggan dör varje indexoperation i den katalogen.
+smuts_sakrad() {
+  local wt="$1" tmpidx tree
+  [ -z "$RADDA_TRAD" ] && return 1
+  tmpidx="$(mktemp)"; rm -f "$tmpidx"
+  GIT_INDEX_FILE="$tmpidx" git -C "$wt" -c core.fsmonitor=false read-tree HEAD >/dev/null 2>&1 \
+    && GIT_INDEX_FILE="$tmpidx" git -C "$wt" -c core.fsmonitor=false add -A >/dev/null 2>&1 \
+    && tree="$(GIT_INDEX_FILE="$tmpidx" git -C "$wt" -c core.fsmonitor=false write-tree 2>/dev/null)"
+  rm -f "$tmpidx"
+  [ -z "${tree:-}" ] && return 1
+  case " $RADDA_TRAD " in *" $tree "*) return 0;; esac
+  return 1
+}
+
 # ── Färskhetskontroll: en stale origin/main ger falska larm ─────────────────
 # Provet HÄMTAR SJÄLVT. Tidigare stod här en uppmaning till läsaren att fetcha
 # först — prosa, inte mekanism. 2026-09-16 föll provet på exakt det: tre
@@ -53,6 +94,8 @@ if ! git rev-parse --verify -q origin/main >/dev/null; then
   echo "ODÖMBART: origin/main saknas."; exit 2
 fi
 echo "origin/main: $(git log --oneline -1 origin/main)"
+bygg_raddatrad
+echo "radda-grenar att jämföra mot: $(echo $RADDA_TRAD | wc -w | tr -d ' ')"
 echo
 
 # ── Klassificera ett commit-SHA ─────────────────────────────────────────────
@@ -71,31 +114,6 @@ klassa() {
 n_main=0; n_remote=0; n_foraldralos=0; n_smutsig=0; n_smuts_sakrad=0; n_tot=0
 IG_TOT=0; IG_TRAD=0
 FARLIGA=""
-
-# Är ett smutsigt worktrees NUVARANDE innehåll redan säkrat på origin?
-# Tillagt 2026-09-16 efter att provet larmat "STÄDA INGENTING" om 31 worktrees
-# vars innehåll radda-okommitterat.sh just hade pushat. En vakt som skriker varg
-# blir ignorerad, och en ignorerad vakt är värre än ingen
-# (11-tre-vakter-mot-aterfall.md).
-#
-# Provet är INNEHÅLL, inte namn: bygg worktreets träd i ett tempindex och jämför
-# med trädet i radda/smuts-<namn>. Lika träd = innehållet finns på origin.
-# Har worktreet ändrats sedan räddningen skiljer sig träden, och larmet står kvar
-# — vilket är rätt, för då finns nytt arbete som inte är säkrat.
-smuts_sakrad() {
-  local wt="$1" namn ref tmpidx tree fjarrtree
-  namn="$(basename "$wt" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
-  ref="refs/remotes/origin/radda/smuts-$namn"
-  git rev-parse --verify -q "$ref" >/dev/null 2>&1 || return 1
-  tmpidx="$(mktemp)"; rm -f "$tmpidx"
-  GIT_INDEX_FILE="$tmpidx" git -C "$wt" read-tree HEAD >/dev/null 2>&1 \
-    && GIT_INDEX_FILE="$tmpidx" git -C "$wt" add -A >/dev/null 2>&1 \
-    && tree="$(GIT_INDEX_FILE="$tmpidx" git -C "$wt" write-tree 2>/dev/null)"
-  rm -f "$tmpidx"
-  [ -z "${tree:-}" ] && return 1
-  fjarrtree="$(git rev-parse "$ref^{tree}" 2>/dev/null)"
-  [ "$tree" = "$fjarrtree" ]
-}
 
 echo "=== WORKTREES ==="
 printf "%-12s %-10s %-9s %s\n" LÄGE HEAD SMUTS KATALOG

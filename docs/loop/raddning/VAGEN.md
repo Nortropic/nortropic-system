@@ -135,6 +135,27 @@ git status --porcelain | wc -l                   # ska vara 0
 *En grindkörning på ett stale eller smutsigt träd producerar tal som ser ut som evidens.
 Det är den dyraste sortens fel i detta projekt.*
 
+### Två fällor till, mätta natten 2026-09-17
+
+**Kommandon skrivs för zsh, och prövas i zsh.** Macen kör zsh; en Linuxcontainer kör
+bash. Tre skillnader fällde tre körningar i rad:
+
+| Idiom | bash | zsh |
+|---|---|---|
+| `G="git -C d"; $G status` | ordelas → fungerar | **ordelas inte** → `command not found` |
+| `"$c:refs/heads/x"` | literal | **`:r` är en modifierare** → refspecen blir `<sha>efs/heads/x` |
+
+Skriv `git` explicit eller använd en funktion, och sätt alltid klammer runt en variabel
+följd av kolon: `"${c}:refs/heads/${namn}"`.
+
+**En grindfixtur kan vara riggad att vägra.** `h-039`:s fixturer sätter
+`core.fsmonitor=/never/invoked/method-helper` — en sökväg som avsiktligt inte finns,
+eftersom testet går ut på att bevisa att hjälparen aldrig anropas. Varje indexoperation i
+en sådan katalog dör. Räddning kräver `-c core.fsmonitor=false`.
+
+Det är en egen kategori: **riggad fixtur**. En generisk mekanism som antar att `git add`
+fungerar faller på den, och det är inte mekanismens fel — det är att kategorin finns.
+
 ---
 
 ## §3. Läget, mätt — inte påstått
